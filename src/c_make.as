@@ -35,6 +35,8 @@ export OSTYPE
 MACHINETYPE = $(shell echo `uname -m`)
 export MACHINETYPE
 
+include $(LOCAL_WORK)/src/site_name.as
+
 # AS Project Standards
 include $(LOCAL_WORK)/src/c_make.gen
 
@@ -95,10 +97,11 @@ ifeq ($(OSTYPE), FreeBSD)
   CC               = gcc
   CXX              = g++
   CFLAGS_OPT       = -g 
-  CFLAGS          += -O3 -DNEEDXDRUHYPER -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 
+  CFLAGS          += -O3 -DNEEDXDRUHYPER -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads 
   CXXDEFS          = -D__cplusplus
   INC_IMPORT_DIRS += /usr/local/include /usr/X11R6/include
   USRLIB          += /usr/local/lib /usr/X11R6/lib
+  LDFLAGS         += -llthread -llgcc_r
 endif
 
 ifeq ($(OSTYPE), Darwin)
@@ -243,15 +246,12 @@ OBJ_SEARCH_PATH = $(LOCAL_OBJ)
 
 ## Load if we are using SOAP or CURL as our UID transport
 ## This has to be external to this file so that AS_UID/Makefile will work
+#include $(LOCAL_WORK)/src/AS_UID/uid_transport.as
 
-include $(LOCAL_WORK)/src/AS_UID/uid_transport.as
-
-ifeq ($(UID_SERVER), TIGR)
+ifeq ($(USE_SOAP_UID), 1)
   CFLAGS   += -DUSE_SOAP_UID
   CXXFLAGS += -DUSE_SOAP_UID
-endif
-
-ifeq ($(UID_SERVER), JCVI)
+else
   LDFLAGS += -lcurl
 endif
 
