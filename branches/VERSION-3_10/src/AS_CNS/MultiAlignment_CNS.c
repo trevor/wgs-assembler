@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.29 2005-08-27 13:37:19 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.29.2.1 2005-10-07 20:49:26 catmandew Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -1009,7 +1009,7 @@ int32 AppendFragToLocalStore(FragType type, int32 iid, int complement,int32 cont
             GetNumIntMultiPoss(uma->f_list)+GetNumIntUnitigPoss(uma->u_list);
       //      if(ALIGNMENT_CONTEXT!=AS_MERGE)
       if(1){
-	fprintf(stderr,"Merge context --> ungapped positions\n");
+	// fprintf(stderr,"Merge context --> ungapped positions\n");
 	fragment.components = 
 	  SetUngappedFragmentPositions(type,fragment.n_components,uma);
       } else {
