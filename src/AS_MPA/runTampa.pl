@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl
-# $Id: runTampa.pl,v 1.1.2.2 2005-09-22 21:26:43 catmandew Exp $
+# $Id: runTampa.pl,v 1.1.2.3 2005-10-07 20:52:21 catmandew Exp $
 #
 # Wrapper to run and post-process results from TAMPA
 # (Tool for Analyzing Mate Pairs in Assemblies)
@@ -75,7 +75,7 @@ my %PARAMETERS = ("assemblyPrefix" => "",
                   "ataOutput" => 0,
                   "rawOutput" => 0,);
 
-my $MY_VERSION = " Version 1.01 (Build " . (qw/$Revision: 1.1.2.2 $/ )[1]. ")";
+my $MY_VERSION = " Version 1.01 (Build " . (qw/$Revision: 1.1.2.3 $/ )[1]. ")";
 my $MY_APPLICATION = "TAMPA";
 
 my $REFERENCE = qq~
@@ -364,7 +364,7 @@ if(!$PARAMETERS{"dontDoIntra"})
     if($PARAMETERS{"verboseLevel"} > 1);
   
   # create csv file for sequence-by-sequence summary
-  my $sfn = $PARAMETERS{"assemblyPrefix"} . ".intra.spreadsheet.txt";
+  my $sfn = $PARAMETERS{"assemblyPrefix"} . ".intra.summary.tampa";
   my $sfh = new FileHandle $sfn, "w" or
       die "Failed to open $sfn for writing";
 
@@ -498,7 +498,7 @@ if(!$PARAMETERS{"dontDoInter"})
     if($PARAMETERS{"verboseLevel"} > 1);
 
   # create csv file for sequence-by-sequence summary
-  my $sfn = $PARAMETERS{"assemblyPrefix"} . ".inter.spreadsheet.txt";
+  my $sfn = $PARAMETERS{"assemblyPrefix"} . ".inter.summary.tampa";
   my $sfh = new FileHandle $sfn, "w" or
       die "Failed to open $sfn for writing";
 
