@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: Trapezoid.h,v 1.5 2005-07-13 14:47:55 brianwalenz Exp $ */
+/* $Id: Trapezoid.h,v 1.5.2.1 2005-10-14 19:23:58 catmandew Exp $ */
 #ifndef TILTEDTRAPEZOID_H
 #define TILTEDTRAPEZOID_H
 

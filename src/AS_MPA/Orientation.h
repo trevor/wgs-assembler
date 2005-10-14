@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: Orientation.h,v 1.4.2.1 2005-09-21 20:09:13 catmandew Exp $ */
+/* $Id: Orientation.h,v 1.4.2.2 2005-10-14 19:23:58 catmandew Exp $ */
 #ifndef ORIENTATION_H
 #define ORIENTATION_H
 
