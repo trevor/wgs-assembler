@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: CIScaffoldT_Merge_CGW.c,v 1.6 2005-08-25 20:36:41 brianwalenz Exp $";
+static char CM_ID[] = "$Id: CIScaffoldT_Merge_CGW.c,v 1.6.2.1 2005-10-14 20:36:43 catmandew Exp $";
 
 #undef ORIG_MERGE_EDGE_INVERT
 #define MINSATISFIED_CUTOFF 0.985
@@ -4370,26 +4370,27 @@ void ExamineUsableSEdges(VA_TYPE(PtrT) *sEdges,
     
     // temp code starts here --------------------------------------------
     {
-      int32 edgeWeightCount[128];
+#define MAX_NUM_WEIGHTS_FOR_COUNTING 1024
+      int32 edgeWeightCount[MAX_NUM_WEIGHTS_FOR_COUNTING];
       fprintf( GlobalData->stderrc,"GetNumPtrTs( sEdges ) = %d\n",
                (int) GetNumPtrTs( sEdges ));
-      
+       
       fprintf( GlobalData->stderrc, "maxEdgeWeight = %d\n", maxWeightEdge);
-      
-      for ( i = 0; i < 128; i++)
+  
+      for ( i = 0; i < MAX_NUM_WEIGHTS_FOR_COUNTING; i++)
         edgeWeightCount[i] = 0;
-      assert(maxWeightEdge < 128);
       
       for ( i = 0; i < GetNumPtrTs( sEdges ); i++)
-      {
-        edgeWeightCount[ sEdge[i]->edgesContributing ]++;
-      }
-
-      for ( i = 0; i <= maxWeightEdge; i++)
+        if(sEdge[i]->edgesContributing < MAX_NUM_WEIGHTS_FOR_COUNTING)
+          edgeWeightCount[ sEdge[i]->edgesContributing ]++; 
+ 
+      if(maxWeightEdge < MAX_NUM_WEIGHTS_FOR_COUNTING)
+        fprintf(GlobalData->stderrc,"maxWeightEdge = %5d but only counting to %5d\n", maxWeightEdge, MAX_NUM_WEIGHTS_FOR_COUNTING);
+      for ( i = 0; i <= min(MAX_NUM_WEIGHTS_FOR_COUNTING, maxWeightEdge); i++)
       {
         if ( edgeWeightCount[i] > 0 )
-          fprintf( GlobalData->stderrc,"edgeWeightCount[ %3d ] = %3d\n", i, edgeWeightCount[i]);
-      }
+          fprintf( GlobalData->stderrc,"edgeWeightCount[ %5d ] = %5d\n", i, edgeWeightCount[i]);
+      } 
     }
     // temp code ends here ----------------------------------------
   }
