@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl
-# $Id: asm2TampaResults.pl,v 1.1.2.3 2005-10-07 20:52:21 catmandew Exp $
+# $Id: asm2TampaResults.pl,v 1.1.2.4 2005-10-14 17:47:20 catmandew Exp $
 #
 # Wrapper to run and post-process results from TAMPA
 # (Tool for Analyzing Mate Pairs in Assemblies)
@@ -15,7 +15,7 @@ use Carp;
 use FileHandle;
 use Getopt::Long;
 
-my $MY_VERSION = " Version 1.01 (Build " . (qw/$Revision: 1.1.2.3 $/ )[1]. ")";
+my $MY_VERSION = " Version 1.01 (Build " . (qw/$Revision: 1.1.2.4 $/ )[1]. ")";
 
 my $HELPTEXT = qq~
 Produce TAMPA results from an assembly
@@ -90,7 +90,7 @@ system($command) == 0
 
 # run TAMPA
 my $libFilename = $assemblyPrefix . "Libs.txt";
-$command = $binariesPath . "runTampa.pl " .
+$command = $binariesPath . "runTampa " .
   "-a $assemblyPrefix " .
   "-l $libFilename";
 $command .= " -b $binariesPath" if($binariesPath);
@@ -98,16 +98,10 @@ print "Running $command\n";
 system($command) == 0
   or die "\nFailed to run command\n$command\n\n";
 
-# copy spreadsheet files
+# copy files
 # intra
-my $spreadsheetFilename = $assemblyPrefix . ".intra.summary.tampa";
-$command = "cp $spreadsheetFilename ..";
-print "Running $command\n";
-system($command) == 0
-  or die "\nFailed to run command\n$command\n\n";
-# inter
-$spreadsheetFilename = $assemblyPrefix . ".inter.summary.tampa";
-$command = "cp $spreadsheetFilename ..";
+my $filenames = $assemblyPrefix . ".int*.tampa";
+$command = "cp $filenames ..";
 print "Running $command\n";
 system($command) == 0
   or die "\nFailed to run command\n$command\n\n";
