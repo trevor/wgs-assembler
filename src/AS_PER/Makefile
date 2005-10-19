@@ -34,8 +34,7 @@ AS_PER_TEST_SOURCES = testFragStore.c dumpFragStore.c testLoad.c \
 	FragStoreStats.c binaryDumpFragStore.c loadBinaryDump.c \
 	AS_PER_fragDB.c dumpFragDB.c PopulateFragStore.c \
 	partitionFragStore.c dumpFrag.c dumpFragFromPartition.c\
-	testFrgStoreSizes.c test_include.c resetFrgStoreToCNSClr.c \
-        dumpFragClearLens.c
+	testFrgStoreSizes.c test_include.c resetFrgStoreToCNSClr.c
 
 #stressFragStore.c 
 
@@ -52,13 +51,17 @@ LIBRARIES = libAS_PER.a
 PROGS = testFragStore dumpFragStore testLoad FragStoreStats \
 	dumpFragDB PopulateFragStore partitionFragStore \
 	dumpFrag dumpFragFromPartition testFrgStoreSizes \
-	resetFrgStoreToCNSClr         dumpFragClearLens
-
+	resetFrgStoreToCNSClr
 #binaryDumpFragStore loadBinaryDump 
 #stressFragStore 
 
 INC_IMPORT_DIRS = \
 	$(ORACLE_HOME)/rdbms/demo $(ORACLE_HOME)/network/public
+
+LIB_IMPORT_DIRS += /usr/local/lib \
+	/usr/lib \
+	/usr/shlib \
+	$(ORACLE_HOME)/lib 
 
 #LLIBCLNTSH = /home/flanigmj/sandbox/oracle/lib/libclntsh.so.8.0
 OCISHAREDLIBS=$(LLIBCLNTSH)
@@ -74,8 +77,7 @@ include $(LOCAL_WORK)/src/c_make.as
 #CDEFS += -DFRAGSTORE_VERSION=2    # added branch-point info (1999)
 #CDEFS += -DFRAGSTORE_VERSION=3    # added screen match info (1999)
 #CDEFS += -DFRAGSTORE_VERSION=4    # added indexed store features (2000)
-#CDEFS += -DFRAGSTORE_VERSION=5    # added multiple clear ranges (Oct 2001)
-CDEFS += -DFRAGSTORE_VERSION=6     # remove time_t and old cruft 2005/7/19
+CDEFS += -DFRAGSTORE_VERSION=5    # added multiple clear ranges (Oct 2001)
 
 all: $(OBJECTS) $(LIBRARIES) $(PROGS) 
 
@@ -98,8 +100,6 @@ dumpFragDB: $(AS_PER_OBJS) AS_PER_fragDB.o dumpFragDB.o \
 	libAS_UTL.a $(OCISHAREDLIBS) 
 
 dumpFragStore: $(AS_PER_OBJS)  dumpFragStore.o libAS_UTL.a 
-
-dumpFragClearLens: $(AS_PER_OBJS) dumpFragClearLens.o libAS_UTL.a
 
 dumpFrag: $(AS_PER_OBJS)  dumpFrag.o libAS_UTL.a 
 

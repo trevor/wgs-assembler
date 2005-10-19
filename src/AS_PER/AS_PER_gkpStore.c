@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: AS_PER_gkpStore.c,v 1.5 2005-08-12 20:48:51 ahalpern Exp $";
+static char CM_ID[] = "$Id: AS_PER_gkpStore.c,v 1.4 2005-03-22 19:49:20 jason_miller Exp $";
 
 /*************************************************************************
  Module:  AS_PER_gkpfrgStore
@@ -38,8 +38,8 @@ static char CM_ID[] = "$Id: AS_PER_gkpStore.c,v 1.5 2005-08-12 20:48:51 ahalpern
  *************************************************************************/
 
 /* RCS Info
- * $Id: AS_PER_gkpStore.c,v 1.5 2005-08-12 20:48:51 ahalpern Exp $
- * $Revision: 1.5 $
+ * $Id: AS_PER_gkpStore.c,v 1.4 2005-03-22 19:49:20 jason_miller Exp $
+ * $Revision: 1.4 $
  *
  */
 #include <assert.h>
@@ -369,7 +369,7 @@ void InitGateKeeperStore(GateKeeperStore *gkpStore, char *path){
   gkpStore->welStore = (GateKeeperWellStore)0;
 }
 
-int TestOpenGateKeeperStoreCommon(GateKeeperStore *gkpStore,const char *mode){
+int TestOpenGateKeeperStore(GateKeeperStore *gkpStore){
   char name[FILENAME_MAX];
   int exists = 0;
 
@@ -389,74 +389,74 @@ int TestOpenGateKeeperStoreCommon(GateKeeperStore *gkpStore,const char *mode){
       exists = -1;
       closedir (dbDir);
       sprintf(name,"%s/gkp.bat", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.frg", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.lnk", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.loc", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.s_loc", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.seq", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.btg", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.dst", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.s_dst", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.scn", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
 	fclose(fp);
       }
       sprintf(name,"%s/gkp.rpt", gkpStore->storePath);
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
 
       if(fp){
 	fileCount++;
@@ -466,14 +466,14 @@ int TestOpenGateKeeperStoreCommon(GateKeeperStore *gkpStore,const char *mode){
       // old but upgradable files
       sprintf(name,"%s/gkp.sqp", gkpStore->storePath);
         
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
       if(fp){
         fileCount++;
         fclose(fp);
       }
       sprintf(name,"%s/gkp.wel", gkpStore->storePath);
       
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
       if(fp){
         fileCount++;
         fclose(fp);
@@ -482,28 +482,28 @@ int TestOpenGateKeeperStoreCommon(GateKeeperStore *gkpStore,const char *mode){
       // Upgrade files
       {
         sprintf(name,"%s/gkp.aux", gkpStore->storePath);
-        fp = fopen(name,mode);
+        fp = fopen(name,"r+");
         if(fp){
           upgrade_count++;
           fclose(fp);
         }
         
         sprintf(name,"%s/gkp.don", gkpStore->storePath);
-        fp = fopen(name,mode);
+        fp = fopen(name,"r+");
         if(fp){
           upgrade_count++;
           fclose(fp);
         }
         
         sprintf(name,"%s/gkp.lib", gkpStore->storePath);
-        fp = fopen(name,mode);
+        fp = fopen(name,"r+");
         if(fp){
           upgrade_count++;
           fclose(fp);
         }
 
         sprintf(name,"%s/gkp.s_sqp", gkpStore->storePath);
-        fp = fopen(name,mode);
+        fp = fopen(name,"r+");
         if(fp){
           upgrade_count++;
           fclose(fp);
@@ -512,7 +512,7 @@ int TestOpenGateKeeperStoreCommon(GateKeeperStore *gkpStore,const char *mode){
       
       sprintf(name,"%s/gkp.phash", gkpStore->storePath);
 
-      fp = fopen(name,mode);
+      fp = fopen(name,"r+");
       if(fp){
 	fileCount++;
 	fclose(fp);
@@ -537,15 +537,6 @@ int TestOpenGateKeeperStoreCommon(GateKeeperStore *gkpStore,const char *mode){
 
   return exists;
 
-}
-
-
-int TestOpenGateKeeperStore(GateKeeperStore *gkpStore){
-  return TestOpenGateKeeperStoreCommon(gkpStore,"r+");
-}
-
-int TestOpenReadOnlyGateKeeperStore(GateKeeperStore *gkpStore){
-  return TestOpenGateKeeperStoreCommon(gkpStore,"r");
 }
 
 int RemoveGateKeeperStoreFiles(GateKeeperStore *gkpStore){

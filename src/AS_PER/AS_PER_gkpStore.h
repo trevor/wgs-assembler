@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* 	$Id: AS_PER_gkpStore.h,v 1.8 2005-08-12 20:48:51 ahalpern Exp $	 */
+/* 	$Id: AS_PER_gkpStore.h,v 1.4 2005-03-22 19:49:20 jason_miller Exp $	 */
 #ifndef AS_PER_GKPFRGSTORE_H
 #define AS_PER_GKPFRGSTORE_H
 /*************************************************************************
@@ -53,9 +53,6 @@ typedef struct{
   CDS_UID_t UID;
   char name[256];
   time_t created;
-#ifndef __x86_64__ // 8 byte time_t on x86_64, so pad elsewhere
-  uint32 padtime_t;
-#endif
   char comment[256];
   unsigned int deleted:1;
   unsigned int spare:31;
@@ -76,9 +73,6 @@ typedef struct{
   int32 numPlates;
   int32 numWells;
   int32 numLinks;
-#ifdef __i386__
-  uint32 pad386;
-#endif // Alpha and x86_64 are rounding up to 584, need extra pad on 386
 }GateKeeperBatchRecord;
 
 typedef struct{
@@ -538,7 +532,6 @@ int OpenReadOnlyGateKeeperStore(GateKeeperStore *gkpStore);
 int CopyGateKeeperStoreFiles(GateKeeperStore *gkpStore, char *path);
 int RemoveGateKeeperStoreFiles(GateKeeperStore *gkpStore);
 int TestOpenGateKeeperStore(GateKeeperStore *gkpStore);
-int TestOpenReadOnlyGateKeeperStore(GateKeeperStore *gkpStore);
 void InitGateKeeperStore(GateKeeperStore *gkpStore, char *path);
 void CloseGateKeeperStore(GateKeeperStore *gkpStore);
 int UpgradeGateKeeperStore(GateKeeperStore *gkpStore);
