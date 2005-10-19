@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: AS_PER_fragStore.c,v 1.8 2005-10-04 06:51:08 brianwalenz Exp $";
+static char CM_ID[] = "$Id: AS_PER_fragStore.c,v 1.4 2005-03-22 19:49:20 jason_miller Exp $";
 
 /*************************************************************************
  Module:  AS_PER_fragStore
@@ -238,7 +238,7 @@ void unloadFragRecord(FragStore *myStore, FragRecord *fr, int32 getFlags){
 
      getVLRecordStore(GET_FILEHANDLE(myStore->sourceStore, fr->frag.sourceOffset), 
 		     GET_FILEOFFSET(fr->frag.sourceOffset), fr->source, 
-		     (VLSTRING_SIZE_T)VLSTRING_MAX_SIZE, 
+		     (VLSTRING_SIZE_T)(MAX_SOURCE_LENGTH + MAX_SCREEN_MATCH*sizeof(IntScreenMatch) + sizeof(int32) + sizeof(int64)), 
 		     &actualLength);
     
 #ifdef DEBUG
@@ -278,7 +278,7 @@ void unloadFragRecord(FragStore *myStore, FragRecord *fr, int32 getFlags){
   }
   if(getFlags & FRAG_S_SEQUENCE){
     getVLRecordStore(GET_FILEHANDLE(myStore->sequenceStore, fr->frag.sequenceOffset), 
-		     GET_FILEOFFSET(fr->frag.sequenceOffset), encodeBuffer, (VLSTRING_SIZE_T)VLSTRING_MAX_SIZE, &actualLength);
+		     GET_FILEOFFSET(fr->frag.sequenceOffset), encodeBuffer, (VLSTRING_SIZE_T)MAX_SEQUENCE_LENGTH, &actualLength);
     
     encodeBuffer[actualLength] = '\0';
     decodeSequenceQuality(encodeBuffer, actualLength, fr->sequence, fr->quality, fr->frag.hasQuality);
@@ -328,7 +328,7 @@ void unloadFragRecordPartition(StoreHandle seqStore, StoreHandle srcStore, FragR
 
      getVLRecordStore(srcStore,
 		     GET_FILEOFFSET(fr->frag.sourceOffset), fr->source, 
-		     (VLSTRING_SIZE_T)VLSTRING_MAX_SIZE, 
+		     (VLSTRING_SIZE_T)(MAX_SOURCE_LENGTH + MAX_SCREEN_MATCH*sizeof(IntScreenMatch) + sizeof(int32) + sizeof(int64)), 
 		     &actualLength);
     
 #ifdef DEBUG
@@ -368,7 +368,7 @@ void unloadFragRecordPartition(StoreHandle seqStore, StoreHandle srcStore, FragR
   }
   if(getFlags & FRAG_S_SEQUENCE){
     getVLRecordStore(seqStore, 
-		     GET_FILEOFFSET(fr->frag.sequenceOffset), encodeBuffer, (VLSTRING_SIZE_T)VLSTRING_MAX_SIZE, &actualLength);
+		     GET_FILEOFFSET(fr->frag.sequenceOffset), encodeBuffer, (VLSTRING_SIZE_T)MAX_SEQUENCE_LENGTH, &actualLength);
     
     encodeBuffer[actualLength] = '\0';
     decodeSequenceQuality(encodeBuffer, actualLength, fr->sequence, fr->quality, fr->frag.hasQuality);
@@ -514,35 +514,47 @@ int testOpenFragStore(const char *FragStorePath, const char *rw){
   char frgbuffer[FILENAME_MAX];
   char srcbuffer[FILENAME_MAX];
   char seqbuffer[FILENAME_MAX];
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  char idxbuffer[FILENAME_MAX];
+  FILE * idxFile;
+#endif
   char *errorFile;
   FILE *fragFile, *sourceFile, *seqFile, *parFile;
 
   if(FragStorePath){
-    dbDir = opendir(FragStorePath);
-    if(dbDir == NULL){
-      fprintf(stderr,"*** Couldn't find Fragment Store directory %s\n", FragStorePath);
-      return 1; // failure
-    }
-    closedir(dbDir);
+  dbDir = opendir(FragStorePath);
+ if(dbDir == NULL){
+   fprintf(stderr,"*** Couldn't find Fragment Store directory %s\n", FragStorePath);
+   return 1; // failure
+ }
+ closedir(dbDir);
 #ifdef DEBUG_OPEN
-    fprintf(stderr," Verified existence of directory %s\n", FragStorePath);
+ fprintf(stderr," Verified existence of directory %s\n", FragStorePath);
 #endif
   }else{
     fprintf(stderr,"Can't Open a Memory-based frag Store....\n");
     return 1; // failure
   }
-  sourceFile = fragFile = seqFile = parFile = NULL;
-  sprintf(parbuffer,"%s/db.par", FragStorePath);
-  if((parFile = fopen(parbuffer,rw)) == NULL){
+ sourceFile = fragFile = seqFile = parFile = NULL;
+ sprintf(parbuffer,"%s/db.par", FragStorePath);
+ if((parFile = fopen(parbuffer,rw)) == NULL){
 
    fprintf(stderr,"* Unpartitioned frag store no file %s\n", parbuffer);
    fflush(stderr);
    sprintf(frgbuffer,"%s/db.frg", FragStorePath);
    sprintf(seqbuffer,"%s/db.seq", FragStorePath);
    sprintf(srcbuffer,"%s/db.src", FragStorePath);
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+   sprintf(idxbuffer,"%s/db.idx", FragStorePath);
+#endif
    if(((fragFile = fopen(frgbuffer, rw)) != NULL) &&
       ((sourceFile = fopen(srcbuffer, rw)) != NULL) &&
       ((seqFile = fopen(seqbuffer, rw)) != NULL)
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+      &&
+      (!needIndex || (idxFile = fopen(idxbuffer, rw)) != NULL)
+#endif
+
       ){
 #ifdef DEBUG_OPEN
      fprintf(stderr,"** Successfully verified openability of db files\n");
@@ -557,7 +569,12 @@ int testOpenFragStore(const char *FragStorePath, const char *rw){
        if(sourceFile){
 	 fclose(sourceFile);
 	 if(seqFile){
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+	   fclose(seqFile);
+	   errorFile = idxbuffer;
+#else
 	   assert(0);
+#endif	 
 	 }else{
 	   errorFile = seqbuffer;
 	 }
@@ -620,9 +637,13 @@ int testOpenFragStore(const char *FragStorePath, const char *rw){
 */
 FragStoreHandle openFragStoreCommon
 ( const char *FragStorePath, /* Path to directory */
-  const char *rw,             /* "r" or "r+" */
+  const char *rw,             /* "r" or "rw" */
   const int needIndex){
 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  FILE *idxFile;
+#endif
+  // mode_t mode;
   char frgbuffer[FILENAME_MAX];
   char parbuffer[FILENAME_MAX];
   char srcbuffer[FILENAME_MAX];
@@ -677,6 +698,14 @@ FragStoreHandle openFragStoreCommon
    myStore->sourceStore[0] = openStore(srcbuffer, rw);
    myStore->sequenceStore[0] = openStore(seqbuffer, rw);
 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+   if(idxFile)
+     myStore->index = CreateFromFileVA_int32(idxFile);
+   else
+     myStore->index = NULL;
+
+   myStore->indexModified = FALSE;
+#endif
  }else{
    int i;
    for(i = 0; i < myStore->numPartitions; i++){
@@ -695,6 +724,7 @@ FragStoreHandle openFragStoreCommon
 #endif
  statsStore (myStore -> fragStore, & status);
  FragStore_Version = status . version;
+ // if  (status . version < FRAGSTORE_VERSION)  changed by Jason Oct 2001
  if  (status . version != FRAGSTORE_VERSION)
      {
       fprintf (stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
@@ -713,7 +743,7 @@ FragStoreHandle openFragStoreCommon
 
 FragStoreHandle openFragStore
 ( const char *FragStorePath, /* Path to directory */
-  const char *rw){             /* "r" or "r+" */
+  const char *rw){             /* "r" or "rw" */
   return openFragStoreCommon(FragStorePath, rw, FALSE);
 }
 
@@ -748,15 +778,15 @@ int copyFragStore
     /* Create a directory if needed */
     {
       DIR *dbDir = opendir(TargetFragStorePath);
-      if (dbDir) {
-        closedir(dbDir);
-      } else {
-        if(mkdir(TargetFragStorePath, S_IRWXU | S_IRWXG | S_IROTH)){
-          sprintf(buffer,"%sFragStore: Failure to create directory %s", (move?"move":"copy"),TargetFragStorePath);
-          perror(buffer);
-          return 1;
-        }
+      if(dbDir == NULL)
+      if(mkdir(TargetFragStorePath, S_IRWXU | S_IRWXG | S_IROTH)){
+	sprintf(buffer,"%sFragStore: Failure to create directory %s", (move?"move":"copy"),TargetFragStorePath);
+	perror(buffer);
+	return 1;
       }
+
+    /* chdir(FragStorePath); */
+      closedir (dbDir);
     }
 
   sprintf(cmd,"%s %s/db.frg %s/db.src %s/db.seq %s", (move?"mv":"cp"),SourceFragStorePath, SourceFragStorePath, SourceFragStorePath, TargetFragStorePath);
@@ -774,7 +804,12 @@ FragStoreHandle loadFragStorePartial
   int64 lastElem)
 {
   DIR *dbDir;
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  FILE *idxFile;
+  int needIndex = FALSE;
+#endif
   FILE *fragFile, *sourceFile, *seqFile;
+  // mode_t mode;
   char frgbuffer[2048];
   char srcbuffer[2048];
   char seqbuffer[2048];
@@ -794,13 +829,13 @@ FragStoreHandle loadFragStorePartial
 
   if(FragStorePath){
   dbDir = opendir(FragStorePath);
-  if (dbDir == NULL) {
-    fprintf(stderr,"*** Couldn't find Fragment Store directory %s\n", FragStorePath);
-    return NULLSTOREHANDLE;
-  }
-  closedir(dbDir);
+ if(dbDir == NULL){
+   fprintf(stderr,"*** Couldn't find Fragment Store directory %s\n", FragStorePath);
+   return NULLSTOREHANDLE;
+ }
+ closedir(dbDir);
 #ifdef DEBUG_OPEN
-  fprintf(stderr," Verified existence of directory %s\n", FragStorePath);
+ fprintf(stderr," Verified existence of directory %s\n", FragStorePath);
 #endif
   }else{
     fprintf(stderr,"Can't Open a Memory-based frag Store....\n");
@@ -810,9 +845,16 @@ FragStoreHandle loadFragStorePartial
  sprintf(frgbuffer,"%s/db.frg", FragStorePath);
  sprintf(seqbuffer,"%s/db.seq", FragStorePath);
  sprintf(srcbuffer,"%s/db.src", FragStorePath);
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+ sprintf(idxbuffer,"%s/db.idx", FragStorePath);
+#endif
  if(((fragFile = fopen(frgbuffer, "r")) != NULL) &&
     ((sourceFile = fopen(srcbuffer, "r")) != NULL) &&
     ((seqFile = fopen(seqbuffer, "r")) != NULL) 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+    &&
+    (!needIndex && (idxFile = fopen(idxbuffer, "r")) != NULL)
+#endif
     ){
 #ifdef DEBUG_OPEN
    fprintf(stderr,"** Successfully verified openability of db files\n");
@@ -899,6 +941,14 @@ if( firstElem == STREAM_FROMSTART &&
  myStore->sourceStore[0] = loadStorePartial(srcbuffer, firstSourceElem, lastSourceElem);
  myStore->sequenceStore[0] = loadStorePartial(seqbuffer, firstSeqElem, lastSeqElem);
 }
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+ if(idxFile)
+   myStore->index = CreateFromFileVA_int32(idxFile);
+ else
+   myStore->index = NULL;
+
+   myStore->indexModified = FALSE;
+#endif
 #ifdef DEBUG_OPEN
  fprintf(stderr," *** Done! Opening Stores ***\n");
 #endif
@@ -934,6 +984,7 @@ FragStoreHandle loadFragStore
 */  
 FragStoreHandle createFragStoreCommon
 ( const char *FragStorePath, const char *name, int64 firstID, int indexed, int numPartitions){
+  mode_t mode;
   char buffer[2048];
   char *nameBuffer = NULL;
   // int myStoreIndex;
@@ -958,24 +1009,24 @@ FragStoreHandle createFragStoreCommon
   /* First we need to create a directory for the database */
 
 
+  mode = S_IRWXU | S_IRWXG | S_IROTH;
   if(FragStorePath){
 #ifdef DEBUG
     fprintf(stderr," Creating file-based fragment store\n");
 #endif
     DIR *dbDir = opendir(FragStorePath);
 
-    if (dbDir) {
-      closedir(dbDir);
-    } else {
-      if (mkdir(FragStorePath, S_IRWXU | S_IRWXG | S_IROTH)) {
+    if(dbDir == NULL)
+      if(mkdir(FragStorePath, mode)){
 	sprintf(buffer,"createFragStore: Failure to create directory %s",
                 FragStorePath);
 	perror(buffer);
 	exit(1);
       }
-    }
 
+    /* chdir(FragStorePath); */
     nameBuffer = buffer;
+    closedir (dbDir);
   } else{
     nameBuffer = NULL;
 #ifdef DEBUG
@@ -989,6 +1040,20 @@ FragStoreHandle createFragStoreCommon
    
   myStore->fragStore = createIndexStore(nameBuffer,name,
 					sizeof(ShortFragRecord), FRAGSTORE_VERSION, firstID);
+
+  /**** Index Store support ****/
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  if(indexed){
+    if  (FragStorePath)
+      sprintf(buffer,"%s/db.idx", FragStorePath);
+   
+    myStore->index = CreateVA_int32(1000);
+
+  }else{
+    myStore->index = NULL;
+  }
+  myStore->indexModified = FALSE;
+#endif
 
   if(myStore->numPartitions == 1){
   if  (FragStorePath)
@@ -1055,6 +1120,11 @@ FragStoreHandle resetFragStore(FragStoreHandle fs, int64 firstID){
 
   myStore->sourceStore[0] = resetVLRecordStore(myStore->sourceStore[0]);
 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  if(myStore->index != NULL)
+    ResetVA_int32(myStore->index);
+#endif
+    
  return FragStore_myHandle(myStore);
 
 
@@ -1079,6 +1149,15 @@ int concatFragStore(FragStoreHandle targetH, FragStoreHandle sourceH){
 	  sourceH, source->status, targetH, target->status);
 #endif
 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  if(target->index != NULL ||
+     source->index != NULL){
+
+    fprintf(stderr,"*** Fatal Error: concatFragStore does not operate on indexed stores \n");
+    fflush(stderr);
+    assert(0 /* concatFragStore does not operate on indexed stores */);
+  }
+#endif
   assert(source->status == ActiveStore &&
 	 target->status == ActiveStore);
 
@@ -1128,6 +1207,26 @@ int concatFragStore(FragStoreHandle targetH, FragStoreHandle sourceH){
 }
 
 
+
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+/***********************************************************************/
+/* commitIndex */
+int commitIndex(FragStore *myStore){
+  char buffer[2048];
+
+  if(!myStore->indexModified)
+    return FALSE;
+
+  if(strlen(myStore->storePath) > 0){ // If this is not an in-memory store
+    FILE *indexFile;
+    sprintf(buffer,"%s/db.idx",myStore->storePath);
+    indexFile = fopen(buffer,"w");
+    AssertPtr(indexFile);
+    CopyToFileVA_int32(myStore->index, indexFile);
+  }
+
+}
+#endif
 /***********************************************************************/
 /* closeFragStore
       Close Store: commit all changes and close the store.
@@ -1151,6 +1250,10 @@ int closeFragStore(FragStoreHandle f){
   }
   free(myStore->sequenceStore);
   free(myStore->sourceStore);
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  if(myStore->index != NULL)
+    commitIndex(myStore);
+#endif    
   return(0);
 
 }
@@ -1167,6 +1270,10 @@ int commitFragStore(FragStoreHandle store){
   commitStore(myStore->fragStore);
   commitStore(myStore->sequenceStore[0]);
   commitStore(myStore->sourceStore[0]);
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  if(myStore->index != NULL)
+    commitIndex(myStore);
+#endif
   return(0);
 }
 
@@ -1186,8 +1293,18 @@ int getFragStoreCommon(FragStoreHandle fs, int64 index, int32 getFlags, ReadStru
   FragRecord *fr = (FragRecord *)rs;
 
 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  if(direct || myStore->index != NULL){
+#endif
     if(getIndexStore(myStore->fragStore, index, &fr->frag))
       return 1;
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  }else{
+    int32 localID =  *Getint32(myStore->index, index); // get the mapping from the index
+    if(getIndexStore(myStore->fragStore, localID, &fr->frag)) // get the fragment
+      return 1;
+  }
+#endif
 #ifdef DEBUG
   fprintf(stderr," getFragStore:  seqOffset = " F_U64 "  srcOffset = " F_U64 "\n",
 	  fr->frag.sequenceOffset, fr->frag.sourceOffset);
@@ -1246,6 +1363,15 @@ int appendFragStorePartition(FragStoreHandle store, ReadStructp rs, int32 partit
 #endif
   statsStore(myStore->fragStore , &stats);
 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  fr->frag.localIndex = stats.lastElem;
+
+  if(myStore->index){ // Update the index
+    int32 *currentVal = Getint32(myStore->index, fr->frag.readIndex);
+    assert(!currentVal || *currentVal == 0); // Either not present, or uninitialized
+    *currentVal = fr->frag.localIndex;
+  }
+#endif
 #ifdef DEBUG_APPEND
   fprintf(stderr,"*** appendFragStore lastElem = " F_S64 " readIndex = " F_IID "\n",
 	  stats.lastElem, fr->frag.readIndex);
@@ -1300,14 +1426,12 @@ int appendFragStorePartition(FragStoreHandle store, ReadStructp rs, int32 partit
   fprintf(stderr,"* Appending source field of length " F_VLS " screenLength = %u\n",
 	  length, screenMatchLength);
 #endif
-  assert(length <= VLSTRING_MAX_SIZE);
   appendVLRecordStore(myStore->sourceStore[partition]   , fr->source, length);
 
   /*** NOTE: encodeBuffer is NOT a null terminated string.  Therefore
    *** we use the elngth of the sequence data as the length of the VL
    *** record.
    ***/
-  assert(strlen(fr->sequence) <= VLSTRING_MAX_SIZE);
   length = (VLSTRING_SIZE_T)strlen(fr->sequence);
   appendVLRecordStore(myStore->sequenceStore[partition]   , encodeBuffer, length);
 
@@ -1337,6 +1461,15 @@ int appendFragStore(FragStoreHandle store, ReadStructp rs){
 
   statsStore(myStore->fragStore , &stats);
 
+#if FRAGSTORE_VERSION > FRAGSTORE_VERSION_PRODUCTION
+  fr->frag.localIndex = stats.lastElem;
+
+  if(myStore->index){ // Update the index
+    int32 *currentVal = Getint32(myStore->index, fr->frag.readIndex);
+    assert(!currentVal || *currentVal == 0); // Either not present, or uninitialized
+    *currentVal = fr->frag.localIndex;
+  }
+#endif
 #ifdef DEBUG_APPEND
   fprintf(stderr,"*** appendFragStore lastElem = " F_S64 " readIndex = " F_IID "\n",
 	  stats.lastElem, fr->frag.readIndex);
@@ -1385,7 +1518,6 @@ int appendFragStore(FragStoreHandle store, ReadStructp rs){
   }else{
     length = sourceLength + screenMatchLength;
   }
-  assert(length <= VLSTRING_MAX_SIZE);
 
 #if 0
   fprintf(stderr,"* Appending source field of length " F_VLS " screenLength = %u\n",
@@ -1397,7 +1529,6 @@ int appendFragStore(FragStoreHandle store, ReadStructp rs){
    *** we use the elngth of the sequence data as the length of the VL
    *** record.
    ***/
-  assert(strlen(fr->sequence) <= VLSTRING_MAX_SIZE);
   length = (VLSTRING_SIZE_T)strlen(fr->sequence);
   appendVLRecordStore(myStore->sequenceStore[0]   , encodeBuffer, length);
 
@@ -1446,11 +1577,7 @@ int appendDumpToFragStore(FragStoreHandle store, ShortFragRecord *fr, VA_TYPE(ch
 
   appendIndexStore(myStore->fragStore, (void *)(fr));
 
-  assert(GetNumchars(source) <= VLSTRING_MAX_SIZE);
-
   appendVLRecordStore(myStore->sourceStore[0]   , Getchar(source,0), GetNumchars(source));
-
-  assert(GetNumchars(sequence) <= VLSTRING_MAX_SIZE);
 
   appendVLRecordStore(myStore->sequenceStore[0]   , Getchar(sequence,0), GetNumchars(sequence));
 
@@ -1749,10 +1876,12 @@ void unloadNDumpFragRecord(FragStore *myStore, FragRecord *fr, FILE *outfp){
   dumpFieldDelimiter(outfp);
   fprintf(outfp,F_IID,fr->frag.readIndex);
   dumpFieldDelimiter(outfp);
+  fprintf(outfp,F_TIME_T,fr->frag.entryTime);
+  dumpFieldDelimiter(outfp);
 
     getVLRecordStore(myStore->sourceStore[0], 
 		     fr->frag.sourceOffset, fr->source, 
-		     (VLSTRING_SIZE_T)VLSTRING_MAX_SIZE, 
+		     (uint16)(MAX_SOURCE_LENGTH + MAX_SCREEN_MATCH*sizeof(IntScreenMatch) + sizeof(int32) + sizeof(int64)), 
 		     &actualLength);
     
 #ifdef DEBUG
@@ -1770,7 +1899,7 @@ void unloadNDumpFragRecord(FragStore *myStore, FragRecord *fr, FILE *outfp){
 
 
     getVLRecordStore(myStore->sequenceStore[0], 
-		     fr->frag.sequenceOffset, encodeBuffer, (VLSTRING_SIZE_T)VLSTRING_MAX_SIZE, &actualLength);
+		     fr->frag.sequenceOffset, encodeBuffer, (VLSTRING_SIZE_T)MAX_SEQUENCE_LENGTH, &actualLength);
     
 
     safeWrite(outfp,&actualLength, sizeof(actualLength));
@@ -1869,6 +1998,7 @@ int loadDumpFragRecord(FILE *infp, ShortFragRecord *fr, VA_TYPE(char ) *sequence
   fr->clearRegionEnd = scratch;
   if(1 != fscanf(infp,F_UID "~~~,~~~",&fr->accID)) assert(0);
   if(1 != fscanf(infp,F_IID "~~~,~~~",&fr->readIndex)) assert(0);
+  if(1 != fscanf(infp,F_TIME_T "~~~,~~~",&fr->entryTime)) assert(0);
 
   fprintf(stderr,"* loading frag with readIndex " F_IID "\n", fr->readIndex);
 
