@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* 	$Id: PrimitiveVA_MSG.h,v 1.5 2005-07-19 21:24:22 gdenisov Exp $	 */
+/* 	$Id: PrimitiveVA_MSG.h,v 1.5.4.1 2005-10-26 20:56:04 gdenisov Exp $	 */
 /***************************************************************************
  *  PrimitiveVA.h
  *  
@@ -30,10 +30,13 @@
 #ifndef PRIMITIVE_VA_MSG
 #define PRIMITIVE_VA_MSG
 
+#include "AS_global.h"
 #include "AS_MSG_pmesg.h"
 #include "AS_UTL_Var.h"
 
+#ifndef   HUREF2_COMPATIBLE
 VA_DEF(IntMultiVar)
+#endif
 VA_DEF(IntMultiPos)
 VA_DEF(IntElementPos)
 VA_DEF(IntUnitigPos)
