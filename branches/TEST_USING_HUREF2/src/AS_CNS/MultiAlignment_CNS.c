@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41 2005-10-01 15:20:31 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.1 2005-10-26 16:14:02 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -2417,8 +2417,12 @@ ClusterReads(AlPair *ap)
 //*********************************************************************************
 // Basic MultiAlignmentNode (MANode) manipulation
 //*********************************************************************************
-int RefreshMANode(int32 mid, int quality, CNS_Options *opp, int32 *nvars, 
-   IntMultiVar **v_list, int make_v_list) 
+#ifndef   HUREF2_COMPATIBLE
+    int RefreshMANode(int32 mid, int quality, CNS_Options *opp, 
+                      int32 *nvars, IntMultiVar **v_list, int make_v_list)
+#else
+    int RefreshMANode(int32 mid, int quality, CNS_Options *opp)
+#endif
 {
     // refresh columns from cid to end
     // if quality == -1, don't recall the consensus base
@@ -2431,7 +2435,6 @@ int RefreshMANode(int32 mid, int quality, CNS_Options *opp, int32 *nvars,
     Column *column;
     AlPair  ap;
     MANode *ma = GetMANode(manodeStore,mid);
-    int32   min_len_vlist = 10;
 
     //  Make sure that we have valid options here, we then reset the
     //  pointer to the freshly copied options, so that we can always
@@ -2446,7 +2449,6 @@ int RefreshMANode(int32 mid, int quality, CNS_Options *opp, int32 *nvars,
     }
 
     window = opp->smooth_win;
-   *nvars = 0;
 
 #if 0
     fprintf(stderr, "Calling RefreshMANode, quality = %d\n", quality);
@@ -2588,11 +2590,14 @@ int RefreshMANode(int32 mid, int quality, CNS_Options *opp, int32 *nvars,
 #if 0
             fprintf(stderr, "total number of reads after ClusterReads %d\n", ap.nr);
 #endif
+#ifndef   HUREF2_COMPATIBLE
             /* Store variations in a v_list */
+           *nvars = 0;
             if ((quality > 0) && make_v_list 
                                              // && (ap.nr > 0)
                                                               )
             {
+                int32   min_len_vlist = 10;
                 if (!(*v_list))
                 {
                    *v_list = (IntMultiVar *)safe_malloc(min_len_vlist*
@@ -2635,6 +2640,7 @@ int RefreshMANode(int32 mid, int quality, CNS_Options *opp, int32 *nvars,
                 }
                 (*nvars)++;
             }
+#endif
             
             i = vend;
             FREE(ap.iids); 
@@ -2663,9 +2669,6 @@ int SeedMAWithFragment(int32 mid, int32 fid, int quality,
   FragmentBeadIterator fi;
   int32 cid;
   int32 bid;
-  IntMultiVar *vl = NULL;
-  int32 nv=0;
-  int i, make_v_list;
 
   ma = GetMANode(manodeStore, mid);
   if (ma == NULL ) CleanExit("SeedMAWithFragment ma==NULL",__LINE__,1);
@@ -2679,9 +2682,17 @@ int SeedMAWithFragment(int32 mid, int32 fid, int quality,
      cid = ColumnAppend(cid, bid);
   }
   fragment->manode=mid;
-  make_v_list = 0;
-  RefreshMANode(mid, quality, opp, &nv, &vl, make_v_list); 
-  if (vl) free(vl);
+#ifndef   HUREF2_COMPATIBLE
+  {
+      IntMultiVar *vl = NULL;
+      int32 nv=0;
+      int make_v_list = 0;
+      RefreshMANode(mid, quality, opp, &nv, &vl, make_v_list); 
+      if (vl) free(vl);
+  }
+#else 
+  RefreshMANode(mid, quality, opp);
+#endif
   return 1;
 }
 
@@ -4130,7 +4141,12 @@ int RemoveNullColumn(int32 nid) {
 // to merge and removing null columns
 //*********************************************************************************
 
-int32 MergeRefine(int32 mid, IntMultiVar **v_list, int32 *num_vars, CNS_Options *opp) 
+#ifndef   HUREF2_COMPATIBLE
+int32 MergeRefine(int32 mid, IntMultiVar **v_list, int32 *num_vars, 
+    CNS_Options *opp)
+#else
+int32 MergeRefine(int32 mid, CNS_Options *opp)
+#endif
 {
   MANode      *ma = NULL;
   int32 cid;
@@ -4138,9 +4154,6 @@ int32 MergeRefine(int32 mid, IntMultiVar **v_list, int32 *num_vars, CNS_Options 
   int32 removed=0;
   int32 merged;
   Column *column,*next_column;
-  IntMultiVar *vl=NULL;
-  int32 nv=0;
-  int i, make_v_list=0; 
 
   ma = GetMANode(manodeStore,mid);
   if (ma == NULL ) CleanExit("MergeRefine ma==NULL",__LINE__,1);
@@ -4163,27 +4176,37 @@ int32 MergeRefine(int32 mid, IntMultiVar **v_list, int32 *num_vars, CNS_Options 
     }
     cid = column->next;
   }
-  if (v_list && num_vars)
-      make_v_list = 1;
-  RefreshMANode(mid, 1, opp, &nv, &vl, make_v_list);
-  if (make_v_list && num_vars)
+#ifndef   HUREF2_COMPATIBLE
   {
-      if (nv > 0)
+      IntMultiVar *vl=NULL;
+      int32 nv=0;
+      int i, make_v_list=0;
+ 
+      if (v_list && num_vars)
+          make_v_list = 1;
+      RefreshMANode(mid, 1, opp, &nv, &vl, make_v_list);
+      if (make_v_list && num_vars)
       {
-         *v_list = (IntMultiVar *)safe_realloc(*v_list, nv * sizeof(IntMultiVar));
-         *num_vars = nv;
-          for (i=0; i<nv; i++)
+          if (nv > 0)
           {
-              (*v_list)[i] = vl[i];
+             *v_list = (IntMultiVar *)safe_realloc(*v_list, nv * sizeof(IntMultiVar));
+             *num_vars = nv;
+              for (i=0; i<nv; i++)
+              {
+                  (*v_list)[i] = vl[i];
+              }
+          }
+          else
+          {
+              free(*v_list);
+             *num_vars = 0;
           }
       }
-      else
-      {
-          free(*v_list);
-         *num_vars = 0;
-      }
+      if (vl) free(vl);
   }
-  if (vl) free(vl);
+#else
+    RefreshMANode(mid, 1, opp);
+#endif
   return removed;
 }
 
@@ -5164,9 +5187,7 @@ int AbacusRefine(MANode *ma,int32 from, int32 to, CNS_RefineLevel level,
   int32 orig_length = ma_length; 
   int32 refined_length = orig_length;
   Column *start_column;
-  IntMultiVar *vl=NULL;
-  int32 nv=0;
-  int i, make_v_list;
+  int i;
  
   if(from < 0 || from > ma_length-1){
      CleanExit("AbacusRefine range (from) invalid",__LINE__,1);
@@ -5209,9 +5230,17 @@ int AbacusRefine(MANode *ma,int32 from, int32 to, CNS_RefineLevel level,
       }
       start_column = GetColumn(columnStore, stab_bgn);
   }
-  make_v_list = 0;
-  RefreshMANode(ma->lid, 1, opp, &nv, &vl, make_v_list);
-  if (vl) free(vl);
+#ifndef   HUREF2_COMPATIBLE
+  {
+      int32 nv=0;
+      IntMultiVar *vl=NULL;
+      int make_v_list = 0;
+      RefreshMANode(ma->lid, 1, opp, &nv, &vl, make_v_list);
+      if (vl) free(vl);
+  }
+#else
+  RefreshMANode(ma->lid, 1, opp);
+#endif
   refined_length = GetMANodeLength(ma->lid);
   if ( refined_length < orig_length ) 
   {
@@ -5392,8 +5421,6 @@ int RealignToConsensus(int32 mid,
   assert(ma_realigned!=NULL);
   SeedMAWithFragment(ma_realigned->lid, cns_fid, 0, opp);
   for (i=fid_bgn;i<fid_end;i++) {
-   IntMultiVar *vl=NULL;
-   int32 nv=0;
 
    afrag = GetFragment(fragmentStore,i);
    afirst = GetBead(beadStore,afrag->beads);
@@ -5405,7 +5432,15 @@ int RealignToConsensus(int32 mid,
    ApplyAlignment(cns_fid,aoffset,i,ahang,Getint32(trace,0));
    afrag->deleted = 0;
    GetMultiAlignInStore(unitigStore, mid);
-   RefreshMANode(mid, 0, opp, &nv, &vl, 0);
+#ifndef   HUREF2_COMPATIBLE
+   {
+      IntMultiVar *vl=NULL;
+      int32 nv=0;
+      RefreshMANode(mid, 0, opp, &nv, &vl, 0);
+   }
+#else
+      RefreshMANode(mid, 0, opp);
+#endif
   }
  
  return 1;
@@ -5469,8 +5504,6 @@ int MultiAlignUnitig(IntUnitigMesg *unitig,
     IntMultiPos *positions=unitig->f_list;
     int num_frags = unitig->num_frags;
     int unitig_forced = 0;
-    IntMultiVar *vl=NULL;
-    int32 nv=0;
 
     //  Make sure that we have valid options here, we then reset the
     //  pointer to the freshly copied options, so that we can always
@@ -5671,8 +5704,16 @@ int MultiAlignUnitig(IntUnitigMesg *unitig,
 #endif
        }
     }
-    unitig->num_vars = 0;
+#ifndef   HUREF2_COMPATIBLE
+  unitig->num_vars = 0;
+  {
+    IntMultiVar *vl=NULL;
+    int32 nv=0;
     RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
+  }
+#else
+    RefreshMANode(ma->lid, 0, opp);
+#endif
     free(offsets);
 
     if ( cnslog != NULL && printwhat == CNS_VERBOSE) 
@@ -5680,6 +5721,8 @@ int MultiAlignUnitig(IntUnitigMesg *unitig,
     if ( ! unitig_forced ) {
         score_reduction = AbacusRefine(ma,0,-1,CNS_SMOOTH, opp);
         //fprintf(cnslog,"Score reduced by %d in AbacusRefine.\n", score_reduction);
+
+#ifndef   HUREF2_COMPATIBLE
         MergeRefine(ma->lid, NULL, NULL, opp);
         AbacusRefine(ma,0,-1,CNS_POLYX, opp);
         MergeRefine(ma->lid, NULL, NULL, opp);
@@ -5687,6 +5730,15 @@ int MultiAlignUnitig(IntUnitigMesg *unitig,
             PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
         AbacusRefine(ma,0,-1,CNS_INDEL, opp);
         MergeRefine(ma->lid, NULL, NULL, opp);
+#else
+        MergeRefine(ma->lid, opp);
+        AbacusRefine(ma,0,-1,CNS_POLYX, opp);
+        MergeRefine(ma->lid, opp);
+        if ( cnslog != NULL && printwhat == CNS_VERBOSE)
+            PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
+        AbacusRefine(ma,0,-1,CNS_INDEL, opp);
+        MergeRefine(ma->lid, opp);
+#endif
         if (cnslog != NULL && printwhat != CNS_QUIET && printwhat != CNS_STATS_ONLY) 
         {
           fprintf(stderr,"Should print alignment!\n");
@@ -5967,11 +6019,17 @@ int32 PlaceFragments(int32 fid, Overlap *(*COMPARE_FUNC)(COMPARE_ARGS),
      Column *col = GetColumn(columnStore,afirst->column_index);
      MANode *manode = GetMANode(manodeStore,col->ma_id);
      MultiAlignT *mal = GetMultiAlignInStore(unitigStore, col->ma_id);
-     IntMultiVar *vl = NULL;
-     int32        nv  = 0;
      int i;
 
-     RefreshMANode(manode->lid, 0, opp, &nv, &vl, 0);
+#ifndef   HUREF2_COMPATIBLE
+  {
+    IntMultiVar *vl = NULL;
+    int32        nv  = 0;
+    RefreshMANode(manode->lid, 0, opp, &nv, &vl, 0);
+  }
+#else
+  RefreshMANode(manode->lid, 0, opp);
+#endif
      afirst = GetBead(beadStore,afrag->beads+ahang);
      col = GetColumn(columnStore,afirst->column_index);
 
@@ -6026,9 +6084,6 @@ int MultiAlignContig(IntConConMesg *contig,
    SeqInterval  *offsets;
    int           total_aligned_elements=0;
    static        VA_TYPE(int32) *trace=NULL;
-   IntMultiVar  *vl=NULL;
-   int32 nv=0;
-   IntMultiVar *imv;
 
    if (contig == NULL ) CleanExit("MultiAlignContig contig==NULL",__LINE__,1);
    num_unitigs = contig->num_unitigs;
@@ -6186,7 +6241,15 @@ int MultiAlignContig(IntConConMesg *contig,
         PlaceFragments(bfrag->lid,COMPARE_FUNC, opp);
         //assert( GetNumFragments(fragmentStore) < total_aligned_elements);
      }
-     RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
+#ifndef   HUREF2_COMPATIBLE
+  {
+    IntMultiVar  *vl=NULL;
+    int32 nv=0;
+    RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
+  }
+#else
+  RefreshMANode(ma->lid, 0, opp);
+#endif
      // Now, must find fragments in regions of overlapping unitigs, and adjust 
      // their alignments as needed
      
@@ -6196,6 +6259,10 @@ int MultiAlignContig(IntConConMesg *contig,
        PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
      }
      AbacusRefine(ma,0,-1,CNS_SMOOTH, opp);
+#ifndef   HUREF2_COMPATIBLE
+  {
+     IntMultiVar  *vl=NULL;
+     int32 nv=0;
      MergeRefine(ma->lid, NULL, NULL, opp);
      AbacusRefine(ma,0,-1,CNS_POLYX, opp);
      if ( cnslog != NULL && printwhat == CNS_VERBOSE) {
@@ -6205,6 +6272,18 @@ int MultiAlignContig(IntConConMesg *contig,
      RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
      AbacusRefine(ma,0,-1,CNS_INDEL, opp);
      MergeRefine(ma->lid, &(contig->v_list), &(contig->num_vars), opp);
+  }
+#else
+     MergeRefine(ma->lid, opp);
+     AbacusRefine(ma,0,-1,CNS_POLYX, opp);
+     if ( cnslog != NULL && printwhat == CNS_VERBOSE) {
+       fprintf(cnslog,"\nPOLYX refined alignment\n");
+       PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
+     }
+     RefreshMANode(ma->lid, 0, opp);
+     AbacusRefine(ma,0,-1,CNS_INDEL, opp);
+     MergeRefine(ma->lid, opp);
+#endif
      //     PrintAlignment(cnslog,ma->lid,0,-1,'C');
      if ( cnslog != NULL  && printwhat != CNS_QUIET && printwhat !=CNS_STATS_ONLY) {
        fprintf(cnslog,"\nFinal refined alignment\n");
@@ -6264,8 +6343,6 @@ int MultiAlignContig_NoCompute(FILE *outFile,
    int32 num_columns=0;
    int32 fid,i;
    IntMultiPos *fpositions; 
-   IntMultiVar *vl;
-   int32 nv;
 
    // static VA_TYPE(int32) *trace=NULL;
    static int32 *tracep=NULL;
@@ -6311,7 +6388,16 @@ int MultiAlignContig_NoCompute(FILE *outFile,
 	tracep[imp->delta_length]=0;
         ApplyIMPAlignment(afrag->lid,blid,ahang,tracep);
      }
+
+#ifndef   HUREF2_COMPATIBLE
+  {
+     IntMultiVar *vl;
+     int32 nv;
      RefreshMANode(ma->lid, -2, opp, &nv, &vl, 0);
+  }
+#else
+     RefreshMANode(ma->lid, 0, opp);
+#endif
      UnAlignFragment(0); // remove the consensus string from the multialignment
 
      //PrintAlignment(stdout,ma->lid,0,-1,CNS_DOTS);
@@ -6551,17 +6637,16 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
    MultiAlignT *cma;
    IntUnitigPos *u_list;
    IntMultiPos *f_list;
+#if 0 //!HUREF2_COMPATIBLE
    IntMultiVar  *v_list;
+#endif
    int append_left=0;
    int num_frags=0;
-   int num_vars   = 0;
    int complement=0;
    MANode *ma;
    Fragment *cfrag; 
    Fragment *tfrag = NULL;
    static VA_TYPE(int32) *trace=NULL;
-   IntMultiVar *vl;
-   int32 nv;
 
    //ALIGNMENT_CONTEXT=AS_CONSENSUS;
    ALIGNMENT_CONTEXT=AS_MERGE;
@@ -6577,7 +6662,9 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
    num_frags=GetNumIntMultiPoss(oma->f_list);
    u_list=GetIntUnitigPos(oma->u_list,0);
    f_list=GetIntMultiPos(oma->f_list,0);
+#ifndef   HUREF2_COMPATIBLE
    v_list = GetIntMultiVar(oma->v_list,0);
+#endif
    // capture the consensus sequence of the original contig and put into local "fragment" format
    //PrintIMPInfo(stderr,num_frags,f_list);
    //PrintIUPInfo(stderr,num_unitigs,u_list);
@@ -6654,8 +6741,15 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
          }
          assert(olap_success);
 	 ApplyAlignment(aid,0,bid,ahang,Getint32(trace,0));
-         RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
-
+#ifndef   HUREF2_COMPATIBLE
+         {
+           IntMultiVar *vl;
+           int32 nv;
+           RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
+         }
+#else
+         RefreshMANode(ma->lid, 0, opp);
+#endif
 	 //PrintAlignment(stderr,ma->lid,0,-1,'C');
          pos_offset=ahang;
          tigs_adjusted_pos=GetColumn(columnStore,
@@ -6678,7 +6772,9 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
   cma->delta = CreateVA_int32(0);
   cma->u_list = Clone_VA(oma->u_list);
   cma->udelta = CreateVA_int32(0);
+#if 0 //!HUREF2_COMPATIBLE
   cma->v_list = Clone_VA(oma->v_list);
+#endif
 
   {
   CNS_AlignedContigElement *components;
@@ -6854,8 +6950,6 @@ MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
    IntMultiPos *cpositions; 
    SeqInterval *offsets;
    static VA_TYPE(int32) *trace=NULL;
-   IntMultiVar *vl;
-   int32 nv;
 
    num_contigs = GetNumIntMultiPoss(positions);
    cpositions = GetIntMultiPos(positions,0);
@@ -6969,7 +7063,15 @@ MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
        }
        ApplyAlignment(afrag->lid,0,bfrag->lid,ahang,Getint32(trace,0));
      }
-     RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
+#ifndef   HUREF2_COMPATIBLE
+     {
+       IntMultiVar *vl;
+       int32 nv;
+       RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0);
+     }
+#else
+     RefreshMANode(ma->lid, 0, opp);
+#endif
      // DeleteVA_int32(trace);
    }
   {
@@ -7002,7 +7104,9 @@ MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
 
     // init the f_lists and u_lists by cloning
     cma->f_list = Clone_VA(multiAlign->f_list);
+#if 0 //!HUREF2_COMPATIBLE
     cma->v_list = Clone_VA(multiAlign->v_list);
+#endif
     cma->u_list = Clone_VA(multiAlign->u_list);
 
   } else {
@@ -7010,7 +7114,9 @@ MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
     assert(isRead(cpositions[0].type));
 
     cma->f_list = CreateVA_IntMultiPos(0);
+#if 0 //!HUREF2_COMPATIBLE
     cma->v_list = CreateVA_IntMultiVar(0);
+#endif
     cma->u_list = CreateVA_IntUnitigPos(0);
 
 #if 0 // stupid, we don't need to recreate cpositions, do we?    
@@ -7032,7 +7138,9 @@ MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
 
 	multiAlign = LoadMultiAlignTFromSequenceDB(sequenceDB, cpositions[i].ident, cpositions[i].type == AS_UNITIG);
 	ConcatVA_IntMultiPos(cma->f_list,multiAlign->f_list);
+#if 0 //!HUREF2_COMPATIBLE
         ConcatVA_IntMultiPos(cma->v_list,multiAlign->v_list);
+#endif
 	ConcatVA_IntUnitigPos(cma->u_list,multiAlign->u_list);
 
 	if(cma->source_alloc == 0){

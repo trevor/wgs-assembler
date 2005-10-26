@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static const char CM_ID[] = "$Id: AS_CGW_main.c,v 1.15 2005-09-28 15:13:00 gdenisov Exp $";
+static const char CM_ID[] = "$Id: AS_CGW_main.c,v 1.15.2.1 2005-10-26 16:19:35 gdenisov Exp $";
 
 
 /*********************************************************************
@@ -307,9 +307,11 @@ int main(int argc, char *argv[]){
       case 'h':
 	failOn_NoOverlapFound = 0;
 	break;
+#ifndef   HUREF2_COMPATIBLE
       case 'F':
         novar++;
         break;
+#endif
       case 'G':
 	generateOutput = 0;
 	break;

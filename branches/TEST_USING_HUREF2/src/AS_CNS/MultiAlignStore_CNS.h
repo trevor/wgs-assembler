@@ -18,10 +18,11 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* 	$Id: MultiAlignStore_CNS.h,v 1.5 2005-07-19 21:35:05 gdenisov Exp $	 */
+/* 	$Id: MultiAlignStore_CNS.h,v 1.5.4.1 2005-10-26 16:14:02 gdenisov Exp $	 */
 #ifndef MULTIALIGNSTORE_H
 #define MULTIALIGNSTORE_H
 
+#include "AS_global.h"
 #include "AS_MSG_pmesg.h"
 #include "AS_UTL_Var.h"
 #include "AS_PER_ReadStruct.h"
@@ -47,7 +48,9 @@ typedef struct {
   VA_TYPE(char) *quality;       // quality
   VA_TYPE(int32) *delta;       // deltas for all fragments in f_list
   VA_TYPE(IntMultiPos) *f_list;   // positions of fragments
+#ifndef   HUREF2_COMPATIBLE
   VA_TYPE(IntMultiVar) *v_list;   // variations                  
+#endif
   VA_TYPE(int32) *udelta;       // deltas for all unitigs in u_list
   VA_TYPE(IntUnitigPos) *u_list;  // positions of unitigs
 } MultiAlignT;

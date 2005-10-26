@@ -25,7 +25,7 @@
  Assumptions: There is no UID 0
 **********************************************************************/
 
-static char CM_ID[] = "$Id: AS_TER_terminator_funcs.c,v 1.10 2005-09-15 15:20:16 eliv Exp $";
+static char CM_ID[] = "$Id: AS_TER_terminator_funcs.c,v 1.10.2.1 2005-10-26 16:18:37 gdenisov Exp $";
 
 
 
@@ -710,8 +710,9 @@ static SnapConConMesg* convert_ICM_to_CCO(IntConConMesg* icmMesg, int64 blockSiz
   ccoMesg->forced     = icmMesg->forced;
   ccoMesg->num_pieces = icmMesg->num_pieces;
   ccoMesg->num_unitigs= icmMesg->num_unitigs;
+#ifndef   HUREF2_COMPATIBLE
   ccoMesg->num_vars   = icmMesg->num_vars;  // affects .asm/CCO
- 
+
   if (ccoMesg->num_vars > 0) {
      ccoMesg->vars = (IntMultiVar*) safe_malloc(icmMesg->num_vars*sizeof(IntMultiVar));
      for(i=0; i<icmMesg->num_vars; i++) // i loop
@@ -725,8 +726,8 @@ static SnapConConMesg* convert_ICM_to_CCO(IntConConMesg* icmMesg, int64 blockSiz
         ccoMesg->vars[i].var_length     = icmMesg->v_list[i].var_length ;
         ccoMesg->vars[i].var_seq        = strdup(icmMesg->v_list[i].var_seq);  
      }
-      
   }
+#endif
 
   if( ccoMesg->num_pieces > 0 ){ 
     ccoMesg->pieces = (SnapMultiPos*) safe_malloc(icmMesg->num_pieces*sizeof(SnapMultiPos));
@@ -1438,8 +1439,10 @@ static void free_ULK(SnapUnitigLinkMesg* ulkMesg){
 
 static void free_CCO(SnapConConMesg* ccoMesg){
   /*** DO NOT FREE DELTA ARRAYS...THESE WERE COPIED BY REFERENCE */
+#ifndef   HUREF2_COMPATIBLE
   if( ccoMesg->num_vars > 0)
     free(ccoMesg->vars);
+#endif
   if( ccoMesg->num_pieces > 0)
     free(ccoMesg->pieces);
   if( ccoMesg->num_unitigs > 0)

@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[]= "$Id: AS_MSG_pmesg.c,v 1.13 2005-09-29 07:30:34 brianwalenz Exp $";
+static char CM_ID[]= "$Id: AS_MSG_pmesg.c,v 1.13.2.1 2005-10-26 16:15:40 gdenisov Exp $";
 
 #define AFG_BACKWARDS_COMPATIBLE
 //#define FIX_DANIELS_MESS
@@ -125,9 +125,9 @@ static const char *Mcode;       /* 3-code of current read/write routine */
 
 static char *MemBuffer = NULL;   /* Memory allocation buffer for messages */
 static int   MemMax = -1, MemTop;   /* Memory ceiling and current top */
-
+#ifndef   HUREF2_COMPATIBLE
 int novar = 0;  /*  Output or not the variation records */
-
+#endif
 
 /* Make sure there is a block of size bytes left in memory buffer starting
    at an index that is a multiple of boundary.  Return the *index* into the
@@ -423,8 +423,10 @@ static void *Read_Screen_Mesg(FILE *fin, int external)
   smesg.source   = (char *) GetText("src:",fin,FALSE);
   smesg.sequence = (char *) GetText("seq:",fin,TRUE);
   GET_FIELD(smesg.min_length,MINC_FORMAT,"min length field");
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
      GET_FIELD(smesg.variation,VAR_FORMAT,"variation field");
+#endif
   GET_EOM; 
   // Convert from an index to a pointer.
   smesg.source   = MemBuffer + ((long) (smesg.source));
@@ -1102,6 +1104,7 @@ static void Read_IMP_Mesg(FILE *fin, long indx)
   return;
 }
 
+#ifndef   HUREF2_COMPATIBLE
 static void Read_IMV_Mesg(FILE *fin, long indx)
 {
   IntMultiVar           *imv;
@@ -1139,6 +1142,7 @@ static void Read_VAR_Mesg(FILE *fin, long indx)
   GET_EOM;
   return;
 }
+#endif
 
 static void Read_IUP_Mesg(FILE *fin, long indx)
 {
@@ -1181,7 +1185,8 @@ static void Read_IUP_Mesg(FILE *fin, long indx)
 }
 
 static void *Read_IUM_Mesg(FILE *fin)
-{ static IntUnitigMesg		mesg;
+{ 
+  static IntUnitigMesg		mesg;
   int				i;
   long				cindx, qindx, mpindx, indx;
 # ifdef AS_ENABLE_SOURCE
@@ -1486,15 +1491,18 @@ static void *Read_ICM_Mesg(FILE *fin)
   GET_FIELD(mesg.forced,"for:" F_S32," forced flag");
   GET_FIELD(mesg.num_pieces,"npc:" F_S32," number of pieces");
   GET_FIELD(mesg.num_unitigs,"nou:" F_S32," number of unitigs");
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
       GET_FIELD(mesg.num_vars,"nvr:" F_S32,"num vars field");
   }
+  vindx = vpindx = MoreSpace(mesg.num_vars   *sizeof(IntMultiVar),8);
+#endif
   /* Why use 8 boundary above & below? Damned if I know - ela */
-  vindx = vpindx = MoreSpace(mesg.num_vars   *sizeof(IntMultiVar),8); 
   indx  = mpindx = MoreSpace(mesg.num_pieces *sizeof(IntMultiPos),8);
   uindx = upindx = MoreSpace(mesg.num_unitigs*sizeof(IntUnitigPos),8);
 
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
      if (mesg.num_vars > 0)
@@ -1510,6 +1518,8 @@ static void *Read_ICM_Mesg(FILE *fin)
   else
     mesg.v_list = NULL;
   }
+#endif
+
 // **************************************************
   if (mesg.num_pieces > 0)
   {
@@ -1539,6 +1549,7 @@ static void *Read_ICM_Mesg(FILE *fin)
 // **************************************************
   mesg.consensus = MemBuffer + cindx;
   mesg.quality = MemBuffer + qindx;
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
      if (mesg.num_vars > 0)
@@ -1549,6 +1560,7 @@ static void *Read_ICM_Mesg(FILE *fin)
        mesg.v_list[i].var_seq = MemBuffer + (long) mesg.v_list[i].var_seq;
      }
   }
+#endif
 // **************************************************
   if (mesg.num_pieces > 0)
     mesg.pieces = (IntMultiPos *) (MemBuffer + mpindx);
@@ -1956,15 +1968,18 @@ static void *Read_CCO_Mesg(FILE *fin)
   GET_FIELD(mesg.forced,"for:" F_S32,"forced flag");
   GET_FIELD(mesg.num_pieces,"npc:" F_S32,"number of pieces");
   GET_FIELD(mesg.num_unitigs,"nou:" F_S32,"number of unitigs");
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
      GET_FIELD(mesg.num_vars,"nvr:" F_S32,"number of vars");
   }
-  /* Why use 8 boundary above & below? Damned if I know - ela */
   vindx = vpindx = MoreSpace(mesg.num_vars  *sizeof(IntMultiVar),8);
+#endif
+  /* Why use 8 boundary above & below? Damned if I know - ela */
   indx  = mpindx = MoreSpace(mesg.num_pieces*sizeof(SnapMultiPos),8);
   uindx =upindx = MoreSpace(mesg.num_unitigs*sizeof(UnitigPos),8);
 
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
      if (mesg.num_vars > 0)
@@ -1980,6 +1995,7 @@ static void *Read_CCO_Mesg(FILE *fin)
       else
         mesg.vars = NULL;
   }
+#endif
 // **************************************************
   for (i=0; i < mesg.num_pieces; ++i) {
     if (strncmp(GetLine(fin,TRUE),"{MPS",4) != 0)
@@ -2002,6 +2018,7 @@ static void *Read_CCO_Mesg(FILE *fin)
   GET_EOM;
   mesg.consensus = MemBuffer + cindx;
   mesg.quality = MemBuffer + qindx;
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
     if (mesg.num_vars > 0)
@@ -2012,6 +2029,7 @@ static void *Read_CCO_Mesg(FILE *fin)
       mesg.vars[i].var_seq = MemBuffer + (long) mesg.vars[i].var_seq;
     } 
   }
+#endif
   if (mesg.num_pieces > 0)
     mesg.pieces = (SnapMultiPos *) (MemBuffer + mpindx);
   else
@@ -2509,8 +2527,10 @@ static void Write_Screen_Mesg(FILE *fout, void *vmesg, int external)
   PutText(fout,"src:",mesg->source,FALSE);
   PutText(fout,"seq:",mesg->sequence,TRUE);
   fprintf(fout,MINC_FORMAT "\n",mesg->min_length);
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
      fprintf(fout,VAR_FORMAT "\n",mesg->variation);
+#endif
   fprintf(fout,"}\n");
 }
 
@@ -2934,6 +2954,7 @@ static void Write_IMP_Mesg(FILE *fout, IntMultiPos *mlp)
   return;
 }
 
+#ifndef   HUREF2_COMPATIBLE
 static void Write_IMV_Mesg(FILE *fout, IntMultiVar *imv)
 {
   int i;
@@ -2968,6 +2989,7 @@ static void Write_VAR_Mesg(FILE *fout, IntMultiVar *smv)
   fprintf(fout,"}\n");
   return;
 }
+#endif
 
 static void Write_IUP_Mesg(FILE *fout, IntUnitigPos *up)
 { int i;
@@ -3176,6 +3198,7 @@ static void Write_ICM_Mesg(FILE *fout, void *vmesg)
   fprintf(fout,"for:" F_S32 "\n",mesg->forced);
   fprintf(fout,"npc:" F_S32 "\n",mesg->num_pieces);
   fprintf(fout,"nou:" F_S32 "\n",mesg->num_unitigs);
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
      fprintf(fout,"nvr:" F_S32 "\n",mesg->num_vars);
@@ -3183,6 +3206,7 @@ static void Write_ICM_Mesg(FILE *fout, void *vmesg)
      for (i=0; i < mesg->num_vars; ++i)
        Write_IMV_Mesg(fout, &mesg->v_list[i]);
   }
+#endif
   fflush(NULL);
   for (i=0; i < mesg->num_pieces; ++i)
     Write_IMP_Mesg(fout, &mesg->pieces[i]);
@@ -3340,12 +3364,14 @@ static void Write_CCO_Mesg(FILE *fout, void *vmesg)
   fprintf(fout,"for:" F_S32 "\n",mesg->forced);
   fprintf(fout,"npc:" F_S32 "\n",mesg->num_pieces);
   fprintf(fout,"nou:" F_S32 "\n",mesg->num_unitigs);
+#ifndef   HUREF2_COMPATIBLE
   if (!novar)
   {
      fprintf(fout,"nvr:" F_S32 "\n",mesg->num_vars);
      for (i=0; i < mesg->num_vars; ++i)
        Write_VAR_Mesg(fout, &(mesg->vars[i]));
   }
+#endif
   for (i=0; i < mesg->num_pieces; ++i)
     Write_MPS_Mesg(fout, &mesg->pieces[i]);
   for (i=0; i < mesg->num_unitigs; ++i)
@@ -3896,9 +3922,11 @@ static void Clear_ICM_Mesg(void *vmesg, int typ)
     free(mesg->pieces[i].delta);
   free(mesg->pieces);
   free(mesg->unitigs);
+#ifndef   HUREF2_COMPATIBLE
   for (i=0; i < mesg->num_vars; ++i)
     free(mesg->v_list[i].var_seq);
   free(mesg->v_list);           
+#endif
 }
 
 #if 0

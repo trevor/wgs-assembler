@@ -25,7 +25,7 @@
    Assumptions:  libAS_UTL.a
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignStore_CNS.c,v 1.12 2005-10-10 19:22:18 brianwalenz Exp $";
+static char CM_ID[] = "$Id: MultiAlignStore_CNS.c,v 1.12.2.1 2005-10-26 16:14:02 gdenisov Exp $";
 
 
 #include <assert.h>
@@ -194,7 +194,9 @@ CreateMultiAlignT(void)
   ma->quality = NULL;
   ma->delta = NULL;
   ma->f_list = NULL;
+#ifndef   HUREF2_COMPATIBLE
   ma->v_list = NULL;
+#endif
   ma->udelta = NULL;
   ma->u_list = NULL;
 
@@ -209,7 +211,9 @@ CreateEmptyMultiAlignT(void)
   ma->quality = CreateVA_char(0);
   ma->delta = CreateVA_int32(0);;
   ma->f_list = CreateVA_IntMultiPos(0);
+#ifndef   HUREF2_COMPATIBLE
   ma->v_list = CreateVA_IntMultiVar(0);
+#endif
   ma->udelta = CreateVA_int32(0);
   ma->u_list = CreateVA_IntUnitigPos(0);
 
@@ -234,7 +238,9 @@ CopyMultiAlignT(MultiAlignT *newma, MultiAlignT *ma)
     newma->quality = Clone_VA(ma->quality);
     // Save the delta pointers as offset from base of delta array
     newma->f_list = Clone_VA(ma->f_list);
+#ifndef   HUREF2_COMPATIBLE
     newma->v_list = Clone_VA(ma->v_list);
+#endif
     newma->u_list = Clone_VA(ma->u_list);
     newma->delta = Clone_VA(ma->delta);
     newma->udelta = Clone_VA(ma->udelta);
@@ -243,7 +249,9 @@ CopyMultiAlignT(MultiAlignT *newma, MultiAlignT *ma)
     ReuseClone_VA(newma->quality,ma->quality);
     // Save the delta pointers as offset from base of delta array
     ReuseClone_VA(newma->f_list,ma->f_list);
+#ifndef   HUREF2_COMPATIBLE
     ReuseClone_VA(newma->v_list,ma->v_list);
+#endif
     ReuseClone_VA(newma->u_list,ma->u_list);
     ReuseClone_VA(newma->delta,ma->delta);
     ReuseClone_VA(newma->udelta, ma->udelta);
@@ -259,7 +267,9 @@ CopyMultiAlignT(MultiAlignT *newma, MultiAlignT *ma)
     int32 *oldbase = Getint32(ma->delta, 0);
     int32 *newbase = Getint32(newma->delta, 0);
     int numf = GetNumIntMultiPoss(ma->f_list);
+#ifndef   HUREF2_COMPATIBLE
     int numv = GetNumIntMultiVars(ma->v_list);
+#endif
     for(i = 0; i < numf; i++){
       IntMultiPos *npos = GetIntMultiPos(newma->f_list,i);
       int offset = (npos->delta - oldbase);
@@ -273,6 +283,7 @@ CopyMultiAlignT(MultiAlignT *newma, MultiAlignT *ma)
          }  
       }     
     }
+#ifndef   HUREF2_COMPATIBLE
     for(i = 0; i < numv; i++)
     {
       IntMultiVar *nvar = GetIntMultiVar(newma->v_list,i);
@@ -280,6 +291,7 @@ CopyMultiAlignT(MultiAlignT *newma, MultiAlignT *ma)
       nvar->var_seq = (char *) safe_malloc((strlen(old_var_seq)+1)*sizeof(char));
       strcpy(nvar->var_seq, old_var_seq);
     }
+#endif
   }
   {/* Adjust the delta pointers in the clone */
     int i;
@@ -323,7 +335,9 @@ CloneSurrogateOfMultiAlignT(MultiAlignT *oldMA, int32 newNodeID)
 #endif
   newma->delta = CreateVA_int32(0);
   newma->f_list = CreateVA_IntMultiPos(0);
+#ifndef   HUREF2_COMPATIBLE
   newma->v_list = CreateVA_IntMultiVar(0);
+#endif
   newma->udelta = CreateVA_int32(0);
   newma->u_list = Clone_VA(oldMA->u_list);
   //  newma->id = newNodeID;
@@ -465,7 +479,9 @@ CreateMultiAlignTFromIUM(IntUnitigMesg *ium, int localID, int sequenceOnly)
       ma->delta = CreateVA_int32(delta_len);
       
       ma->f_list = CreateVA_IntMultiPos(ium->num_frags);
+#ifndef   HUREF2_COMPATIBLE
       ma->v_list = CreateVA_IntMultiVar(ium->num_vars); 
+#endif
       ma->u_list = CreateVA_IntUnitigPos(1);
       
 
@@ -505,6 +521,7 @@ CreateMultiAlignTFromIUM(IntUnitigMesg *ium, int localID, int sequenceOnly)
 	delta_len+=cfr_mesg->delta_length;
 	SetIntMultiPos(ma->f_list, cfr, &tmp);
       }
+#ifndef   HUREF2_COMPATIBLE
       for(cvr = 0; cvr < ium->num_vars; cvr++)
       {
          IntMultiVar *cvr_mesg = ium->v_list + cvr; 
@@ -514,6 +531,7 @@ CreateMultiAlignTFromIUM(IntUnitigMesg *ium, int localID, int sequenceOnly)
          tmp.position = cvr_mesg->position;
          SetIntMultiVar(ma->v_list, cvr, &tmp);
       }
+#endif
   }
 
   ptr = Getchar(ma->consensus,0);
@@ -609,8 +627,9 @@ CreateMultiAlignTFromICM(IntConConMesg *icm, int localID, int sequenceOnly)
       ma->f_list = CreateVA_IntMultiPos(icm->num_pieces);
       ma->udelta = CreateVA_int32(0);
       ma->u_list = CreateVA_IntUnitigPos(0);
+#ifndef   HUREF2_COMPATIBLE
       ma->v_list = CreateVA_IntMultiVar(icm->num_vars);
-      
+#endif
 
       for(cfr = 0,delta_len=0; cfr < icm->num_pieces; cfr++){
 	IntMultiPos *cfr_mesg = icm->pieces + cfr;
@@ -647,6 +666,7 @@ CreateMultiAlignTFromICM(IntConConMesg *icm, int localID, int sequenceOnly)
 	delta_len+=cfr_mesg->delta_length;
 	SetIntMultiPos(ma->f_list, cfr, &tmp);
       }
+#ifndef   HUREF2_COMPATIBLE
       for(cvr = 0; cvr < icm->num_vars; cvr++)
       {
          IntMultiVar *cvr_mesg = icm->v_list + cvr;
@@ -662,6 +682,7 @@ CreateMultiAlignTFromICM(IntConConMesg *icm, int localID, int sequenceOnly)
          strcpy(tmp.var_seq, cvr_mesg->var_seq);
          SetIntMultiVar(ma->v_list, cvr, &tmp);
       }
+#endif
     }
 
   ptr = Getchar(ma->consensus,0);
@@ -732,7 +753,9 @@ CreateMultiAlignTFromCCO(SnapConConMesg *cco, int localID, int sequenceOnly)
     {
       ma->delta = CreateVA_int32(delta_len);
       ma->f_list = CreateVA_SnapMultiPos(cco->num_pieces);
+#ifndef   HUREF2_COMPATIBLE
       ma->v_list = CreateVA_IntMultiVar(cco->num_vars);  
+#endif
       ma->udelta = CreateVA_int32(0);
       ma->u_list = CreateVA_UnitigPos(0);
       
@@ -772,6 +795,7 @@ CreateMultiAlignTFromCCO(SnapConConMesg *cco, int localID, int sequenceOnly)
 	delta_len+=cfr_mesg->delta_length;
 	SetSnapMultiPos(ma->f_list, cfr, &tmp);
       }
+#ifndef   HUREF2_COMPATIBLE
       for(cvr = 0; cvr < cco->num_vars; cvr++)
       {
          IntMultiVar *cvr_mesg = cco->vars + cvr;
@@ -787,6 +811,7 @@ CreateMultiAlignTFromCCO(SnapConConMesg *cco, int localID, int sequenceOnly)
          strcpy(tmp.var_seq, cvr_mesg->var_seq);
          SetIntMultiVar(ma->v_list, cvr, &tmp);
       }
+#endif
     }
 
   ptr = Getchar(ma->consensus,0);
@@ -853,19 +878,23 @@ DeleteMultiAlignT(MultiAlignT *ma)
   if (ma->source_alloc) {
     // make sure space alloced to hold source is freed
     IntMultiPos *t = NULL;
-    IntMultiVar *v = NULL;
     int n_frags=GetNumIntMultiPoss(ma->f_list);
+#ifndef   HUREF2_COMPATIBLE
+    IntMultiVar *v = NULL;
     int n_vars=GetNumIntMultiVars(ma->v_list);
+#endif
     if (n_frags > 0) t=GetIntMultiPos(ma->f_list,0);
     for (i=0;i<n_frags;i++){
        if ( t->source ) free(t->source);
        t++;
     }
+#ifndef   HUREF2_COMPATIBLE
     if (n_vars > 0) v=GetIntMultiVar(ma->v_list, 0);
     for (i=0;i<n_vars;i++){
        if ( v->var_seq) free(v->var_seq);
        v++;
     }
+#endif
   }   
   DeleteVA_char(ma->consensus);
   DeleteVA_char(ma->quality);
@@ -873,7 +902,9 @@ DeleteMultiAlignT(MultiAlignT *ma)
   DeleteVA_IntUnitigPos(ma->u_list);
   DeleteVA_int32(ma->delta);
   DeleteVA_IntMultiPos(ma->f_list);
+#ifndef   HUREF2_COMPATIBLE
   DeleteVA_IntMultiVar(ma->v_list);
+#endif
   free(ma);
 }
 
@@ -957,7 +988,9 @@ SaveMultiAlignTToStream(MultiAlignT *ma, FILE *stream)
   totalSize += CopyToFileVA_char(ma->quality, stream);
   totalSize += CopyToFileVA_int32(ma->delta, stream);
   totalSize += CopyToFileVA_IntMultiPos(ma->f_list, stream);
+#ifndef   HUREF2_COMPATIBLE
   totalSize += CopyToFileVA_IntMultiVar(ma->v_list, stream);
+#endif
   totalSize += CopyToFileVA_int32(ma->udelta, stream);
   totalSize += CopyToFileVA_IntMultiPos(ma->u_list, stream);
   totalSize += (3 * sizeof(int32));
@@ -1029,7 +1062,9 @@ LoadMultiAlignTFromStream(FILE *stream, int32 *reference)
   ma->quality = CreateFromFileVA_char(stream,0);
   ma->delta = CreateFromFileVA_int32(stream,0);
   ma->f_list = CreateFromFileVA_IntMultiPos(stream,0);
+#ifndef   HUREF2_COMPATIBLE
   ma->v_list = CreateFromFileVA_IntMultiVar(stream,0);
+#endif
   ma->udelta = CreateFromFileVA_int32(stream,0);
   ma->u_list = CreateFromFileVA_IntUnitigPos(stream,0);
   status = safeRead(stream, &ma->forced, sizeof(int32));
@@ -1077,7 +1112,9 @@ ReLoadMultiAlignTFromStream(FILE *stream, MultiAlignT *ma, int32 *reference)
   ResetVA_int32(ma->delta);
   ResetVA_int32(ma->udelta);
   ResetVA_IntMultiPos(ma->f_list);
+#ifndef   HUREF2_COMPATIBLE
   ResetVA_IntMultiVar(ma->v_list);
+#endif
   ResetVA_IntUnitigPos(ma->u_list);
 
   // Sentinel to say this is non-null
@@ -1103,7 +1140,9 @@ ReLoadMultiAlignTFromStream(FILE *stream, MultiAlignT *ma, int32 *reference)
   LoadFromFileVA_char(stream,ma->quality,0);
   LoadFromFileVA_int32(stream,ma->delta,0);
   LoadFromFileVA_IntMultiPos(stream,ma->f_list,0);
+#ifndef   HUREF2_COMPATIBLE
   LoadFromFileVA_IntMultiVar(stream,ma->v_list,0);
+#endif
   LoadFromFileVA_int32(stream,ma->udelta,0);
   LoadFromFileVA_IntUnitigPos(stream,ma->u_list,0);
   status = safeRead(stream, &ma->forced, sizeof(int32));
@@ -1150,7 +1189,9 @@ GetMemorySize(MultiAlignT *ma)
   size = GetMemorySize_VA(ma->consensus) * 2 +
          GetMemorySize_VA(ma->delta) +
          GetMemorySize_VA(ma->f_list) +
+#ifndef   HUREF2_COMPATIBLE
          GetMemorySize_VA(ma->v_list) +
+#endif
          GetMemorySize_VA(ma->udelta) +
          GetMemorySize_VA(ma->u_list);
 
