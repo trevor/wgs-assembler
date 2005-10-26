@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: Output_CGW.c,v 1.9 2005-09-22 23:58:54 brianwalenz Exp $";
+static char CM_ID[] = "$Id: Output_CGW.c,v 1.9.2.1 2005-10-26 16:19:35 gdenisov Exp $";
 
 #include <assert.h>
 #include <math.h>
@@ -370,7 +370,9 @@ void OutputContigsFromMultiAligns(){
       icm_mesg.iaccession = ctg->outputID;
       icm_mesg.forced = 0;
       icm_mesg.num_pieces = numFrag;
+#ifndef   HUREF2_COMPATIBLE
       icm_mesg.num_vars = GetNumIntMultiVars(ma->v_list); // affects .cgw/ICM
+#endif
 //    icm_mesg.num_vars = 60;   // affects .cgw/ICM
       icm_mesg.pieces = mp;
       icm_mesg.num_unitigs = numUnitig;
@@ -850,8 +852,10 @@ void OutputUnitigsFromMultiAligns(void){
     ium_mesg.forced = 0;
     ium_mesg.num_frags = GetNumIntMultiPoss(ma->f_list);
     ium_mesg.f_list = GetIntMultiPos(ma->f_list,0);
+#ifndef   HUREF2_COMPATIBLE
     ium_mesg.num_vars = GetNumIntMultiVars(ma->v_list); // affects .cns
     ium_mesg.v_list = GetIntMultiVar(ma->v_list,0);
+#endif
 
     (GlobalData->writer)(GlobalData->outfp,&pmesg);
     {

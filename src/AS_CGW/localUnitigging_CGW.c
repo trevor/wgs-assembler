@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: localUnitigging_CGW.c,v 1.8 2005-09-15 15:20:16 eliv Exp $";
+static char CM_ID[] = "$Id: localUnitigging_CGW.c,v 1.8.2.1 2005-10-26 16:19:35 gdenisov Exp $";
 
 
 /*********************************************************************
@@ -1376,8 +1376,10 @@ void OutputMergedMetaUnitig(CDS_CID_t sid,MultiAlignT *ma){
   icm_mesg.pieces = mp;
   icm_mesg.num_unitigs = numUnitig;
   icm_mesg.length = GetMultiAlignLength(ma);
+#ifndef   HUREF2_COMPATIBLE
   icm_mesg.num_vars = 0;
   icm_mesg.v_list   = NULL;
+#endif
   if(icm_mesg.num_unitigs > 1){
     icm_mesg.consensus = ""; // Getchar(ma->consensus,0);
     icm_mesg.quality = ""; // Getchar(ma->quality,0);

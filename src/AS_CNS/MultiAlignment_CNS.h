@@ -21,7 +21,7 @@
 #ifndef MULTIALIGNMENT_CNS_INCLUDE
 #define MULTIALIGNMENT_CNS_INCLUDE
 
-
+#include "AS_global.h"
 #include "MultiAlignStore_CNS.h"
 #include "AS_PER_genericStore.h"
 #include "AS_UTL_Var.h"
@@ -292,7 +292,11 @@ int GetMANodeConsensus(int32 mid, VA_TYPE(char) *, VA_TYPE(char) *);
 int GetMANodePositions(int32 , int, IntMultiPos *, int, IntUnitigPos *, 
     VA_TYPE(int32) *);
 void PrintAlignment(FILE *, int32, int32, int32, CNS_PrintKey );
-int32 MergeRefine(int32 , IntMultiVar **, int32 *, CNS_Options *);
+#ifndef   HUREF2_COMPATIBLE
+    int32 MergeRefine(int32 , IntMultiVar **, int32 *, CNS_Options *);
+#else
+    int32 MergeRefine(int32 , CNS_Options *);
+#endif
 
 typedef enum {
   LEFT_SHIFT  = (int) 'L', // Left Shifted

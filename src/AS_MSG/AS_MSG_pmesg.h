@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: AS_MSG_pmesg.h,v 1.12 2005-09-29 07:30:34 brianwalenz Exp $   */
+/* $Id: AS_MSG_pmesg.h,v 1.12.2.1 2005-10-26 16:15:40 gdenisov Exp $   */
 
 #ifndef AS_MSG_PMESG_INCLUDE
 #define AS_MSG_PMESG_INCLUDE
@@ -754,6 +754,7 @@ typedef struct IntMultiPos {
 
 /* IMV message */
 
+#ifndef   HUREF2_COMPATIBLE
 typedef struct IntMultiVar {
   SeqInterval     position;
   int32           var_length;
@@ -764,6 +765,7 @@ typedef struct IntMultiVar {
   int32           num_alleles;
   int32           window_size;  
 } IntMultiVar;
+#endif
 
 /* This is a variant of IntMultiPos to handle deltas in a longer (unitig) sequence */
 typedef struct {
@@ -812,8 +814,10 @@ typedef struct {
   int32		  forced;
   int32           num_frags;
   IntMultiPos    *f_list;
+#ifndef   HUREF2_COMPATIBLE
   int32           num_vars; 
   IntMultiVar    *v_list;
+#endif
 } IntUnitigMesg;
 
 
@@ -850,10 +854,12 @@ typedef struct {
   int32		             forced;
   int32                      num_pieces;
   int32                      num_unitigs;
-  int32                      num_vars;
   IntMultiPos               *pieces;
   IntUnitigPos              *unitigs;
-  IntMultiVar               *v_list;
+#ifndef   HUREF2_COMPATIBLE
+//  int32                      num_vars;
+//  IntMultiVar               *v_list;
+#endif
 } IntConConMesg;
 
 
@@ -1022,9 +1028,11 @@ typedef struct {
   char            *quality;
   int32		  forced;
   int32           num_frags;
-  int32           num_vars;
   SnapMultiPos    *f_list;// changed in comparison to internal message
+#ifndef   HUREF2_COMPATIBLE
+  int32           num_vars;
   IntMultiVar     *v_list;
+#endif
 } SnapUnitigMesg;
 
 
@@ -1060,9 +1068,11 @@ typedef struct {
   int32                       forced;
   int32                       num_pieces;
   int32                       num_unitigs;
-  int32                       num_vars;
   SnapMultiPos               *pieces; // changed in comparison to internal message
+#ifndef   HUREF2_COMPATIBLE
+  int32                       num_vars;
   IntMultiVar                *vars;   
+#endif
   UnitigPos                  *unitigs;// changed in comparison to internal message
 } SnapConConMesg;
 
