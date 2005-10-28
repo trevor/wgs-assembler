@@ -281,7 +281,7 @@ int main(int argc, char *argv[])
 	  fprintf(stderr,"Printing OVLs to %s\n", optarg);
 	  OVLFile=fopen( optarg, "w");
 	  assert(OVLFile!=NULL);
-	  WriteMesg_AS = OutputFileType_AS(AS_PROTO_OUTPUT);
+	  WriteMesg_AS = (MesgWriter)OutputFileType_AS(AS_PROTO_OUTPUT);
 	  assert(WriteMesg_AS!=NULL);
 	  break;
 	case '1':
@@ -371,7 +371,7 @@ int main(int argc, char *argv[])
 	      
 #define AFFINEBLOCKSIZE 4
 	      Analyze_Affine_Overlap_AS(&A,&B,O,AS_ANALYZE_ALL,&alen,&blen,&del,&sub,&ins,
-					&affdel,&affins,&blockdel,&blockins,AFFINEBLOCKSIZE);
+					&affdel,&affins,&blockdel,&blockins,AFFINEBLOCKSIZE, NULL);
 	      
 	      errRate = (sub+ins+del)/(double)(alen+ins);
 	      
