@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: processIntra.cc,v 1.5.2.3 2005-10-14 19:24:46 catmandew Exp $ */
+/* $Id: processIntra.cc,v 1.5.2.4 2005-10-28 16:12:13 catmandew Exp $ */
 #include <cstdio>  // for sscanf
 #include <iostream>
 #include <iomanip>
@@ -165,7 +165,7 @@ void PrintOutput(vector<CompositeMPPolygon<UNIT_TYPE> > & printmpps,
                  bool printGnuplot)
 {
   char label[1024];
-  char type;
+  char type[1024];
   bool polymorphic;
   char outFilename[1024];
   ofstream ataOS, gnuOS;
@@ -175,23 +175,23 @@ void PrintOutput(vector<CompositeMPPolygon<UNIT_TYPE> > & printmpps,
   {
     case MPI_STRETCHED:
       sprintf(label, "insertion");
-      type = 's';
+      sprintf(type, "ins");
       break;
     case MPI_COMPRESSED:
       sprintf(label, "deletion");
-      type = 'd';
+      sprintf(type, "del");
       break;
     case MPI_INVERSION:
       sprintf(label, MatePairLabel[mpii]);
-      type = 'v';
+      sprintf(type, "inv");
       break;
     case MPI_TRANSPOSITION:
       sprintf(label, MatePairLabel[mpii]);
-      type = 't';
+      sprintf(type, "trn");
       break;
     default:
       sprintf(label, MatePairLabel[mpii]);
-      type = '?';
+      sprintf(type, "unk");
       break;
   }
   
