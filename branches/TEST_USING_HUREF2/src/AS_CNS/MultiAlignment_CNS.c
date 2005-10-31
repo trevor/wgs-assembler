@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.1 2005-10-26 16:14:02 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.2 2005-10-31 20:59:52 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -76,6 +76,7 @@ static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.1 2005-10-26 16:14:02 
 #define STABWIDTH                           6
 #define MAX_ALLOWED_MA_DEPTH               40
 #define MAX_EXTEND_LENGTH                2048
+#define SHOW_ABACUS                        0
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -5079,17 +5080,17 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
 
     left_abacus = CreateAbacus(ma->lid,start_column->lid,stab_bgn);
     orig_abacus = CloneAbacus(left_abacus);
-    //ShowAbacus(orig_abacus);
+    if (SHOW_ABACUS) ShowAbacus(orig_abacus);
     MergeAbacus(orig_abacus);
     orig_score = ScoreAbacus(orig_abacus,&orig_columns);
-    //ShowAbacus(orig_abacus);
+    if (SHOW_ABACUS) ShowAbacus(orig_abacus);
     right_abacus = CloneAbacus(left_abacus);
     left_score = LeftShift(left_abacus,&left_columns);
     right_score = RightShift(right_abacus,&right_columns);
     //fprintf(stderr,"Abacus Report:\norig_score: %d left_score: %d right_score: %d\n",
     //             orig_score,left_score,right_score); 
-    //ShowAbacus(left_abacus);
-    //ShowAbacus(right_abacus);
+    if (SHOW_ABACUS) ShowAbacus(left_abacus);
+    if (SHOW_ABACUS) ShowAbacus(right_abacus);
     // determine best score and apply abacus to real columns
     orig_gap_score = AffineScoreAbacus(orig_abacus);
     left_gap_score = AffineScoreAbacus(left_abacus);
@@ -5104,7 +5105,7 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
        if ( left_gap_score < right_gap_score ) {
           score_reduction += orig_gap_score - left_gap_score; 
           //fprintf(stderr,"\nTry to apply LEFT abacus:\n");
-          //ShowAbacus(left_abacus);
+          if (SHOW_ABACUS) ShowAbacus(left_abacus);
           GetAbacusBaseCount(left_abacus,&abacus_count);
           ApplyAbacus(left_abacus, opp);
        } 
@@ -5112,7 +5113,7 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
        {
           score_reduction += orig_gap_score - right_gap_score; 
           //fprintf(stderr,"\nTry to apply RIGHT abacus:\n");
-          //ShowAbacus(right_abacus);
+          if (SHOW_ABACUS) ShowAbacus(right_abacus);
           GetAbacusBaseCount(right_abacus,&abacus_count);
           ApplyAbacus(right_abacus, opp);
        }
