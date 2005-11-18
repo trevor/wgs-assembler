@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: AS_MSG_pmesg.h,v 1.12.2.1 2005-10-26 16:15:40 gdenisov Exp $   */
+/* $Id: AS_MSG_pmesg.h,v 1.12.2.2 2005-11-18 20:17:37 gdenisov Exp $   */
 
 #ifndef AS_MSG_PMESG_INCLUDE
 #define AS_MSG_PMESG_INCLUDE
@@ -857,8 +857,8 @@ typedef struct {
   IntMultiPos               *pieces;
   IntUnitigPos              *unitigs;
 #ifndef   HUREF2_COMPATIBLE
-//  int32                      num_vars;
-//  IntMultiVar               *v_list;
+    int32                      num_vars;
+    IntMultiVar               *v_list;
 #endif
 } IntConConMesg;
 
