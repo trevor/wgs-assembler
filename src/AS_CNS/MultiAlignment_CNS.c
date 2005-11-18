@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.2 2005-10-31 20:59:52 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.3 2005-11-18 20:13:48 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -6260,7 +6260,7 @@ int MultiAlignContig(IntConConMesg *contig,
        PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
      }
      AbacusRefine(ma,0,-1,CNS_SMOOTH, opp);
-#ifndef   HUREF2_COMPATIBLE
+#ifndef HUREF2_COMPATIBLE
   {
      IntMultiVar  *vl=NULL;
      int32 nv=0;
@@ -6638,7 +6638,7 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
    MultiAlignT *cma;
    IntUnitigPos *u_list;
    IntMultiPos *f_list;
-#if 0 //!HUREF2_COMPATIBLE
+#ifndef HUREF2_COMPATIBLE
    IntMultiVar  *v_list;
 #endif
    int append_left=0;
