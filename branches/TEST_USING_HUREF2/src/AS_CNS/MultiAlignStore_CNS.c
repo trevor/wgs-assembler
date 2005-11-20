@@ -25,7 +25,7 @@
    Assumptions:  libAS_UTL.a
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignStore_CNS.c,v 1.12.2.1 2005-10-26 16:14:02 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignStore_CNS.c,v 1.12.2.2 2005-11-20 14:52:24 gdenisov Exp $";
 
 
 #include <assert.h>
@@ -634,8 +634,6 @@ CreateMultiAlignTFromICM(IntConConMesg *icm, int localID, int sequenceOnly)
       for(cfr = 0,delta_len=0; cfr < icm->num_pieces; cfr++){
 	IntMultiPos *cfr_mesg = icm->pieces + cfr;
 	IntMultiPos tmp;
-	
-
 	
 	tmp.type = cfr_mesg->type;
 	tmp.ident = cfr_mesg->ident;
@@ -2002,8 +2000,10 @@ PrintMultiAlignT(FILE *out,
        free(multia);
        for (i=0;i<depth;i++) {
          free((int *)idarray[i]);
+         free((int *)oriarray[i]);
        }
        free(idarray);
+       free(oriarray);
   }
   return 1;
 }
@@ -2149,12 +2149,15 @@ PrintMultiAlignTSNPs(
   if (multia) {
        for (i=0;i<2*depth;i++) {
          free((char *)multia[i]);
+         free((int *)oriarray[i]);
        }
        free(multia);
        for (i=0;i<depth;i++) {
          free((int *)idarray[i]);
+         free((int *)oriarray[i]);
        }
        free(idarray);
+       free(oriarray);
   }
   return 1;
 }
