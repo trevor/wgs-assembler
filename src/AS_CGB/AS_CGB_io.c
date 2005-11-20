@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 static char CM_ID[] 
-= "$Id: AS_CGB_io.c,v 1.5 2005-08-12 20:17:02 gdenisov Exp $";
+= "$Id: AS_CGB_io.c,v 1.5.4.1 2005-11-20 13:08:44 gdenisov Exp $";
 /* *******************************************************************
  *
  * Module: AS_CGB_io.c
@@ -251,7 +251,9 @@ void output_the_chunks
     achunk.forced         = forced;
     achunk.num_frags      = mychunk->num_frags;
     achunk.f_list         = GetVA_IntMultiPos(the_imps,0);
-    achunk.num_vars       = 0;
+#ifndef HUREF2_COMPATIBLE
+    achunk.num_vars       = 0;q
+#endif
 
     fragment_count += mychunk->num_frags;
     if(fragment_count_target > 0) {
