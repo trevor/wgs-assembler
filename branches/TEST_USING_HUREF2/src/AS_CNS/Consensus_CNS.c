@@ -27,7 +27,7 @@
                  
  *********************************************************************/
 
-static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.18.2.1 2005-10-26 16:14:02 gdenisov Exp $";
+static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.18.2.2 2005-11-20 15:15:49 gdenisov Exp $";
 
 // Operating System includes:
 #include <stdlib.h>
@@ -833,7 +833,7 @@ int main (int argc, char *argv[]) {
       VA_TYPE(char) *quality=CreateVA_char(200000);
       time_t t;
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.18.2.1 $ processing. Started %s\n",
+      fprintf(stderr,"# Consensus $Revision: 1.18.2.2 $ processing. Started %s\n",
         ctime(&t));
       InitializeAlphTable();
       if ( ! align_ium && USE_SDB && extract > -1 ) 
@@ -851,6 +851,7 @@ int main (int argc, char *argv[]) {
         ctmp.pieces      = GetIntMultiPos(ma->f_list,0);
         ctmp.num_unitigs = GetNumIntUnitigPoss(ma->u_list);
         ctmp.unitigs     = GetIntUnitigPos(ma->u_list,0);
+        ctmp.placed      = AS_PLACED;
 #if 0
         fprintf(stderr, "Before MultiAlignContig #%d: ctmp.num_vars = %d\n", ctmp.iaccession, ctmp.num_vars);
 #endif
@@ -869,25 +870,26 @@ int main (int argc, char *argv[]) {
 #endif
         if ( printwhat != CNS_STATS_ONLY && cnslog != NULL )
         {
-           ma = CreateMultiAlignTFromICM(&ctmp,-1,0);
-           PrintMultiAlignT(cnslog,ma,global_fragStore,global_fragStorePartition, 
+           MultiAlignT *ma1 = CreateMultiAlignTFromICM(&ctmp,-1,0);
+           PrintMultiAlignT(cnslog,ma1,global_fragStore,global_fragStorePartition, 
                             global_bactigStore, 1,0,READSTRUCT_LATEST);
-          fflush(cnslog);
-          tmesg.t = MESG_ICM; 
-          tmesg.m = &ctmp; 
-          writer(cnsout,&tmesg); 
-          fflush(cnsout);
+           fflush(cnslog);
+           tmesg.t = MESG_ICM; 
+           tmesg.m = &ctmp; 
+           writer(cnsout,&tmesg); 
+           fflush(cnsout);
 #ifndef   HUREF2_COMPATIBLE
-          if (ctmp.v_list != NULL)
-          {
+           if (ctmp.v_list != NULL)
+           {
               int i;
               for (i=0; i<ctmp.num_vars; i++)
 //                if (ctmp.v_list[i].var_seq != 0)
                       free(ctmp.v_list[i].var_seq);      
               free(ctmp.v_list);
-          }
-          ctmp.num_vars = 0;
+           }
+           ctmp.num_vars = 0;
 #endif
+//         FREE(ma1);
         }
         exit(0); 
       }
@@ -1120,7 +1122,7 @@ int main (int argc, char *argv[]) {
             {
               AuditLine auditLine;
               AppendAuditLine_AS(adt_mesg, &auditLine, t,
-                                 "Consensus", "$Revision: 1.18.2.1 $","(empty)");
+                                 "Consensus", "$Revision: 1.18.2.2 $","(empty)");
             }
 #endif
               VersionStampADT(adt_mesg,argc,argv);
@@ -1144,7 +1146,7 @@ int main (int argc, char *argv[]) {
       }
 
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.18.2.1 $ Finished %s\n",ctime(&t));
+      fprintf(stderr,"# Consensus $Revision: 1.18.2.2 $ Finished %s\n",ctime(&t));
       if (printcns) 
       {
         int unitig_length = (unitig_count>0)? (int) input_lengths/unitig_count: 0; 
