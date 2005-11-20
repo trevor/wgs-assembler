@@ -301,7 +301,8 @@ void PrintAlignment(FILE *, int32, int32, int32, CNS_PrintKey );
 typedef enum {
   LEFT_SHIFT  = (int) 'L', // Left Shifted
   RIGHT_SHIFT = (int) 'R', // Right Shifted
-  UNSHIFTED   = (int) 'U'  // Unshifted
+  UNSHIFTED   = (int) 'U', // Unshifted
+  MIXED_SHIFT = (int) 'M'  // shifted in different directions
 } ShiftStatus;
 
 typedef struct {
