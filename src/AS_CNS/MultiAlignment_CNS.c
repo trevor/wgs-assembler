@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.4 2005-11-20 15:52:38 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.5 2005-11-21 00:57:33 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -5476,13 +5476,15 @@ MapConsensus(int ***imap, char **consensus,  char ***ugconsensus,
     int len, int *uglen)
 {
     int i, j, k;
-
+    uglen[0] = uglen[1] = 0;
    *ugconsensus = (char **)safe_malloc(2*sizeof(char *));
    *imap        = (int  **)safe_malloc(2*sizeof(int  *));
     for (i=0; i<2; i++)
     {
       (*ugconsensus)[i] = (char *)safe_malloc(len*sizeof(char));    
       (*imap)[i]        = (int  *)safe_malloc(len*sizeof(int ));
+        for (j=0; j<len; j++)
+            (*imap)[i][j] = j;                
         k=0;
         for (j=0; j<len; j++)
         {
@@ -5752,9 +5754,9 @@ void  GetTemplateForAbacus(char **template, char **consensus, int len,
     /* Set Ns in the right part of the template */
     i = uglen[long_allele]-1-adjright[long_allele];
     j = uglen[short_allele]-1-adjright[short_allele];
-    while ((imap[long_allele][i] > rpos) &&
-           (i >= adjleft[long_allele]) &&
-           (j >= adjleft[short_allele]))
+    while ((i >= adjleft[long_allele]) &&
+           (j >= adjleft[short_allele]) &&
+           (imap[long_allele][i] > rpos))
     {
         if ((ugconsensus[short_allele][j] != ugconsensus[long_allele][i]) &&
             ((*template)[imap[long_allele][i]] != '-'))
@@ -5944,13 +5946,13 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
     { 
         int i;
         AlPair  ap;
-        char  **reads, **consensus, **ugconsensus, *template;
-        int   **imap, uglen[2], adjleft[2], adjright[2];
+        char  **reads=NULL, **consensus=NULL, **ugconsensus=NULL, *template=NULL;
+        int   **imap=NULL, uglen[2]={0,0}, adjleft[2]={-1,-1}, adjright[2]={-1,-1};
         int     gapcount[2], short_allele=-1, long_allele=-1;
-        int     lscore=0, rscore=0, lpos, rpos;
+        int     lscore=0, rscore=0, lpos=-1, rpos=-1;
         int     mixed_columns=0;
         int32   mixed_score=0, mixed_gap_score=0;
-        Abacus *mixed_abacus;
+        Abacus *mixed_abacus=NULL;
 
         SetDefault(&ap);
         ap.nr = best_abacus->rows;
