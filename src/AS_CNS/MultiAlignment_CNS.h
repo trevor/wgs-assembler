@@ -61,6 +61,7 @@ typedef struct {
  */
 int32    nr;          // number of reads in the region of variation
 int32    max_nr;
+int32    nb;
 int32    nr_best_allele;
 int32    best_allele;
 double   ratio;
@@ -351,7 +352,8 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *, FragStoreHandle ,
 
 void ResetStores(int32 num_frags, int32 num_columns);
 int SetupSingleColumn(char *, char *, char *, char *, CNS_Options *opp);
-int BaseCall(int32 , int , double *, AlPair , int, char *, int, CNS_Options *opp);
+int BaseCall(int32 , int , double *, AlPair *, int, char *, int, int,
+   CNS_Options *);
 void ShowColumn(int32 cid);
 
 int MultiAlignUnitig(IntUnitigMesg *, FragStoreHandle, VA_TYPE(char) *,
