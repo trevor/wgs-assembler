@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.7 2005-12-07 20:47:01 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.8 2005-12-08 16:07:55 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -2579,7 +2579,8 @@ UpdateScores(AlPair ap, char cbase, char abase)
             }
             // Call consensus using both the alleles
             // The goal is to calculate variation at a given position
-            BaseCall(cid, quality, &(varf[index]), &ap, -1, &cbase, 0, 1, opp);
+            BaseCall(cid, quality, &(varf[index]), &ap, -1, &cbase, 0, get_scores, 
+                opp);
             cids[index] = cid;
         }
         column->ma_index = index;
