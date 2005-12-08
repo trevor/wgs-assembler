@@ -33,9 +33,29 @@
 #define CNS_MAX_QV 60
 #define CNS_NALPHABET 6
 #define CNS_NP 32 
+#define MIN_ALLOCATED_DEPTH 100
+
 #define COMPARE_ARGS char *aseq, char *bseq, int beg, int end, int opposite, \
                     double erate, double thresh, int minlen, \
 				 CompareOptions what
+
+typedef struct {
+/*  This structure is used when recalling consensus bases
+ *  to use only one of two alleles
+ */
+int32    nr;          // number of reads in the region of variation
+int32    max_nr;
+int32    nb;
+int32    nr_best_allele;
+int32    best_allele;
+double   ratio;
+char    *bases;
+char    *alleles;     // may be 0 or 1
+char    *types;
+int32   *iids;        // iids of the reads
+int32   *sum_qvs;     // used to select the best allele
+int32  **dist_matrix; // nr x nr matrix of cross-distances between reads
+} AlPair;
 
 // -----------------------------------
 // Jason introduced this new structure to address previous
@@ -258,7 +278,7 @@ typedef struct {
 int GetMANodeConsensus(int32 mid, VA_TYPE(char) *sequence, VA_TYPE(char) *quality);
 int GetMANodePositions(int32 mid, int num_frags, IntMultiPos *imps, int num_unitigs, IntUnitigPos *iups, VA_TYPE(int32) *deltas);
 void PrintAlignment(FILE *print, int32 mid, int32 from, int32 to, CNS_PrintKey what);
-int32 MergeRefine(int32 mid);
+int32 MergeRefine(int32 mid, int get_scores);
 
 typedef enum {
   LEFT_SHIFT  = (int) 'L', // Left Shifted
@@ -321,7 +341,7 @@ int SetupSingleColumn(char *sequence,
                       char *quality,
                       char *frag_type,
                       char *unitig_type);
-int BaseCall(int32 cid, int quality, int verbose);
+int BaseCall(int32 cid, int , AlPair *, int , int);
 void ShowColumn(int32 cid);
 int MultiAlignUnitig(IntUnitigMesg *unitig, 
                      FragStoreHandle fragStore,

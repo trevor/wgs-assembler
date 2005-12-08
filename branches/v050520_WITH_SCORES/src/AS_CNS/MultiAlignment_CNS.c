@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.7 2005-05-09 15:33:12 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.7.2.1 2005-12-08 17:18:50 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -51,10 +51,12 @@ static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.7 2005-05-09 15:33:12 gdeni
 #undef TEST_IMP2ARRAY
 #define ALT_QV_THRESH 30
 #define IDENT_NAMESPACE 1
+#define INITIAL_NR    100
 #define DONT_SHOW_OLAP 0
 #define SHOW_OLAP 1
 #undef ALIGN_TO_CONSENSUS
 #define PRINTUIDS
+#define FREE(x) if((x)!=NULL) {free((char *)(x));(x)=NULL;}
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -84,6 +86,9 @@ static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.7 2005-05-09 15:33:12 gdeni
 #include "Array_CNS.h"
 #include "UtilsREZ.h"
 //#include "CA_ALN_local.h"
+
+int ScoreNumColumns;
+int ScoreNumRunsOfGaps;
 
 //=================================================================================
 //  Tables to facilitate SNP Basecalling
@@ -728,7 +733,8 @@ int SetUngappedFragmentPositions(FragType type,int32 n_frags, MultiAlignT *uma) 
         anchor_frag=GetCNS_AlignedContigElement(fragment_positions,anchor->components);
         for (ifrag=0;ifrag<anchor->n_components;ifrag++,anchor_frag++) { 
            if ( anchor_frag->frg_or_utg == CNS_ELEMENT_IS_FRAGMENT ) {
-             int lookup_rc = LookupInPHashTable_AS (unitigFrags, IDENT_NAMESPACE, anchor_frag->idx.fragment.frgIdent, &value);
+             int lookup_rc = LookupInPHashTable_AS (unitigFrags, IDENT_NAMESPACE, 
+                 anchor_frag->idx.fragment.frgIdent, &value);
              if (lookup_rc == HASH_SUCCESS ) {
                anchor_frag->idx.fragment.frgInUnitig=uma->id;
                in_unitig_frags++;
@@ -1604,7 +1610,9 @@ char QVInRange(int q) {
     }
 }
 
-int BaseCall(int32 cid, int quality, int verbose) {
+int BaseCall(int32 cid, int quality, AlPair *ap, int verbose,
+    int get_scores) 
+{
 /*
 Calculate the consensus call for the given column 
 */
@@ -1618,6 +1626,7 @@ int other_depth=0;
 int score=0;
 int bi;
 int32 bid;
+int32 iid = 0;
 char base;
 char cqv;
 int qv = 0;
@@ -1627,6 +1636,8 @@ FragType type;
 UnitigType utype;
 ColumnBeadIterator ci;
 int used_surrogate=0;
+
+ap->nb = 0;
 
 if(!CreateColumnBeadIterator(cid,&ci)){
      CleanExit("BaseCall CreateColumnBeadIterator failed",__LINE__,1);
@@ -1677,6 +1688,7 @@ if (quality > 0) {
     }
     bmask = AMASK[BaseToInt(base)];
     type = GetFragment(fragmentStore,bead->frag_index)->type;
+    iid   = GetFragment(fragmentStore,bead->frag_index)->iid;
     if (type  != AS_READ &&
     	type  != AS_B_READ &&
         type  != AS_EXTR &&
@@ -1686,6 +1698,20 @@ if (quality > 0) {
     } else {
       read_base_count[BaseToInt(base)]++;
       AppendBead(reads,bead);
+      if (get_scores)
+      {
+          ap->bases[ap->nb] = base;
+          ap->iids[ap->nb]  = iid;
+          ap->nb++;
+          if (ap->nb == ap->max_nr)
+          {
+             ap->max_nr += INITIAL_NR;
+             ap->bases = (char *)safe_realloc(ap->bases,
+                         ap->max_nr*sizeof(char));
+             ap->iids = (int32 *)safe_realloc(ap->iids,
+                         ap->max_nr*sizeof(int32));
+          }
+      }
     }
     if ( type != AS_UNITIG ) {
       frag_cov++;
@@ -1895,17 +1921,63 @@ if (quality > 0) {
  return score; 
 }
 
+static void
+UpdateScoreNumRunsOfGaps(AlPair ap, int prev_nr, char *prev_bases,
+    int32 *prev_iids)
+{
+    int i, j;
+
+    // Updating count of stretches of gaps
+    for (i=0; i<prev_nr; i++) {
+       if (prev_bases[i] == '-')
+           continue;
+
+       for (j=0; j<ap.nb; j++) {
+           if (ap.bases[j] != '-')
+               continue;
+
+           if (prev_iids[i] == ap.iids[j])
+               ScoreNumRunsOfGaps++;
+       }
+    }
+}
+
+static void
+SetDefault(AlPair *ap)
+{
+    ap->nr = 0;
+}
+
 //=================================================================================
 // Basic MultiAlignmentNode (MANode) manipulation
 //=================================================================================
 
-int RefreshMANode(int32 mid, int quality) {
+int 
+RefreshMANode(int32 mid, int quality, int get_scores) 
+{
   // refresh columns from cid to end
 // if quality == -1, don't recall the consensus base
   int index=0;
   int32 cid;
   Column *column;
   MANode *ma = GetMANode(manodeStore,mid);
+  int32  *prev_iids; 
+  char   *prev_bases;
+  int     i, max_prev_nr=INITIAL_NR, prev_nr=0;
+  AlPair  ap;
+
+  SetDefault(&ap);
+  ap.max_nr = MIN_ALLOCATED_DEPTH;
+  ap.iids  = (int32 *)safe_calloc(ap.max_nr, sizeof(int32));
+  ap.bases =  (char *)safe_calloc(ap.max_nr, sizeof(char));
+  ap.nr = -1;
+
+  if (get_scores ) {
+      prev_bases = (char  *)safe_malloc(max_prev_nr*sizeof(char ));
+      prev_iids  = (int32 *)safe_malloc(max_prev_nr*sizeof(int32));
+  }
+
+
   if (ma == NULL ) CleanExit("RefreshMANode ma==NULL",__LINE__,1);
   if ( ma->first == -1 ) return 1;
   Resetint32(ma->columns);
@@ -1913,7 +1985,10 @@ int RefreshMANode(int32 mid, int quality) {
   while ( cid  > -1 ) {
     column = GetColumn(columnStore,cid);
     if (column == NULL ) CleanExit("RefreshMANode column==NULL",__LINE__,1);
-    if ( quality != -2 ) BaseCall(cid,quality,0);
+
+    if ( quality != -2 ) 
+        BaseCall(cid,quality, &ap, 0, get_scores);
+
     column->ma_index = index;
     AppendVA_int32(ma->columns,&cid);
     // sanity check
@@ -1924,9 +1999,54 @@ int RefreshMANode(int32 mid, int quality) {
         CleanExit("RefreshMANode column relationships violated",__LINE__,1);
       }
     }
+
+    if (get_scores)
+    {
+#if 0
+        fprintf(stderr, "ap.nb=%d ap.bases=", ap.nb);
+        for (i=0; i<ap.nb; i++)
+            fprintf(stderr, "%c", ap.bases[i]);
+        fprintf(stderr, " prev_nr=%d prev_bases=", prev_nr);
+        for (i=0; i<prev_nr; i++)
+            fprintf(stderr, "%c", prev_bases[i]);
+        fprintf(stderr, " ScoreNumRunsOfGaps=%d \nap.iids= ", ScoreNumRunsOfGaps);
+        for (i=0; i<ap.nb; i++)
+            fprintf(stderr, "%d ", ap.iids[i]);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "prev_iids= ");
+        for (i=0; i<prev_nr; i++)
+            fprintf(stderr, "%d ", prev_iids[i]);
+        fprintf(stderr, "\n");
+#endif
+        UpdateScoreNumRunsOfGaps(ap, prev_nr, prev_bases, prev_iids);
+        if (ap.nb > max_prev_nr) {
+            max_prev_nr =  ap.nb;
+            prev_bases = (char *)safe_realloc(prev_bases,
+                max_prev_nr*sizeof(char));
+            prev_iids  = (int32 *)safe_realloc(prev_iids,
+                max_prev_nr*sizeof(int32));
+        }
+        prev_nr = ap.nb;
+        for (i=0; i<ap.nb; i++) {
+            prev_bases[i] = ap.bases[i];
+            prev_iids[i]  = ap.iids[i];
+        }
+    }
     cid = column->next;
     index++;
   }
+
+  if (get_scores ) {
+      ScoreNumColumns += index;
+  }
+
+  FREE(ap.bases);
+  FREE(ap.iids);
+  if (get_scores) {
+      FREE(prev_bases);
+      FREE(prev_iids);
+  }
+
   return 1;
 }
 
@@ -1947,7 +2067,7 @@ int SeedMAWithFragment(int32 mid, int32 fid, int quality) {
      cid = ColumnAppend(cid, bid);
   }
   fragment->manode=mid;
-  RefreshMANode(mid,quality); 
+  RefreshMANode(mid,quality, 0); 
   return 1;
 }
 
@@ -3406,7 +3526,7 @@ int RemoveNullColumn(int32 nid) {
 // to merge and removing null columns
 //=================================================================================
 
-int32 MergeRefine(int32 mid) {
+int32 MergeRefine(int32 mid, int get_scores) {
   MANode *ma = GetMANode(manodeStore,mid);
   int32 cid;
   int32 nid;
@@ -3433,7 +3553,7 @@ int32 MergeRefine(int32 mid) {
     }
     cid = column->next;
   }
-  RefreshMANode(mid,1);
+  RefreshMANode(mid,1, get_scores);
   return removed;
 }
 
@@ -3900,6 +4020,8 @@ int ApplyAbacus(Abacus *a) {
   int32 bid,eid,i;
   char a_entry;
   Bead *bead,*exch_bead;
+  AlPair ap;
+
   if ( a->shift == LEFT_SHIFT) {
      column = GetColumn(columnStore,a->start_column);
      if (column == NULL ) CleanExit("ApplyAbacus column==NULL",__LINE__,1);
@@ -3962,7 +4084,7 @@ int ApplyAbacus(Abacus *a) {
                 exch_bead->boffset);
          */
        }
-       BaseCall(column->lid,1,0);
+       BaseCall(column->lid,1, &ap, 0, 0);
        column = GetColumn(columnStore,column->next);
        columns++;
      } 
@@ -4025,7 +4147,7 @@ int ApplyAbacus(Abacus *a) {
                 exch_bead->boffset);
          */
        }
-       BaseCall(column->lid,1,0);
+       BaseCall(column->lid,1,&ap, 0, 0);
        column = GetColumn(columnStore,column->prev);
        columns++;
      } 
@@ -4302,7 +4424,7 @@ int AbacusRefine(MANode *ma,int32 from, int32 to, CNS_RefineLevel level) {
       }
       start_column = GetColumn(columnStore, stab_bgn);
   }
-  RefreshMANode(ma->lid,1);
+  RefreshMANode(ma->lid,1, 0);
   refined_length = GetMANodeLength(ma->lid);
   if ( refined_length < orig_length ) {
     //fprintf(stderr,"Column reduction = ", orig_length-GetMANodeLength(ma->lid));
@@ -4482,7 +4604,7 @@ int RealignToConsensus(int32 mid,char *sequence,char *quality,int32 fid_bgn, int
    UnAlignFragment(i);
    ApplyAlignment(cns_fid,aoffset,i,ahang,Getint32(trace,0));
    afrag->deleted = 0;
-   RefreshMANode(ma_realigned->lid,0);
+   RefreshMANode(ma_realigned->lid,0, 0);
   }
  
  return 1;
@@ -4703,7 +4825,7 @@ for (i=1;i<num_frags;i++) {
   }
 }
 
-RefreshMANode(ma->lid,0);
+RefreshMANode(ma->lid,0, 0);
 //DeleteVA_int32(trace);
 free(offsets);
 
@@ -4711,12 +4833,12 @@ if ( cnslog != NULL && printwhat == CNS_VERBOSE) PrintAlignment(cnslog,ma->lid,0
 if ( ! unitig_forced ) {
 score_reduction = AbacusRefine(ma,0,-1,CNS_SMOOTH);
 //fprintf(cnslog,"Score reduced by %d in AbacusRefine.\n", score_reduction);
-MergeRefine(ma->lid);
+MergeRefine(ma->lid, 0);
 AbacusRefine(ma,0,-1,CNS_POLYX);
-MergeRefine(ma->lid);
+MergeRefine(ma->lid, 0);
 if ( cnslog != NULL && printwhat == CNS_VERBOSE) PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
 AbacusRefine(ma,0,-1,CNS_INDEL);
-MergeRefine(ma->lid);
+MergeRefine(ma->lid, 0);
 if ( cnslog != NULL && printwhat != CNS_QUIET && printwhat != CNS_STATS_ONLY ) {
   fprintf(stderr,"Should print alignment!\n");
   PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
@@ -4985,7 +5107,7 @@ int32 PlaceFragments(int32 fid, Overlap *(*COMPARE_FUNC)(COMPARE_ARGS)) {
      Bead *afirst = GetBead(beadStore,afrag->beads+ahang);
      Column *col = GetColumn(columnStore,afirst->column_index);
      MANode *manode = GetMANode(manodeStore,col->ma_id);
-     RefreshMANode(manode->lid,0);
+     RefreshMANode(manode->lid,0, 0);
      afirst = GetBead(beadStore,afrag->beads+ahang);
      col = GetColumn(columnStore,afirst->column_index);
 
@@ -5186,7 +5308,7 @@ int MultiAlignContig(IntConConMesg *contig,
         PlaceFragments(bfrag->lid,COMPARE_FUNC);
         //assert( GetNumFragments(fragmentStore) < total_aligned_elements);
      }
-     RefreshMANode(ma->lid,0);
+     RefreshMANode(ma->lid,0, 0);
      // Now, must find fragments in regions of overlapping unitigs, and adjust 
      // their alignments as needed
      
@@ -5196,15 +5318,15 @@ int MultiAlignContig(IntConConMesg *contig,
        PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
      }
      AbacusRefine(ma,0,-1,CNS_SMOOTH);
-     MergeRefine(ma->lid);
+     MergeRefine(ma->lid, 0);
      AbacusRefine(ma,0,-1,CNS_POLYX);
      if ( cnslog != NULL && printwhat == CNS_VERBOSE) {
        fprintf(cnslog,"\nPOLYX refined alignment\n");
        PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
      }
-     RefreshMANode(ma->lid,0);
+     RefreshMANode(ma->lid,0, 0);
      AbacusRefine(ma,0,-1,CNS_INDEL);
-     MergeRefine(ma->lid);
+     MergeRefine(ma->lid, 1);
      //     PrintAlignment(cnslog,ma->lid,0,-1,'C');
      if ( cnslog != NULL  && (printwhat == CNS_VERBOSE || printwhat == CNS_VIEW_UNITIG)) { 
        fprintf(cnslog,"\nFinal refined alignment\n");
@@ -5301,7 +5423,7 @@ int MultiAlignContig_NoCompute(FILE *outFile, int scaffoldID,MultiAlignT *cma,
 	tracep[imp->delta_length]=0;
         ApplyIMPAlignment(afrag->lid,blid,ahang,tracep);
      }
-     RefreshMANode(ma->lid,-2);
+     RefreshMANode(ma->lid,-2, 0);
      UnAlignFragment(0); // remove the consensus string from the multialignment
 
      //PrintAlignment(stdout,ma->lid,0,-1,CNS_DOTS);
@@ -5347,6 +5469,8 @@ int ExamineMANode(FILE *outFile,int32 sid, int32 mid, UnitigData *tigData,int nu
   int tindex=0;
   UnitigData *tig;
   MANode *ma = GetMANode(manodeStore,mid);
+  AlPair ap;
+
   if (ma == NULL ) CleanExit("RefreshMANode ma==NULL",__LINE__,1);
   if ( ma->first == -1 ) return 1;
   cid = ma->first;
@@ -5361,7 +5485,7 @@ int ExamineMANode(FILE *outFile,int32 sid, int32 mid, UnitigData *tigData,int nu
     qv = *Getchar(qualityStore,cbead->soffset);
     fprintf(outFile,"%d\t%d\t%d\t%d\t%c\t%c\t" ,sid,ma->iid,index,ugindex,base,qv);
     ShowBaseCountPlain(outFile,&column->base_count);
-    BaseCall(cid,1,0); // recall with quality on (and QV parameters set by user)
+    BaseCall(cid,1,&ap, 0, 0); // recall with quality on (and QV parameters set by user)
     fprintf(outFile,"%c\t%c\t", *Getchar(sequenceStore,cbead->soffset), *Getchar(qualityStore,cbead->soffset));
     // restore original consensus basecall/quality
     Setchar(sequenceStore,cbead->soffset,&base);
@@ -5623,7 +5747,7 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
          }
          assert(olap_success);
 	 ApplyAlignment(aid,0,bid,ahang,Getint32(trace,0));
-         RefreshMANode(ma->lid,0);
+         RefreshMANode(ma->lid,0, 0);
 
 	 //PrintAlignment(stderr,ma->lid,0,-1,'C');
          pos_offset=ahang;
@@ -5759,11 +5883,9 @@ fprintf(stderr," element %d at %d,%d\n", ci,bgn,end);
   return cma;
 }
 
-MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
-				   FragStoreHandle frag_store, VA_TYPE(IntMultiPos) *positions, int quality, int verbose, Overlap *(*COMPARE_FUNC)(COMPARE_ARGS));
-
 MultiAlignT *MergeMultiAlignsFast_new( tSequenceDB *sequenceDBp,
-				   FragStoreHandle frag_store, VA_TYPE(IntElementPos) *positions, int quality, int verbose, Overlap *(*COMPARE_FUNC)(COMPARE_ARGS)){
+    FragStoreHandle frag_store, VA_TYPE(IntElementPos) *positions, 
+    int quality, int verbose, Overlap *(*COMPARE_FUNC)(COMPARE_ARGS)){
   // this is the functionality used in traditionl CGW contigging
   //     I'm now extending it so that "contained" contigs are handled appropriately,
   //     which is necessitated by "local unitigging" (a.k.a. "meta-unitigging")
@@ -5788,11 +5910,14 @@ MultiAlignT *MergeMultiAlignsFast_new( tSequenceDB *sequenceDBp,
     mpos.position=epos->position;
     AppendVA_IntMultiPos(mpositions,&mpos);
   } 
-  return MergeMultiAligns( sequenceDBp, frag_store, mpositions, quality, verbose, COMPARE_FUNC);
+  return MergeMultiAligns( sequenceDBp, frag_store, mpositions, quality, 
+      verbose, COMPARE_FUNC);
 }
 
 MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
-				   FragStoreHandle frag_store, VA_TYPE(IntMultiPos) *positions, int quality, int verbose, Overlap *(*COMPARE_FUNC)(COMPARE_ARGS)){
+  FragStoreHandle frag_store, VA_TYPE(IntMultiPos) *positions, int quality, 
+  int verbose, Overlap *(*COMPARE_FUNC)(COMPARE_ARGS))
+{
 // frag_store needed? no
 
 // C----------------------------C
@@ -5922,7 +6047,7 @@ MultiAlignT *MergeMultiAligns( tSequenceDB *sequenceDBp,
         ApplyAlignment(afrag->lid,0,bfrag->lid,ahang,Getint32(trace,0));
      }
      
-     RefreshMANode(ma->lid,0);
+     RefreshMANode(ma->lid,0, 0);
      // DeleteVA_int32(trace);
   }
   {
@@ -6185,7 +6310,8 @@ int32 AppendArtificialFragToLocalStore(FragType type, int32 iid, int complement,
 int SetupSingleColumn(char *sequence,
                       char *quality,
                       char *frag_type,
-                      char *unitig_type) {
+                      char *unitig_type) 
+{
 // returns the columnd id in the columnStore
 int32 fid,i;
 MANode *ma;
