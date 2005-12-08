@@ -27,7 +27,7 @@
                  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: Consensus_CNS.c,v 1.4 2005-03-22 19:48:40 jason_miller Exp $";
+static char CM_ID[] = "$Id: Consensus_CNS.c,v 1.4.2.1 2005-12-08 17:18:50 gdenisov Exp $";
 
 // Operating System includes:
 #include <stdlib.h>
@@ -60,6 +60,9 @@ static char CM_ID[] = "$Id: Consensus_CNS.c,v 1.4 2005-03-22 19:48:40 jason_mill
 #include "MultiAlignment_CNS.h"
 #include "Globals_CNS.h"
 #include "PublicAPI_CNS.h"
+
+extern int ScoreNumColumns;
+extern int ScoreNumRunsOfGaps;
 
 float CNS_SEQUENCING_ERROR_EST = .02; // Used to calculate '-' probability
 float CNS_SNP_RATE   = 0.0003; // Used to calculate BIAS
@@ -120,6 +123,13 @@ int32 GetUngappedSequenceLength(char *seq) {
       ungappedLength++;
   }
   return ungappedLength;
+}
+
+static void
+OutputScores(int NumColumns, int NumRunsOfGaps)
+{
+     fprintf(stderr, "\nScoreNumColumns     = %d\n", NumColumns);
+     fprintf(stderr, "ScoreNumRunsOfGaps  = %d\n", NumRunsOfGaps);
 }
 
 int main (int argc, char *argv[]) {
@@ -188,7 +198,10 @@ int main (int argc, char *argv[]) {
     allow_forced_frags=0;
     allow_neg_hang=0;
     ALIGNMENT_CONTEXT=AS_CONSENSUS;
-    
+   
+    ScoreNumColumns = 0;
+    ScoreNumRunsOfGaps = 0;
+ 
     while (!errflg && ((ch = getopt(argc, argv, "gnfhPv:d:O:o:r:S:mIUXAD:ECR:iGp:q:e:l:t:T:zs:V:a:")) != EOF)) {
         switch(ch) {
         case 'n':
@@ -727,7 +740,7 @@ int main (int argc, char *argv[]) {
     VA_TYPE(char) *quality=CreateVA_char(200000);
     time_t t;
     t = time(0);
-    fprintf(stderr,"# Consensus $Revision: 1.4 $ processing. Started %s\n",ctime(&t));
+    fprintf(stderr,"# Consensus $Revision: 1.4.2.1 $ processing. Started %s\n",ctime(&t));
     InitializeAlphTable();
     if ( ! align_ium && USE_SDB && extract > -1 ) {
        IntConConMesg ctmp;
@@ -754,6 +767,7 @@ int main (int argc, char *argv[]) {
          writer(cnsout,&tmesg); 
          fflush(cnsout);
        }
+       OutputScores(ScoreNumColumns, ScoreNumRunsOfGaps);
        exit(0); 
     }
     while ( (reader(cgwin,&pmesg) != EOF)
@@ -892,6 +906,7 @@ int main (int argc, char *argv[]) {
         //camview(cam,pcontig->iaccession,pcontig->pieces,pcontig->num_pieces,pcontig->unitigs,
         //        pcontig->num_unitigs,global_fragStore);
         writer(cnsout,pmesg);
+        OutputScores(ScoreNumColumns, ScoreNumRunsOfGaps);
         exit(0);
       }
       fflush(cnsout);
@@ -911,7 +926,7 @@ int main (int argc, char *argv[]) {
         {
           AuditLine auditLine;
           AppendAuditLine_AS(adt_mesg, &auditLine, t,
-                             "Consensus", "$Revision: 1.4 $","(empty)");
+                             "Consensus", "$Revision: 1.4.2.1 $","(empty)");
         }
 #endif
         VersionStampADT(adt_mesg,argc,argv);
@@ -934,7 +949,7 @@ int main (int argc, char *argv[]) {
     fflush(cnslog);
   }
   t = time(0);
-  fprintf(stderr,"# Consensus $Revision: 1.4 $ Finished %s\n",ctime(&t));
+  fprintf(stderr,"# Consensus $Revision: 1.4.2.1 $ Finished %s\n",ctime(&t));
   if (printcns) {
     int unitig_length = (unitig_count>0)? (int) input_lengths/unitig_count: 0; 
     int contig_length = (contig_count>0)? (int) output_lengths/contig_count: 0;
@@ -971,5 +986,6 @@ int main (int argc, char *argv[]) {
                 "ERROR: failure moving the cnsout file to final file name.\n");}
       }
    }
+   OutputScores(ScoreNumColumns, ScoreNumRunsOfGaps);
    return 0;
 }
