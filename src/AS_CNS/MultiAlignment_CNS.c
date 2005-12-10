@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.8 2005-12-08 16:07:55 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.9 2005-12-10 11:32:27 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -4716,32 +4716,49 @@ int32 ScoreAbacus(Abacus *abacus, int *cols)
    return score;       
 }
 
-int32 AffineScoreAbacus(Abacus *abacus)  
-{ 
+int32 AffineScoreAbacus(Abacus *abacus)
+{
    // This simply counts the number of opened gaps, to be used in tie breaker
    //   of edit scores.
    int score=0;
    char b;
    int i,j;
+   int start_column, end_column;
 
-   for (i=0;i<abacus->rows;i++) 
+   if (abacus->shift == LEFT_SHIFT)
+   {
+       start_column = 0;
+       end_column   = abacus->columns/3;
+   }
+   else if (abacus->shift == RIGHT_SHIFT)
+   {
+       start_column = 2*abacus->columns/3;
+       end_column   =   abacus->columns;
+   }
+   else //  abacus->shift == UNSHIFTED
+   {
+       start_column =   abacus->columns/3;
+       end_column   = 2*abacus->columns/3;
+   }
+
+   for (i=0;i<abacus->rows;i++)
    {
      int in_gap=0;
-     for (j=0;j<abacus->columns;j++) 
+     for (j=start_column;j<end_column;j++)
      {
         b = *GetAbacus(abacus,i,j);
-//      if ( abacus->calls[j] != 'n') 
+//      if ( abacus->calls[j] != 'n')
 //      commented out in order to make gap_score
 //      of the orig_abacus non-zero - GD
         {// don't look at null columns
-           if ( b != '-' ) 
+           if ( b != '-' )
            {
               in_gap=0;
-           } 
-           else 
+           }
+           else
            {
               // Size of a gap does not matter, their number in a row does - GD
-              if ( ! in_gap ) 
+              if ( ! in_gap )
               {
                  in_gap = 1;
                  score++;
