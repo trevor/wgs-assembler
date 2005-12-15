@@ -27,7 +27,7 @@
                  
  *********************************************************************/
 
-static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.18.2.3 2005-11-27 16:33:49 gdenisov Exp $";
+static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.18.2.4 2005-12-15 19:35:44 gdenisov Exp $";
 
 // Operating System includes:
 #include <stdlib.h>
@@ -68,8 +68,10 @@ static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.18.2.3 2005-11-27 16:33:49
 #include "Globals_CNS.h"
 #include "PublicAPI_CNS.h"
 
-extern int ScoreNumColumns;
-extern int ScoreNumRunsOfGaps;
+extern int ScoreNumColumnsInUnitigs;
+extern int ScoreNumRunsOfGapsInUnitigs;
+extern int ScoreNumColumnsInContigs;
+extern int ScoreNumRunsOfGapsInContigs;
 extern int ScoreNumAAMismatches;
 extern int ScoreNumFAMismatches;
 
@@ -198,12 +200,16 @@ help_message(int argc, char *argv[])
 }
 
 static void
-OutputScores(int NumColumns, int NumRunsOfGaps, int NumAAMismatches, int NumFAMismatches)
+OutputScores(int NumColumnsInUnitigs, int NumRunsOfGapsInUnitigs, 
+             int NumColumnsInContigs, int NumRunsOfGapsInContigs,
+             int NumAAMismatches, int NumFAMismatches)
 {
-     fprintf(stderr, "\nScoreNumColumns     = %d\n", NumColumns);
-     fprintf(stderr, "ScoreNumRunsOfGaps  = %d\n", NumRunsOfGaps);
-     fprintf(stderr, "ScoreNumAAMismatches= %d\n", NumAAMismatches);
-     fprintf(stderr, "ScoreNumFAMismatches= %d\n", NumFAMismatches);
+     fprintf(stderr, "\nScoreNumColumnsInUnitigs  = %d\n", NumColumnsInUnitigs);
+     fprintf(stderr, "ScoreNumRunsOfGapsInUnitigs = %d\n", NumRunsOfGapsInUnitigs);
+     fprintf(stderr, "ScoreNumColumnsInContigs  = %d\n", NumColumnsInContigs);
+     fprintf(stderr, "ScoreNumRunsOfGapsInContigs = %d\n", NumRunsOfGapsInContigs);
+     fprintf(stderr, "ScoreNumAAMismatches        = %d\n", NumAAMismatches);
+     fprintf(stderr, "ScoreNumFAMismatches        = %d\n", NumFAMismatches);
 }
 
 int main (int argc, char *argv[]) {
@@ -287,9 +293,7 @@ int main (int argc, char *argv[]) {
 
     USE_SDB=0;
     USE_SDB_PART=0;
-#ifndef   HUREF2_COMPATIBLE
     novar = 0;
-#endif
 
     optarg = NULL;
     debug_out = 1;
@@ -299,8 +303,10 @@ int main (int argc, char *argv[]) {
     allow_neg_hang=0;
     ALIGNMENT_CONTEXT=AS_CONSENSUS;
    
-    ScoreNumColumns = 0;
-    ScoreNumRunsOfGaps = 0;
+    ScoreNumColumnsInUnitigs = 0;
+    ScoreNumRunsOfGapsInUnitigs = 0;
+    ScoreNumColumnsInContigs = 0;
+    ScoreNumRunsOfGapsInContigs = 0;
     ScoreNumAAMismatches = 0;
     ScoreNumFAMismatches = 0;
  
@@ -365,12 +371,10 @@ int main (int argc, char *argv[]) {
           iflags++;
           iflags++;
           break;
-#ifndef   HUREF2_COMPATIBLE
         case 'N':
           novar++;   
           iflags++;
           break;
-#endif
         case 'o':
           output_override=1;
           iflags++;
@@ -861,7 +865,7 @@ int main (int argc, char *argv[]) {
       VA_TYPE(char) *quality=CreateVA_char(200000);
       time_t t;
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.18.2.3 $ processing. Started %s\n",
+      fprintf(stderr,"# Consensus $Revision: 1.18.2.4 $ processing. Started %s\n",
         ctime(&t));
       InitializeAlphTable();
       if ( ! align_ium && USE_SDB && extract > -1 ) 
@@ -883,14 +887,12 @@ int main (int argc, char *argv[]) {
 #if 0
         fprintf(stderr, "Before MultiAlignContig #%d: ctmp.num_vars = %d\n", ctmp.iaccession, ctmp.num_vars);
 #endif
-#ifndef   HUREF2_COMPATIBLE
         ctmp.num_vars    = GetNumIntMultiVars(ma->v_list);
         if (ctmp.num_vars == 0)
         {
             ctmp.num_vars = 1;
             ctmp.v_list = safe_malloc(sizeof(IntMultiVar));
         }
-#endif
         MultiAlignContig(&ctmp, sequence, quality, deltas, printwhat,
                         COMPARE_FUNC, &options);
 #if 0
@@ -906,7 +908,6 @@ int main (int argc, char *argv[]) {
            tmesg.m = &ctmp; 
            writer(cnsout,&tmesg); 
            fflush(cnsout);
-#ifndef   HUREF2_COMPATIBLE
            if (ctmp.v_list != NULL)
            {
               int i;
@@ -916,11 +917,11 @@ int main (int argc, char *argv[]) {
               free(ctmp.v_list);
            }
            ctmp.num_vars = 0;
-#endif
 //         FREE(ma1);
         }
-        OutputScores(ScoreNumColumns, ScoreNumRunsOfGaps, ScoreNumAAMismatches,
-            ScoreNumFAMismatches);
+        OutputScores(ScoreNumColumnsInUnitigs, ScoreNumRunsOfGapsInUnitigs, 
+                     ScoreNumColumnsInContigs, ScoreNumRunsOfGapsInContigs,
+                     ScoreNumAAMismatches, ScoreNumFAMismatches);
 
         exit(0); 
       }
@@ -1093,10 +1094,8 @@ int main (int argc, char *argv[]) {
 //                  pcontig->num_vars = 1;
 //                  pcontig->v_list = safe_malloc(sizeof(IntMultiVar));
 //              }
-#ifndef   HUREF2_COMPATIBLE
                 pcontig->num_vars == 0;
                 pcontig->v_list == NULL;
-#endif
                 MultiAlignContig(pcontig, sequence, quality, deltas, printwhat,
                 COMPARE_FUNC, &options);
             }
@@ -1123,11 +1122,11 @@ int main (int argc, char *argv[]) {
               //camview(cam,pcontig->iaccession,pcontig->pieces,pcontig->num_pieces,pcontig->unitigs,
               //        pcontig->num_unitigs,global_fragStore);
               writer(cnsout,pmesg);
-              OutputScores(ScoreNumColumns, ScoreNumRunsOfGaps, ScoreNumAAMismatches,
-                  ScoreNumFAMismatches);
+              OutputScores(ScoreNumColumnsInUnitigs, ScoreNumRunsOfGapsInUnitigs,
+                     ScoreNumColumnsInContigs, ScoreNumRunsOfGapsInContigs,
+                     ScoreNumAAMismatches, ScoreNumFAMismatches);
                   exit(0);
             }
-#ifndef   HUREF2_COMPATIBLE
             if (pcontig->v_list != NULL) 
             {
                 int i;
@@ -1137,7 +1136,6 @@ int main (int argc, char *argv[]) {
                 free(pcontig->v_list);
             }
             pcontig->num_vars = 0;
-#endif
             fflush(cnsout);
             fflush(cnslog);
             contig_count++;
@@ -1157,7 +1155,7 @@ int main (int argc, char *argv[]) {
             {
               AuditLine auditLine;
               AppendAuditLine_AS(adt_mesg, &auditLine, t,
-                                 "Consensus", "$Revision: 1.18.2.3 $","(empty)");
+                                 "Consensus", "$Revision: 1.18.2.4 $","(empty)");
             }
 #endif
               VersionStampADT(adt_mesg,argc,argv);
@@ -1181,7 +1179,7 @@ int main (int argc, char *argv[]) {
       }
 
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.18.2.3 $ Finished %s\n",ctime(&t));
+      fprintf(stderr,"# Consensus $Revision: 1.18.2.4 $ Finished %s\n",ctime(&t));
       if (printcns) 
       {
         int unitig_length = (unitig_count>0)? (int) input_lengths/unitig_count: 0; 
@@ -1226,8 +1224,9 @@ int main (int argc, char *argv[]) {
       }
     }
 
-    OutputScores(ScoreNumColumns, ScoreNumRunsOfGaps, ScoreNumAAMismatches,
-        ScoreNumFAMismatches);
+    OutputScores(ScoreNumColumnsInUnitigs, ScoreNumRunsOfGapsInUnitigs,
+                     ScoreNumColumnsInContigs, ScoreNumRunsOfGapsInContigs,
+                     ScoreNumAAMismatches, ScoreNumFAMismatches);
 
      return 0;
 }
