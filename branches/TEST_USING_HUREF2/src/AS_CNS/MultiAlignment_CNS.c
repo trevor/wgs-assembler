@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.9 2005-12-10 11:32:27 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.41.2.10 2005-12-19 15:52:36 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -6753,6 +6753,14 @@ int MultiAlignUnitig(IntUnitigMesg *unitig,
     IntMultiPos *positions=unitig->f_list;
     int num_frags = unitig->num_frags;
     int unitig_forced = 0;
+
+    if ((num_frags == 1) &&
+        (positions[0].position.bgn == positions[0].position.end))
+    {
+        fprintf(stderr,
+            "Warning: unitig #%d contains a single fragment of length 0 !\n");
+        return 0;
+    }
 
     //  Make sure that we have valid options here, we then reset the
     //  pointer to the freshly copied options, so that we can always
