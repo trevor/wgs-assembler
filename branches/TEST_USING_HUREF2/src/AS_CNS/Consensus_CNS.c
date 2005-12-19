@@ -27,7 +27,7 @@
                  
  *********************************************************************/
 
-static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.18.2.4 2005-12-15 19:35:44 gdenisov Exp $";
+static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.18.2.5 2005-12-19 15:44:02 gdenisov Exp $";
 
 // Operating System includes:
 #include <stdlib.h>
@@ -293,7 +293,9 @@ int main (int argc, char *argv[]) {
 
     USE_SDB=0;
     USE_SDB_PART=0;
+#ifndef   HUREF2_COMPATIBLE
     novar = 0;
+#endif
 
     optarg = NULL;
     debug_out = 1;
@@ -371,10 +373,12 @@ int main (int argc, char *argv[]) {
           iflags++;
           iflags++;
           break;
+#ifndef   HUREF2_COMPATIBLE
         case 'N':
           novar++;   
           iflags++;
           break;
+#endif
         case 'o':
           output_override=1;
           iflags++;
@@ -865,7 +869,7 @@ int main (int argc, char *argv[]) {
       VA_TYPE(char) *quality=CreateVA_char(200000);
       time_t t;
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.18.2.4 $ processing. Started %s\n",
+      fprintf(stderr,"# Consensus $Revision: 1.18.2.5 $ processing. Started %s\n",
         ctime(&t));
       InitializeAlphTable();
       if ( ! align_ium && USE_SDB && extract > -1 ) 
@@ -887,12 +891,14 @@ int main (int argc, char *argv[]) {
 #if 0
         fprintf(stderr, "Before MultiAlignContig #%d: ctmp.num_vars = %d\n", ctmp.iaccession, ctmp.num_vars);
 #endif
+#ifndef   HUREF2_COMPATIBLE
         ctmp.num_vars    = GetNumIntMultiVars(ma->v_list);
         if (ctmp.num_vars == 0)
         {
             ctmp.num_vars = 1;
             ctmp.v_list = safe_malloc(sizeof(IntMultiVar));
         }
+#endif
         MultiAlignContig(&ctmp, sequence, quality, deltas, printwhat,
                         COMPARE_FUNC, &options);
 #if 0
@@ -1155,7 +1161,7 @@ int main (int argc, char *argv[]) {
             {
               AuditLine auditLine;
               AppendAuditLine_AS(adt_mesg, &auditLine, t,
-                                 "Consensus", "$Revision: 1.18.2.4 $","(empty)");
+                                 "Consensus", "$Revision: 1.18.2.5 $","(empty)");
             }
 #endif
               VersionStampADT(adt_mesg,argc,argv);
@@ -1179,7 +1185,7 @@ int main (int argc, char *argv[]) {
       }
 
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.18.2.4 $ Finished %s\n",ctime(&t));
+      fprintf(stderr,"# Consensus $Revision: 1.18.2.5 $ Finished %s\n",ctime(&t));
       if (printcns) 
       {
         int unitig_length = (unitig_count>0)? (int) input_lengths/unitig_count: 0; 
