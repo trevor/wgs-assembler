@@ -178,10 +178,9 @@ examineGap(ContigT *lcontig, int lFragIid, ContigT *rcontig, int rFragIid,
     fprintf(stderr, " last 50 bases of lfragIid clr range: %s\n", &lFragSeqBuffer[lclr_end - 50]);
     lFragSeqBuffer[lclr_end] = tmp_char;
 #endif  
-
     fprintf(stderr, "for frag %d, lclr_bgn: %d, lclr_end: %d, strlen(lFragSeqBuffer): " F_SIZE_T "\n", 
             lFragIid, lclr_bgn, lclr_end, strlen(lFragSeqBuffer));
-    //fprintf(stderr, " lfrag: %s\n", lFragSeqBuffer);
+    // fprintf(stderr, " lfrag: %s\n", lFragSeqBuffer);
   }
 	
 #if 0
@@ -220,7 +219,7 @@ examineGap(ContigT *lcontig, int lFragIid, ContigT *rcontig, int rFragIid,
 	  
     fprintf(stderr, "for frag %d, rclr_bgn: %d, rclr_end: %d, strlen(rFragSeqBuffer): " F_SIZE_T "\n", 
             rFragIid, rclr_bgn, rclr_end, strlen(rFragSeqBuffer));
-    //fprintf(stderr, " rfrag: %s\n", rFragSeqBuffer);
+    // fprintf(stderr, " rfrag: %s\n", rFragSeqBuffer);
   }
 	
 #if 0
@@ -246,7 +245,7 @@ examineGap(ContigT *lcontig, int lFragIid, ContigT *rcontig, int rFragIid,
   }
 
   // grab the last CONTIG_BASES bases of the lcontig consensus sequence
-  lcontigBasesUsed = MIN(CONTIG_BASES - lFragContigOverlapLength, 
+  lcontigBasesUsed = min(CONTIG_BASES - lFragContigOverlapLength, 
                          (int) lcontig->bpLength.mean - lFragContigOverlapLength);
   // lcontigBasesUsed = 100.0;  // temp hack, but it is sometimes better to do 100 than 1000.  why???
   
@@ -314,16 +313,14 @@ examineGap(ContigT *lcontig, int lFragIid, ContigT *rcontig, int rFragIid,
   
   // grab the first CONTIG_BASES bases of the rcontig consensus sequence
   // the rcontig consensus has been flipped if necessary
-  rcontigBasesUsed = MIN(CONTIG_BASES - rFragContigOverlapLength, 
+  rcontigBasesUsed = min(CONTIG_BASES - rFragContigOverlapLength, 
                          (int) rcontig->bpLength.mean - rFragContigOverlapLength);
   for (i = 0; i < rcontigBasesUsed; i++)
     rcompBuffer[ rclr_bgn + i ] = rSequence[ i + rFragContigOverlapLength ]; //Aaron ad rFragContigOverlapLength
   rcompBuffer[ rclr_bgn + i ] = '\0';
 
-#if 0
   fprintf(stderr, "> lcompBuffer gap %d (len: " F_SIZE_T "): \n%s\n", gapNumber, strlen(lcompBuffer), lcompBuffer);
   fprintf(stderr, "> rcompBuffer gap %d (len: " F_SIZE_T "): \n%s\n", gapNumber, strlen(rcompBuffer), rcompBuffer);
-#endif
   
   // now lcompBuffer and rcompBuffer hold the sequence of the fragments in the correct strand
   // now prepare for call to Local_Overlap_AS_forCNS
@@ -459,11 +456,11 @@ examineGap(ContigT *lcontig, int lFragIid, ContigT *rcontig, int rFragIid,
               overlap->length + overlap->endpos - strlen(rcompBufferTrimmed));
 	  
       *lcontigBasesIntact = lcontigBaseStart;
-      *ahang = MAX (0, overlap->begpos);
+      *ahang = max (0, overlap->begpos);
       *olapLengthOut = overlap->length;
-      *bhang = MAX (0, overlap->endpos);
+      *bhang = max (0, overlap->endpos);
       *currDiffs = overlap->diffs;
-      *rcontigBasesIntact = MAX((int) rcontig->bpLength.mean - CONTIG_BASES, 0);
+      *rcontigBasesIntact = max((int) rcontig->bpLength.mean - CONTIG_BASES, 0);
 
       // calculate how many bases would be changed if gap was closed
       // take the whole lcompBuffer, subtract lcontigBasesUsed and lFragContigOverlapLength from ahang

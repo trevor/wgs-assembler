@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 static char CM_ID[] 
-= "$Id: AS_CGB_branchpts.c,v 1.7 2006-11-14 19:58:20 eliv Exp $";
+= "$Id: AS_CGB_branchpts.c,v 1.4 2005-03-22 19:48:22 jason_miller Exp $";
 /* *******************************************************************
  *
  * Module: AS_CGB_branchpts.c
@@ -249,8 +249,8 @@ static int gang_join
   bgang->use_me = use_me;
 
   if( ia == ib ) {
-    bgang->min_offset = MIN(bgang->min_offset,new_offset);
-    bgang->max_offset = MAX(bgang->max_offset,new_offset);
+    bgang->min_offset = min(bgang->min_offset,new_offset);
+    bgang->max_offset = max(bgang->max_offset,new_offset);
     return 0;
   }
 
@@ -294,8 +294,8 @@ static int gang_join
       y_min = new_offset + agang->min_offset;
       y_max = new_offset + agang->max_offset;
 
-      bgang->min_offset = MIN(bgang->min_offset,y_min);
-      bgang->max_offset = MAX(bgang->max_offset,y_max);
+      bgang->min_offset = min(bgang->min_offset,y_min);
+      bgang->max_offset = max(bgang->max_offset,y_max);
 
       iret = 0;
     } else { /* Merge the two sets */
@@ -464,7 +464,7 @@ static void  Get_Chunk_End_Sequence
 	   chunk_index,strlen(sequence),seq_len);
 #endif
     assert( strlen(sequence) == seq_len);
-    out_len = MIN(seq_len,max_len);
+    out_len = min(seq_len,max_len);
     
     if(chunk_suffix) {
       strncpy(s, &(sequence[seq_len-out_len]), out_len);
@@ -598,8 +598,8 @@ static void  Init_Distrib  (Distrib_t * D, int N)
   D -> Max = - FLT_MAX;
   D -> Sum = 0.0;
   D -> N = N;
-  D->Ct    = safe_calloc(sizeof(int), N + 1);
-  D->Thold = safe_calloc(sizeof(double), N + 1);
+  SAFE_CALLOC(D -> Ct, int, N + 1);
+  SAFE_CALLOC(D -> Thold, double, N + 1);
   assert (D -> Thold != NULL);
   
   return;
@@ -681,8 +681,8 @@ static void  Find_Branch_Points
   
   if(avail_len == 0) {
     avail_len = (int)(MAX_BP_CALLS * HEADROOM_FACTOR);
-    avail  = safe_malloc(sizeof(int) * avail_len);
-    chosen = safe_malloc(sizeof(char) * avail_len);
+    SAFE_MALLOC(avail, int, avail_len);
+    SAFE_MALLOC(chosen, char, avail_len);
     
     Init_Distrib (& BP_List_Len_Distrib, 38);
     for  (i = 0;  i < 10;  i ++)
@@ -705,8 +705,8 @@ static void  Find_Branch_Points
 #endif
   if(n > avail_len) {
     avail_len = (int)(n * HEADROOM_FACTOR);
-    avail = safe_realloc(sizeof(int) avail_len);
-    chosen = safe_realloc(sizeof(char) avail_len);
+    SAFE_REALLOC(avail, int, avail_len);
+    SAFE_REALLOC(chosen, char, avail_len);
   }
   
   assert (brncholaps[0].use_me);

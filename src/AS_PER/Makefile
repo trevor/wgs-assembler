@@ -94,7 +94,8 @@ testFragStore: $(AS_PER_OBJS) testFragStore.o libAS_UTL.a
 
 testLoad: $(AS_PER_OBJS) testLoad.o libAS_UTL.a 
 
-dumpFragDB: $(AS_PER_OBJS) AS_PER_fragDB.o dumpFragDB.o libAS_UTL.a $(OCISHAREDLIBS) 
+dumpFragDB: $(AS_PER_OBJS) AS_PER_fragDB.o dumpFragDB.o \
+	libAS_UTL.a $(OCISHAREDLIBS) 
 
 dumpFragStore: $(AS_PER_OBJS)  dumpFragStore.o libAS_UTL.a 
 
@@ -104,7 +105,8 @@ dumpFrag: $(AS_PER_OBJS)  dumpFrag.o libAS_UTL.a
 
 dumpFragFromPartition: $(AS_PER_OBJS) dumpFragFromPartition.o libAS_UTL.a 
 
-PopulateFragStore: $(AS_PER_OBJS)  PopulateFragStore.o libAS_MSG.a libAS_PER.a libAS_UTL.a
+PopulateFragStore: $(AS_PER_OBJS)  PopulateFragStore.o \
+	libAS_UTL.a libAS_MSG.a libAS_PER.a 
 
 binaryDumpFragStore: $(AS_PER_OBJS) binaryDumpFragStore.o libAS_UTL.a 
 

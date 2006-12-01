@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char CM_ID[] = "$Id: dumpDistanceEstimates.c,v 1.14 2006-11-14 19:58:21 eliv Exp $";
+static char CM_ID[] = "$Id: dumpDistanceEstimates.c,v 1.10 2006-08-14 19:21:39 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +32,7 @@ static char CM_ID[] = "$Id: dumpDistanceEstimates.c,v 1.14 2006-11-14 19:58:21 e
 #include <sys/stat.h>
 #include <unistd.h>
 
-
+#include "cds.h"
 #include "AS_global.h"
 #include "AS_UTL_Var.h"
 #include "AS_UTL_timer.h"
@@ -381,7 +381,7 @@ dde_stats(int         operateOnNodes,
         dptr->sigma += (((double)dist)*(double)dist);
 
       }
-    }
+          }
 
     // Mark unitigs as potential Rocks and Stones
     if (operateOnNodes == UNITIG_OPERATIONS) {
@@ -453,10 +453,10 @@ dde_stats(int         operateOnNodes,
     lowerSigma =   median - matePairs[ (int) ((0.5 - 0.34) * GetNumCDS_COORD_ts( dptr->samples ))].samples;
     upperSigma = - median + matePairs[ (int) ((0.5 + 0.34) * GetNumCDS_COORD_ts( dptr->samples ))].samples;	
 
-    newLower = median - 5 * MAX (lowerSigma, upperSigma);
+    newLower = median - 5 * max (lowerSigma, upperSigma);
     if ( newLower < 0 )
       newLower = 0;
-    newUpper = median + 5 * MAX (lowerSigma, upperSigma);
+    newUpper = median + 5 * max (lowerSigma, upperSigma);
     
 #if 0
     fprintf( stderr, "\nlib " F_CID ", numSamples: %d, orig mean, sig: ( %.2f, %.2f), calc mean, sig: (%.2f, %.2f) median: " F_COORD "\n",
@@ -662,8 +662,8 @@ dde_stats(int         operateOnNodes,
       for(j = 0; j < numSamples ; j++, samplep++) {
         CDS_COORD_t sample = *samplep;
         int32 binNum = ((float)sample - (float)dist->min)/dist->bsize;
-        binNum = MIN(binNum, dist->bnum -1);
-        binNum = MAX(binNum,0); // sample can be negative
+        binNum = min(binNum, dist->bnum -1);
+        binNum = max(binNum,0); // sample can be negative
         dist->histogram[binNum]++;
       }
     }

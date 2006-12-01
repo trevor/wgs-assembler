@@ -45,8 +45,8 @@ void aggregate(void *va,int i,void *vb) {
   MyDataType *b = (MyDataType *) vb;
   a[i].n += b->n;
   a[i].x += b->x;
-  a[i].y = MIN(a[i].y,b->y);
-  a[i].z = MAX(a[i].z,b->z);
+  a[i].y = min(a[i].y,b->y);
+  a[i].z = max(a[i].z,b->z);
 }
 int score(MyDataType *data) {
   int i;

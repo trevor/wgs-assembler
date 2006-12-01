@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: Array_CNS.c,v 1.7 2006-10-08 08:47:39 brianwalenz Exp $";
+static char CM_ID[] = "$Id: Array_CNS.c,v 1.6 2006-05-18 18:30:31 vrainish Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,6 +39,7 @@ static char CM_ID[] = "$Id: Array_CNS.c,v 1.7 2006-10-08 08:47:39 brianwalenz Ex
 #include "AS_PER_fragStore.h"
 #include "AS_UTL_Var.h"
 #include "UtilsREZ.h"
+#include "PrimitiveVA.h"
 #include "PrimitiveVA_MSG.h"
 #include "MultiAlignStore_CNS.h"
 #include "MultiAlignment_CNS.h"

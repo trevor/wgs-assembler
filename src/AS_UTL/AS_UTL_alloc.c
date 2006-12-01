@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "AS_global.h"
+#include "cds.h"
 #include "AS_UTL_alloc.h"
 
 // Allocate and return a pointer to an array of  num  elements of
@@ -34,11 +34,6 @@ safe_malloc(size_t len) {
     fprintf(stderr, "Could not malloc memory ("F_SIZE_T" bytes)\n", len);
     assert(p != NULL);
   }
-
-#undef TRASH_MEMORY_FIRST
-#ifdef TRASH_MEMORY_FIRST
-  memset(p, 0xff, len);
-#endif
   
   return(p);
 }

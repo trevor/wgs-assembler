@@ -611,7 +611,7 @@ Local_Overlap *Find_Local_Overlap(int Alen, int Blen, int comp, int nextbest,
 
             Trace[i].value  = best;
             Trace[i].source = srce;
-	    Trace[i].colsAligned = (int)((1.-err)*(double)(MIN(ae-ab,be-bb)+1));
+	    Trace[i].colsAligned = (int)((1.-err)*(double)(min(ae-ab,be-bb)+1));
             if (srce >= 0){
               Trace[i].start = Trace[srce].start;
 	      Trace[i].colsAligned += Trace[srce].colsAligned;
@@ -1133,6 +1133,9 @@ static void Print_Local_Overlap_Piece(FILE *file, char *A, char *B, Local_Segmen
   //    } else {
   //      ovlmsg.orientation = NORMAL;
   //    }
+#ifndef max
+#define max(a,b) (a > b ? a : b)
+#endif
 
   aptr=aseg;
   aptr--;
@@ -1143,7 +1146,7 @@ static void Print_Local_Overlap_Piece(FILE *file, char *A, char *B, Local_Segmen
 		 bptr,
 		 blen,
 		 &spnt,
-		 MAX(10,blen/50));
+		 max(10,blen/50));
 
   PrintAlign(stdout,0,0,aseg,bseg,trace);
 

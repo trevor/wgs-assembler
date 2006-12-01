@@ -33,8 +33,8 @@
 *************************************************/
 
 /* RCS info
- * $Id: AS_BOG_Datatypes.hh,v 1.13 2006-11-21 16:14:53 eliv Exp $
- * $Revision: 1.13 $
+ * $Id: AS_BOG_Datatypes.hh,v 1.8 2005-12-16 21:40:05 eliv Exp $
+ * $Revision: 1.8 $
 */
 
 #ifndef INCLUDE_AS_BOG_DATATYPES
@@ -43,7 +43,7 @@
 //  System include files
 
 extern "C" {
-#include "AS_global.h"
+#include "cds.h"
 }
 
 namespace AS_BOG{
@@ -97,26 +97,6 @@ namespace AS_BOG{
 	typedef CDS_IID_t iuid;
 	const iuid NULL_FRAG_ID=0;
 
-    struct FragmentEnd {
-        iuid id;
-        fragment_end_type end;
-
-        FragmentEnd(iuid id=0, fragment_end_type end=FIVE_PRIME) :
-            id(id), end(end) {}
-
-    };
-    inline bool operator==(FragmentEnd a, FragmentEnd b) {
-        if (a.id == b.id && a.end == b.end)
-            return true;
-        else
-            return false;
-    };
-    inline bool operator<(FragmentEnd a, FragmentEnd b) {
-        if (a.id != b.id)
-            return a.id < b.id;
-        else
-            return a.end < b.end;
-    };
 } //AS_BOG namespace
 
 

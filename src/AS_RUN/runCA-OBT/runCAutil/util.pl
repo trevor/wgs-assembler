@@ -96,7 +96,7 @@ sub setGlobal ($$) {
     $global{$var} = $val;
 }
 
-sub setDefaults () {
+sub setDefaults {
     $global{"binRoot"}                     = undef;
     $global{"cnsPartitions"}               = 128;
     $global{"cnsMinFrags"}                 = 75000;
@@ -120,13 +120,6 @@ sub setDefaults () {
     $global{"immutableFrags"}              = undef;
     $global{"localHost"}                   = undef;
     $global{"localMachine"}                = undef;
-
-    #  Undocumented!
-    $global{"merylMemory"}                 = 800;
-    $global{"merylObtThreshold"}           = 1000;
-    $global{"merylOvlThreshold"}           = 500;
-    $global{"merSize"}                     = 22;
-
     $global{"ovlCorrBatchSize"}            = 175000;
     $global{"ovlCorrOnGrid"}               = 0;
     $global{"ovlCorrConcurrency"}          = 4;
@@ -137,18 +130,8 @@ sub setDefaults () {
     $global{"ovlStoreMemory"}              = 1024;
     $global{"ovlThreads"}                  = 2;
     $global{"ovlOnGrid"}                   = 1;
-    $global{"executionWrapper"}            = undef;
+    $global{"processStats"}                = undef;
     $global{"scratch"}                     = "/scratch";
-    $global{"scriptOnGrid"}                = 0;
-
-    #  Undocumented!
-    $global{"sge"}                         = undef;           #  Options to all qsub
-    $global{"sgeScript"}                   = undef;           #  Options to qsub of the script (high-memory)
-    $global{"sgeOverlap"}                  = "-pe thread 2";  #  Options to overlap jobs
-    $global{"sgeConsensus"}                = "-pe thread 2";  #  Options to consensus jobs
-    $global{"sgeFragmentCorrection"}       = "-pe thread 2";  #  Options to fragment correction jobs
-    $global{"sgeOverlapCorrection"}        = "-pe thread 2";  #  Options to overlap correction jobs
-
     $global{"stoneLevel"}                  = 2;
     $global{"stopAfter"}                   = undef;
     $global{"uidServer"}                   = undef;
@@ -162,23 +145,9 @@ sub setDefaults () {
     $global{"useGrid"}                     = 0;
     $global{"useBogUnitig"}                = 0;
     $global{"vectorIntersect"}             = undef;
-
-    #  Undocumented!  Unimplemented
-    $global{"metagenomics"}                = undef;   #  disable frgCorr, ....
-    $global{"globalErrorRate"}             = 6;
 }
 
-sub makeAbsolute ($) {
-    my $var = shift @_;
-    my $val = getGlobal($var);
-    if (defined($val) && ($val !~ m!^/!)) {
-        $val = "$ENV{'PWD'}/$val";
-        setGlobal($var, $val);
-        $commandLineOptions .= " \"$var=$val\" ";
-    }
-}
-
-sub setParameters ($@) {
+sub setParameters {
     my $specFile = shift @_;
     my @specOpts = @_;
 
@@ -212,11 +181,6 @@ sub setParameters ($@) {
         }
     }
 
-    #  Fiddle with filenames to make them absolute paths.
-    #
-    makeAbsolute("immutableFrags");
-    makeAbsolute("vectorIntersect");
-
     #  If we have been given a configuration in the spec file, use that instead.
     #
     my $binhost = getGlobal("localHost");
@@ -233,7 +197,7 @@ sub setParameters ($@) {
 }
 
 
-sub printHelp () {
+sub printHelp {
     if (getGlobal("help")) {
         foreach my $k (sort keys %global) {
             if (defined(getGlobal($k))) {
@@ -247,7 +211,7 @@ sub printHelp () {
 }
 
 
-sub checkDirectories () {
+sub checkDirectories {
 
     #  Check that we were supplied a work directory, and that it
     #  exists, or we can create it.
@@ -283,7 +247,7 @@ sub checkDirectories () {
 
 sub findLastCheckpoint ($) {
     my $dir     = shift @_;
-    my $lastckp = 0;
+    my $lastckp;
 
     $dir = "$wrk/$dir" if (! -d $dir);
 
@@ -344,7 +308,7 @@ sub backupFragStore ($) {
         print STDERR "Found a backup for $backupName!  Restoring!\n";
 
         unlink "$wrk/$asm.frgStore/db.frg";
-        if (system("cp -p $wrk/$asm.frgStore/db.frg.$backupName $wrk/$asm.frgStore/db.frg")) {
+        if (runCommand("cp -p $wrk/$asm.frgStore/db.frg.$backupName $wrk/$asm.frgStore/db.frg")) {
             unlink "$wrk/$asm.frgStore/db.frg";
             die "Failed to restore frgStore from backup.\n";
         }
@@ -353,7 +317,7 @@ sub backupFragStore ($) {
 
         print STDERR "Backing up the frgStore to $backupName.\n";
 
-        if (system("cp -p $wrk/$asm.frgStore/db.frg $wrk/$asm.frgStore/db.frg.$backupName")) {
+        if (runCommand("cp -p $wrk/$asm.frgStore/db.frg $wrk/$asm.frgStore/db.frg.$backupName")) {
             unlink "$wrk/$asm.frgStore/db.frg.$backupName";
             die "Failed to backup frgStore.\n";
         }
@@ -364,9 +328,7 @@ sub backupFragStore ($) {
 
 sub stopAfter ($) {
     my $stopAfter = shift @_;
-    if (defined($stopAfter) &&
-        defined(getGlobal('stopAfter')) &&
-        (getGlobal('stopAfter') eq $stopAfter)) {
+    if (getGlobal('stopAfter') eq $stopAfter) {
         print STDERR "Stop requested after '$stopAfter'.\n";
         exit(0);
     }
@@ -374,81 +336,15 @@ sub stopAfter ($) {
 
 
 
-
-
-sub runningOnGrid () {
-    return(defined($ENV{'SGE_TASK_ID'}));
-}
-
-sub findNextScriptOutputFile () {
-    my $idx = "00";
-    while (-e "$wrk/runCA.sge.out.$idx") {
-        $idx++;
-    }
-    return("$wrk/runCA.sge.out.$idx");
-}
-
-sub submitScript ($) {
-    my $waitTag = shift @_;
-
-    return if (getGlobal("scriptOnGrid") == 0);
-
-    my $perl = "perl";
-    if (-x "/usr/bin/perl") {
-        system "/usr/bin/perl -c $bin/runCA-OBT.pl >/dev/null 2>&1";
-        $perl = "/usr/bin/perl" if ($? == 0);
-    }
-    if (-x "/usr/local/bin/perl") {
-        system "/usr/local/bin/perl -c $bin/runCA-OBT.pl >/dev/null 2>&1";
-        $perl = "/usr/local/bin/perl" if ($? == 0);
-    }
-
-    my $output = findNextScriptOutputFile();
-    my $script = "$output.sh";
-    my $cmd;
-
-    open(F, "> $script") or die "Failed to open '$script' for writing\n";
-    print F "#!/bin/sh\n";
-    print F "#\n";
-    print F "#  Attempt to (re)configure SGE.  For reasons Bri doesn't know,\n";
-    print F "#  jobs submitted to SGE, and running under SGE, fail to read his\n";
-    print F "#  .tcshrc (or .bashrc, limited testing), and so they don't setup\n";
-    print F "#  SGE (or ANY other paths, etc) properly.  For the record,\n";
-    print F "#  interactive SGE logins (qlogin, etc) DO set the environment.\n";
-    print F "#\n";
-    print F ". \$SGE_ROOT/\$SGE_CELL/common/settings.sh\n";
-    print F "$perl $bin/runCA-OBT.pl $commandLineOptions\n";
-    close(F);
-
-    my $sge       = getGlobal("sge");
-    my $sgeScript = getGlobal("sgeScript");
-
-    if (!defined($waitTag) || ($waitTag eq "")) {
-        $cmd = "qsub $sge $sgeScript -cwd -r y -N runCA_${asm} -j y -o $output $script";
-    } else {
-        $cmd = "qsub $sge $sgeScript -cwd -r y -N runCA_${asm} -j y -o $output -hold_jid \"$waitTag\" $script";
-    }
-
-    system($cmd) and die "Failed to sumbit script.\n";
-    unlink("$script");
-
-    exit(0);
-}
-
-
-
-
-
-
 #  Create an empty file.  Much faster than system("touch ...").
 #
-sub touch ($) {
+sub touch {
     open(F, "> $_[0]") or die "Failed to touch '$_[0]'\n";
     close(F);
 }
 
 
-sub pleaseExecute ($) {
+sub pleaseExecute {
     my $file = shift @_;
 
     print STDERR "Please execute:\n";
@@ -460,18 +356,14 @@ sub pleaseExecute ($) {
 
 #  Utility to run a command and check the exit status, report time used.
 #
-sub runCommand ($$) {
-    my $dir = shift @_;
+sub runCommand {
     my $cmd = shift @_;
 
     my $t = localtime();
     my $d = time();
     print STDERR "----------------------------------------START $t\n$cmd\n";
-    #print STDERR "dir='$dir'\n";
-    #print STDERR "cmd='$cmd'\n";
 
-    my $execwrap = getGlobal("executionWrapper");
-    my $rc = 0xffff & system("cd $dir && $execwrap $cmd");
+    my $rc = 0xffff & system($cmd);
 
     $t = localtime();
     print STDERR "----------------------------------------END $t (", time() - $d, " seconds)\n";
@@ -491,22 +383,20 @@ sub runCommand ($$) {
         }
     }
 
-    my $error = "ERROR: $cmd\nERROR: Command failed with ";
+    my $error = "ERROR: $cmd\n        failed with ";
 
     if ($rc == 0xff00) {
         $error .= "$!\n";
+    } elsif ($rc > 0x80) {
+        $rc >>= 8;
+        $error .= "exit status $rc\n";
     } else {
         if ($rc & 0x80) {
+            $rc &= ~0x80;
             $error .= "coredump from ";
         }
-    
-        if ($rc > 0x80) {
-            $rc >>= 8;
-        }
-        $rc &= 127;
-
         if (defined($signame[$rc])) {
-            $error .= "signal $signame[$rc] ($rc)\n";
+            $error .= "signal $signame[$rc]\n";
         } else {
             $error .= "signal $rc\n";
         }

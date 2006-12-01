@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 brianwalenz Exp $";
+static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.6 2005-08-24 17:44:03 brianwalenz Exp $";
 /*************************************************************************
  Module:  AS_PER_genericStore
  Description:
@@ -52,8 +52,8 @@ static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 bria
  *************************************************************************/
 
 /* RCS Info
- * $Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 brianwalenz Exp $
- * $Revision: 1.7 $
+ * $Id: AS_PER_genericStore.c,v 1.6 2005-08-24 17:44:03 brianwalenz Exp $
+ * $Revision: 1.6 $
  *
  */
 
@@ -69,13 +69,12 @@ static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 bria
 
 
 #define INITIAL_ALLOCATION (2048)
-#define WRITING_BUFFER     (1024 * 1024)
 
 /* This is the structure maintained in memory for each open Store */
 typedef struct{
   FILE *fp;            /* For a file-based store */
   char FileName[FILENAME_MAX];
-  char *buffer;        /* For a memory-based store, also holds setbuffer() buffer for disk stores */
+  char *buffer;        /* For a memory-based store */
   int64 allocatedSize;
   StoreStatus status; 
   StoreStat header;
@@ -347,19 +346,24 @@ StoreHandle createIndexStore
 #ifdef DEBUG
     fprintf(stderr," Creating file-based index store %s\n", path);
 #endif
-    assert(strlen(path) < FILENAME_MAX);
     myStore->fp = fopen(path,"w+b");
-    AssertPtr(myStore->fp);
-    myStore->buffer = (char *)safe_malloc(WRITING_BUFFER);
-    setbuffer(myStore->fp, myStore->buffer, WRITING_BUFFER);
+    if(myStore->fp == NULL){
+      fprintf(stderr,"*** Couldn't open file %s for w+b\n",
+	      path);
+      return(NULLSTOREHANDLE);
+    }
+    assert(strlen(path) < FILENAME_MAX);
     myStore->isMemoryStore = 0;
     strcpy(myStore->FileName, path);
+
   }else{
 #ifdef DEBUG
     fprintf(stderr," Creating memory-based index store \n");
 #endif
     myStore->allocatedSize = INITIAL_ALLOCATION * elementSize;
-    myStore->buffer = (char *)safe_malloc(myStore->allocatedSize);
+    myStore->buffer = (char *)
+      malloc(myStore->allocatedSize);
+    AssertPtr(myStore->buffer);
     myStore->isMemoryStore = 1;
     myStore->fp = NULL;
     myStore->FileName[0]='\0';
@@ -423,14 +427,13 @@ StoreHandle createStringStore
     strcpy(myStore->FileName, path);
     myStore->fp = fopen(path,"w+b");
     AssertPtr(myStore->fp);
-    myStore->buffer = (char *)safe_malloc(WRITING_BUFFER);
-    setbuffer(myStore->fp, myStore->buffer, WRITING_BUFFER);
   }else{
 #ifdef DEBUG
     fprintf(stderr," Creating memory-based string store \n");
 #endif
     myStore->allocatedSize = expectedStringSize;
-    myStore->buffer = (char *)safe_malloc(myStore->allocatedSize);
+    myStore->buffer = (char *)
+      malloc(myStore->allocatedSize);
     AssertPtr(myStore->buffer);
     myStore->isMemoryStore = 1;
     myStore->fp = NULL;
@@ -512,8 +515,6 @@ int closeStore(StoreHandle s){
     }
     if(fclose(myStore->fp) != 0)
       assert(0);
-    free(myStore->buffer);
-    myStore->buffer = NULL;
   }
   myStore->status = UnAllocatedStore;
   return 0;
@@ -571,9 +572,8 @@ int appendIndexStore(StoreHandle s, void *element){
     memcpy(myStore->buffer + offset, 
 	   element, myStore->header.elementSize);
   }else{
-    if (CDS_FTELL(myStore->fp) != offset)
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
+      assert(0);
     safeWrite(myStore->fp, element, myStore->header.elementSize);
   }
   myStore->header.lastElem ++;
@@ -610,9 +610,8 @@ int setIndexStore(StoreHandle s, int64 index, void *element){
     memcpy(myStore->buffer + offset, 
 	   element, myStore->header.elementSize);
   }else{
-    if (CDS_FTELL(myStore->fp) != offset)
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
+      assert(0);
     safeWrite(myStore->fp, element, myStore->header.elementSize);
   }
 
@@ -713,7 +712,9 @@ StoreHandle loadStorePartial
   myStore->allocatedSize = sourceMaxOffset - sourceOffset + 1;
   fprintf(stderr,"* Allocated buffer of size " F_S64 "\n",
           myStore->allocatedSize);
-  myStore->buffer = (char *)safe_malloc(myStore->allocatedSize);
+  myStore->buffer = (char *)
+    malloc(myStore->allocatedSize);
+  AssertPtr(myStore->buffer);
   myStore->isMemoryStore = 1;
   myStore->fp = NULL;
   myStore->header.firstElem = first;
@@ -779,9 +780,8 @@ int deleteIndexStore(StoreHandle s, int64 index){
   if(myStore->isMemoryStore){
     *(myStore->buffer + offset) |= 0x80;
   }else{
-    if (CDS_FTELL(myStore->fp) != offset)
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
+      assert(0);
     safeRead(myStore->fp, &flags, 1);
     flags |= 0x80;
     safeWrite(myStore->fp, (void *)&flags, 1);
@@ -808,9 +808,8 @@ int getIndexStore(StoreHandle s, int64 index, void *buffer){
     memcpy(buffer, myStore->buffer + offset, myStore->header.elementSize);
     return(0);
   }else{
-    if (CDS_FTELL(myStore->fp) != offset)
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
+      assert(0);
     
     return safeRead(myStore->fp,buffer,myStore->header.elementSize);
   }
@@ -857,9 +856,9 @@ int getStringStore(StoreHandle s, int64 offset, char *buffer, int32 maxLength){
   if(myStore->isMemoryStore){
     strncpy(buffer, myStore->buffer + offset + sizeof(StoreStat), length);
   }else{
-    if (CDS_FTELL(myStore->fp) != (off_t)(offset + sizeof(StoreStat)))
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) (offset + sizeof(StoreStat)), SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp,
+                       (off_t) (offset + sizeof(StoreStat)), SEEK_SET))
+      assert(0);
     
     if(safeRead(myStore->fp,buffer,length) != FALSE)
       assert(0);
@@ -905,9 +904,9 @@ int getVLRecordStore(StoreHandle s, int64 offset, void *buffer, VLSTRING_SIZE_T 
 
     
   }else{
-    if (CDS_FTELL(myStore->fp) != (off_t)(actualOffset + sizeof(StoreStat)))
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) (actualOffset + sizeof(StoreStat)), SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp,
+                       (off_t) (actualOffset + sizeof(StoreStat)), SEEK_SET))
+      assert(0);
     if(safeRead(myStore->fp,&length,sizeof(VLSTRING_SIZE_T)) != FALSE)
       assert(0);
 
@@ -956,9 +955,8 @@ int appendStringStore(StoreHandle s, char *string){
     }
     memcpy(myStore->buffer + offset, string, length + 1);
   }else{
-    if (CDS_FTELL(myStore->fp) != offset)
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
+      assert(0);
     safeWrite(myStore->fp, string, length + 1);
 #ifdef DEBUG
     fprintf(stderr,"appendString: wrote %s of length " F_SIZE_T "\n",
@@ -999,13 +997,12 @@ int appendVLRecordStore(StoreHandle s, void *vlr, VLSTRING_SIZE_T length){
     if(length > 0)
       memcpy(myStore->buffer + offset + sizeof(VLSTRING_SIZE_T), vlr, length);
   }else{
-    if (CDS_FTELL(myStore->fp) != offset)
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp, (off_t) offset, SEEK_SET))
+      assert(0);
     safeWrite(myStore->fp, &length, sizeof(VLSTRING_SIZE_T));
-    if (CDS_FTELL(myStore->fp) != (off_t)(offset + sizeof(VLSTRING_SIZE_T)))
-      if(-1 == CDS_FSEEK(myStore->fp, (off_t) (offset + sizeof(VLSTRING_SIZE_T)), SEEK_SET))
-        assert(0);
+    if(-1 == CDS_FSEEK(myStore->fp,
+                       (off_t) (offset + sizeof(VLSTRING_SIZE_T)), SEEK_SET))
+      assert(0);
     if(length > 0)
       safeWrite(myStore->fp, vlr, length);
   }
@@ -1276,9 +1273,8 @@ int writeBufToStore(StoreStruct *target, char *srcPtr, int64 offset, int64 numBy
    if(Store_isMemoryStore(target)){
       memcpy(target->buffer + offset, (void *)srcPtr, numBytes);
    }else{
-     if (CDS_FTELL(target->fp) != offset)
-       if(-1 == CDS_FSEEK(target->fp, (off_t) offset, SEEK_SET))
-         assert(0);
+      if(-1 == CDS_FSEEK(target->fp, (off_t) offset, SEEK_SET))
+        assert(0);
       if(CDS_FTELL(target->fp) != offset)
         assert(0);
       safeWrite(target->fp, srcPtr, numBytes);
@@ -1300,8 +1296,7 @@ int readBufFromStore(StoreStruct *source, char *buffer, int64 offset, int64 numB
       *result = source->buffer + offset;
    }else{
 
-     if (CDS_FTELL(source->fp) != offset)
-       CDS_FSEEK(source->fp, (off_t) offset, SEEK_SET); /* set to offset */
+     CDS_FSEEK(source->fp, (off_t) offset, SEEK_SET); /* set to offset */
      if(CDS_FTELL(source->fp) != offset)
        assert(0);
      safeRead(source->fp, (void *)buffer, numBytes);

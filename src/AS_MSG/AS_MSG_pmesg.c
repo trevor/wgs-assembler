@@ -18,16 +18,13 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[]= "$Id: AS_MSG_pmesg.c,v 1.23 2006-11-14 17:52:17 eliv Exp $";
+static char CM_ID[]= "$Id: AS_MSG_pmesg.c,v 1.20 2006-05-24 19:45:34 eliv Exp $";
 
 //  reads old and new AFG message (with and w/o chaff field)
 #define AFG_BACKWARDS_COMPATIBLE
 #define IAF_BACKWARDS_COMPATIBLE
 
-//  FreeBSD 6.1 fgets() sporadically replaces \n with \0, which
-//  horribly breaks this reader.  Defined this to replace
-//  fgets() with fgetc().
-#undef FGETS_IS_BROKEN
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,7 +111,11 @@ ProtoIOMode GetProtoMode_AS(void){
 }
 
 #define ZERO 0
-#define MAX_LINE_LEN (128 * 1024)    /* Maximum input line length (checked) */
+#define MAX_LINE_LEN 100000    /* Maximum input line length (checked) */
+// CMM: I bumped this up high because a buffer this long is used to
+// store the command line used to evoke each executable in the
+// Assembly pipeline.  The fragment graph builder is given hundreds
+// of files to process at once in the Human assembly.
 
 #define ROUNDUP(n,u) ((((n)-1)/(u) + 1)*(u))  /* Round n up to nearest
                                                  multiple of u */
@@ -123,7 +124,7 @@ static int LineNum = 0;   /* Current line number */
 
 static const char *Mcode;       /* 3-code of current read/write routine */
 
-static char *MemBuffer = NULL;      /* Memory allocation buffer for messages */
+static char *MemBuffer = NULL;   /* Memory allocation buffer for messages */
 static int   MemMax = -1, MemTop;   /* Memory ceiling and current top */
 
 int novar = 0;  /*  Output or not the variation records */
@@ -137,6 +138,7 @@ int novar = 0;  /*  Output or not the variation records */
 
 static void MakeSpace(const int size){
   size_t newsize=1;
+  //  int newsize=1;
   char *newbufr;
 
   if(MemMax> size)
@@ -147,10 +149,20 @@ static void MakeSpace(const int size){
   else
     newsize = 2 * size;
 
-  newsize = ROUNDUP(newsize,8);
-  newbufr = (char *)safe_realloc(MemBuffer,newsize);
-  MemBuffer = newbufr;
-  MemMax    = newsize;
+      newsize = ROUNDUP(newsize,8);
+      newbufr = (char *) realloc(MemBuffer,newsize);
+      /*
+      if(MemBuffer == NULL)
+	fprintf(stderr,"* Reallocing MemBuffer to size " F_SIZE_T "  old:%p  new:%p\n",
+		newsize, MemBuffer, newbufr);
+      */
+      if (newbufr == NULL)
+        { fprintf(stderr,"ERROR: Out of memory (%s)",Mcode);
+          fprintf(stderr," at line %d\n",LineNum);
+          exit (1);
+        }
+      MemBuffer = newbufr;
+      MemMax    = newsize;
 }
 
 
@@ -168,101 +180,82 @@ static long MoreSpace(const int size, const int boundary)
 }
 
 static char  CurLine[MAX_LINE_LEN];     /* Line buffer for reading messages. */
+static char *Sentinal = CurLine + (MAX_LINE_LEN-2); /* ...for line overflow. */
 
-static char *ReadLine(FILE *fin) {
+static char *ReadLine(char *line, int lineMax, FILE *fin) {
 
-  CurLine[MAX_LINE_LEN-2] = '\n';
-  CurLine[MAX_LINE_LEN-1] = 0;
+  line[lineMax-2] = '\n';
+  line[lineMax-1] = 0;
 
   errno = 0;
 
   LineNum++;
-
-#ifdef FGETS_IS_BROKEN
-  int p=0;
-  for (p=0; p<MAX_LINE_LEN-1; p++) {
-    CurLine[p] = fgetc(fin);
-    if (CurLine[p] == 0)
-      CurLine[p] = '\n';
-    if (CurLine[p] == '\n') {
-      CurLine[p+1] = 0;
-      break;
-    }
-  }
-#else
-  if (fgets(CurLine, MAX_LINE_LEN-1, fin) == NULL) {
+  if (fgets(line, lineMax-1, fin) == NULL) {
     fprintf(stderr,"ERROR: AS_MSG_pmesg.c::ReadLine()-- Premature end of input at line %d (%s)\n", LineNum, Mcode);
-    fprintf(stderr,"       '%s'\n", CurLine);
+    fprintf(stderr,"       %100s\n", CurLine);
     exit(1);
   }
-#endif
 
   if (errno) {
     fprintf(stderr,"ERROR: AS_MSG_pmesg.c::ReadLine()-- Read error at line %d: '%s'\n", LineNum, strerror(errno));
-    fprintf(stderr,"       '%s'\n", CurLine);
+    fprintf(stderr,"       %100s\n", CurLine);
     exit(1);
   }
 
-  if (CurLine[MAX_LINE_LEN-2] != '\n') {
-    fprintf(stderr,"ERROR: Input line %d is too long (%s)\n", LineNum, Mcode);
-    fprintf(stderr,"       '%s'\n", CurLine);
+  if (*Sentinal != '\n') {
+    fprintf(stderr,"ERROR: Input line %d is too long (%s)", LineNum, Mcode);
+    fprintf(stderr,"       %100s\n", CurLine);
     exit(1);
   }
 
-  //fprintf(stderr, "READLINE -- %d %d %s", CurLine[0], CurLine[1], CurLine);
-
-  return(CurLine);
+  return(line);
 }
 
 
 static char *GetLine(FILE *fin, int skipComment)   /* Get next input line (there must be one). */
 { 
-    do {
-        ReadLine(fin);
-    }
-    while (skipComment && CurLine[0] == '#');
-    return (CurLine);
+  do {
+    ReadLine(CurLine, MAX_LINE_LEN, fin);
+  }
+  while (skipComment && CurLine[0] == '#');
+  return (CurLine);
 }
 
    /* Found an enum out-of-range error. */
 
 static void MtypeError(const char * const name)
-{   
-    fprintf(stderr,"ERROR: Illegal %s type value \"%c\" (%s) at line %d\n",
-            name,CurLine[4],Mcode, LineNum);
-    exit (1);
+{ fprintf(stderr,"ERROR: Illegal %s type value \"%c\"(%s)",name,CurLine[4],Mcode);
+  fprintf(stderr," at line %d\n",LineNum);
+  exit (1);
 }
 
    /* Found a bad 3-code field name. */
 
 static void MtagError(const char * const tag)
-{ 
-    fprintf(stderr,"ERROR: Illegal tag \"%s\" (expected \"%s\") (%s) at line %d\n",
-            CurLine, tag, Mcode, LineNum);
-    exit (1);
+{ fprintf(stderr,"ERROR: Illegal tag \"%s\"(%s)",tag,Mcode);
+  fprintf(stderr," at line %d\n",LineNum);
+  exit (1);
 }
 
    /* Field content area did not have correct syntax. */
 
 static void MfieldError(const char * const mesg)
-{ 
-    int len;
+{ int len;
 
-    len = strlen(CurLine)-1;
-    if (CurLine[len] == '\n')
-        CurLine[len] = '\0';
-    fprintf(stderr,"ERROR: %s \"%s\" (%s) at line %d\n",
-            mesg,CurLine,Mcode,LineNum);
-    exit (1);
+  len = strlen(CurLine)-1;
+  if (CurLine[len] == '\n')
+    CurLine[len] = '\0';
+  fprintf(stderr,"ERROR: %s \"%s\"(%s)",mesg,CurLine+4,Mcode);
+  fprintf(stderr," at line %d\n",LineNum);
+  exit (1);
 }
 
    /* General error message exit. */
 
 static void MgenError(const char * const mesg)
-{ 
-    fprintf(stderr,"ERROR: %s (%s) at line %d\n",
-            mesg,Mcode,LineNum);
-    exit (1);
+{ fprintf(stderr,"ERROR: %s (%s)",mesg,Mcode);
+  fprintf(stderr," at line %d\n",LineNum);
+  exit (1);
 }
 
    /* Get a text field item: syntax "tag\n(%s\n)*.\n".
@@ -274,18 +267,17 @@ static long GetText(const char * const tag, FILE *fin, const int delnewlines)
   int len;
  
   if (strncmp(GetLine(fin, TRUE),tag,4) != 0)
-      MtagError(tag);
+    MtagError(tag);
   text = MemTop;
   while (1)
-  { 
+    { 
       char *line = GetLine(fin, FALSE);
-      if ((line[0] == '.') && (line[1] == '\n'))
-        break;
+      if (line[0] == '.' && line[1] == '\n') break;
       len = strlen(CurLine);
       if (delnewlines && CurLine[len-1] == '\n') len -= 1;
       idx = MoreSpace(len,1);
       strncpy(MemBuffer+idx,CurLine,len);
-  }
+    }
   idx = MoreSpace(1,1);
   MemBuffer[idx] = '\0';
   return (text);
@@ -303,7 +295,7 @@ static long GetString(const char * const tag, FILE *fin)
   text = MemTop;
   do
     {
-      ReadLine(fin);
+      ReadLine(CurLine, MAX_LINE_LEN, fin);
     }
   while (CurLine[0] == '#');
   if (strncmp(CurLine,tag,4) != 0)
@@ -317,7 +309,7 @@ static long GetString(const char * const tag, FILE *fin)
       idx = MoreSpace(len,1);
       strncpy(MemBuffer+idx,str,len);
       if (eos) break;
-      str = ReadLine(fin);
+      str = ReadLine(CurLine,MAX_LINE_LEN,fin);
     }
   idx = MoreSpace(1,1);
   MemBuffer[idx] = '\0';
@@ -329,26 +321,25 @@ static long GetString(const char * const tag, FILE *fin)
 static void PutText(FILE *fout, const char * const tag, 
 		     char * text, const int format)
 {
-    // Note that the data of "text" is modified!!!
-    int i, len;
-    fprintf(fout,"%s\n",tag);
-    if ((text != NULL) && (text[0] != 0)) {
-        len = strlen(text);
-        if (format) { 
-            for (i = 0; i < len; i += 70)
-            { 
-                fprintf(fout,"%.*s\n",70,text);
-                text += 70;
-            }
-            fprintf(fout,".\n");
-        } else{ 
-            if (text[len-1] == '\n')     /* Strip trailing new line if prez. */
-            text[len-1] = '\0';
-            fprintf(fout,"%s\n.\n", text);
+  // Note that the data of "text" is modified!!!
+  int i, len;
+  fprintf(fout,"%s\n",tag);
+  if(text != NULL){
+    len = strlen(text);
+    if (format)
+      { for (i = 0; i < len; i += 70)
+        { fprintf(fout,"%.*s\n",70,text);
+	text += 70;
         }
-    } else{
-        fprintf(fout,".\n");
-    }
+      fprintf(fout,".\n");
+      } else{ 
+	if (text[len-1] == '\n')     /* Strip trailing new line if prez. */
+	  text[len-1] = '\0';
+	fprintf(fout,"%s\n.\n", text);
+      }
+  }else{
+    fprintf(fout,"\n.\n");
+  }
 }
 
 /* Macros to get each type of 3-code field: obvious combo's of above */
@@ -1136,32 +1127,38 @@ static void Read_IMP_Mesg(FILE *fin, long indx)
 
 static void Read_IMV_Mesg(FILE *fin, long indx)
 {
-  IntMultiVar *imv = (IntMultiVar *) (MemBuffer + indx);
+  IntMultiVar           *imv;
+  long                   vindx;
 
+  imv = (IntMultiVar *) (MemBuffer + indx);
   GET_PAIR(imv->position.bgn,imv->position.end, POS2_FORMAT,"position field");
   GET_FIELD(imv->num_reads,"nrd:" F_S32,"number of reads"); 
-  GET_FIELD(imv->num_conf_alleles,"nca:" F_S32,"number of confirmed alleles");
-  GET_FIELD(imv->anchor_size,"anc:" F_S32,"anchor size");
+  GET_FIELD(imv->nr_best_allele,"nba:" F_S32,"number of reads in the best allele");
+  GET_FIELD(imv->num_alleles,"nal:" F_S32,"number of alleles");
+  GET_FIELD(imv->ratio,RAT_IN_FORMAT,"alleles ratio");
+  GET_FIELD(imv->window_size,"win:" F_S32,"window size");
   GET_FIELD(imv->var_length,"len:" F_S32,"length field");
-  imv->nr_conf_alleles = (char *)GetText("nra:",fin,FALSE);
-  imv->weights         = (char *)GetText("wgt:",fin,FALSE);
-  imv->var_seq =         (char *)GetText("seq:",fin,FALSE);
+  vindx = GetText("seq:",fin,FALSE);
+  imv->var_seq = (char *) vindx;
   GET_EOM;
   return;
 }
 
 static void Read_VAR_Mesg(FILE *fin, long indx)
 {
-  IntMultiVar *smv = (IntMultiVar *) (MemBuffer + indx);
+  IntMultiVar           *smv;
+  long                   vindx;
 
+  smv = (IntMultiVar *) (MemBuffer + indx);
   GET_PAIR(smv->position.bgn,smv->position.end, POS2_FORMAT,"position field");
   GET_FIELD(smv->num_reads,"nrd:" F_S32,"number of reads");
-  GET_FIELD(smv->num_conf_alleles,"nca:" F_S32,"number of confirmed alleles");
-  GET_FIELD(smv->anchor_size,"anc:" F_S32,"anchor size");
+  GET_FIELD(smv->nr_best_allele,"nba:" F_S32,"number of reads in the best allele");
+  GET_FIELD(smv->num_alleles,"nal:" F_S32,"number of alleles");
+  GET_FIELD(smv->ratio,RAT_IN_FORMAT,"alleles ratio");
+  GET_FIELD(smv->window_size,"win:" F_S32,"window size");
   GET_FIELD(smv->var_length,"len:" F_S32,"length field");
-  smv->nr_conf_alleles = (char *)GetText("nra:",fin,FALSE);
-  smv->weights         = (char *)GetText("wgt:",fin,FALSE);
-  smv->var_seq         = (char *)GetText("seq:",fin,FALSE);
+  vindx = GetText("seq:",fin,FALSE);
+  smv->var_seq = (char *) vindx;
   GET_EOM;
   return;
 }
@@ -1439,7 +1436,7 @@ static void *Read_ISF_Mesg(FILE *fin)
 
   GET_FIELD(mesg.iaccession,"acc:" F_IID,"ISF accession");
   GET_FIELD(mesg.num_contig_pairs,"noc:" F_S32,"number of contigs");
-  num = MAX(1,mesg.num_contig_pairs);
+  num = max(1,mesg.num_contig_pairs);
   if (num > 0) {
     indx = MoreSpace(num*sizeof(IntContigPairs),8);
     icp = mesg.contig_pairs = (IntContigPairs *) (MemBuffer + indx);
@@ -1569,9 +1566,6 @@ static void *Read_ICM_Mesg(FILE *fin)
      else
        mesg.v_list = NULL;
      for (i=0; i < mesg.num_vars; ++i) {
-       mesg.v_list[i].nr_conf_alleles = MemBuffer + 
-           (long) mesg.v_list[i].nr_conf_alleles;
-       mesg.v_list[i].weights = MemBuffer + (long) mesg.v_list[i].weights;
        mesg.v_list[i].var_seq = MemBuffer + (long) mesg.v_list[i].var_seq;
      }
   }
@@ -2031,9 +2025,6 @@ static void *Read_CCO_Mesg(FILE *fin)
     else
       mesg.vars = NULL;
     for (i=0; i < mesg.num_vars; ++i) {
-      mesg.vars[i].nr_conf_alleles = MemBuffer + 
-          (long) mesg.vars[i].nr_conf_alleles;
-      mesg.vars[i].weights = MemBuffer + (long) mesg.vars[i].weights;
       mesg.vars[i].var_seq = MemBuffer + (long) mesg.vars[i].var_seq;
     } 
   }
@@ -2154,7 +2145,7 @@ static void *Read_SCF_Mesg(FILE *fin)
 
   GET_PAIR(mesg.eaccession,mesg.iaccession,IACCS_FORMAT,"accession number");
   GET_FIELD(mesg.num_contig_pairs,"noc:" F_S32,"number of contigs");
-  num = MAX(mesg.num_contig_pairs, 1);
+  num = max(mesg.num_contig_pairs, 1);
   if (num > 0) {
     indx = MoreSpace(num*sizeof(SnapContigPairs),8);
     icp = mesg.contig_pairs = (SnapContigPairs *) (MemBuffer + indx);
@@ -2925,29 +2916,34 @@ static void Write_IMP_Mesg(FILE *fout, IntMultiPos *mlp)
 
 static void Write_IMV_Mesg(FILE *fout, IntMultiVar *imv)
 {
+  int i;
+
   fprintf(fout,"{IMV\n");
   fprintf(fout, POS2_FORMAT "\n", imv->position.bgn,imv->position.end);
   fprintf(fout,"nrd:" F_S32 "\n",imv->num_reads);
-  fprintf(fout,"nca:" F_S32 "\n",imv->num_conf_alleles);
-  fprintf(fout,"anc:" F_S32 "\n",imv->anchor_size);
+  fprintf(fout,"nba:" F_S32 "\n",imv->nr_best_allele);
+  fprintf(fout,"nal:" F_S32 "\n",imv->num_alleles);
+  fprintf(fout,RAT_OUT_FORMAT "\n",imv->ratio);
+  fprintf(fout,"win:" F_S32 "\n",imv->window_size);
   fprintf(fout,"len:" F_S32 "\n",imv->var_length);
-  PutText(fout,"nra:",imv->nr_conf_alleles,FALSE);
-  PutText(fout,"wgt:",imv->weights,FALSE);
-  PutText(fout,"seq:",imv->var_seq,FALSE);
+  if (imv->var_length > 0)
+     PutText(fout,"seq:",imv->var_seq,FALSE);
   fprintf(fout,"}\n");
   return;
 }
 
 static void Write_VAR_Mesg(FILE *fout, IntMultiVar *smv)
 {
+  int i;
+
   fprintf(fout,"{VAR\n");
-  fprintf(fout, POS2_FORMAT "\n", smv->position.bgn,smv->position.end);
+  fprintf(fout,POS2_FORMAT "\n", smv->position.bgn,smv->position.end);
   fprintf(fout,"nrd:" F_S32 "\n",smv->num_reads);
-  fprintf(fout,"nca:" F_S32 "\n",smv->num_conf_alleles);
-  fprintf(fout,"anc:" F_S32 "\n",smv->anchor_size);
+  fprintf(fout,"nba:" F_S32 "\n",smv->nr_best_allele);
+  fprintf(fout,"nal:" F_S32 "\n",smv->num_alleles);
+  fprintf(fout,RAT_OUT_FORMAT "\n",smv->ratio);
+  fprintf(fout,"win:" F_S32 "\n",smv->window_size);
   fprintf(fout,"len:" F_S32 "\n",smv->var_length);
-  PutText(fout,"nra:",smv->nr_conf_alleles,FALSE);
-  PutText(fout,"wgt:",smv->weights,FALSE);
   PutText(fout,"seq:",smv->var_seq,FALSE);
   fprintf(fout,"}\n");
   return;
@@ -3108,7 +3104,7 @@ static void Write_ICP_Mesg(FILE *fout, IntContigPairs *mesg)
 static void Write_ISF_Mesg(FILE *fout, void *vmesg)
 { IntScaffoldMesg *mesg = (IntScaffoldMesg *) vmesg;
   int		i;
-  int num = MAX(1, mesg->num_contig_pairs);
+  int num = max(1, mesg->num_contig_pairs);
   fprintf(fout,"{ISF\n");
   fprintf(fout,"acc:" F_IID "\n", mesg->iaccession);
   fprintf(fout,"noc:" F_S32 "\n",mesg->num_contig_pairs);
@@ -3407,7 +3403,7 @@ static void Write_CTP_Mesg(FILE *fout, SnapContigPairs *mesg)
 static void Write_SCF_Mesg(FILE *fout, void *vmesg)
 { SnapScaffoldMesg *mesg = (SnapScaffoldMesg *) vmesg;
   int		i;
-  int num = MAX(1,mesg->num_contig_pairs);
+  int num = max(1,mesg->num_contig_pairs);
   fprintf(fout,"{SCF\n");
   fprintf(fout,IACCS_FORMAT "\n",mesg->eaccession,mesg->iaccession);
   fprintf(fout,"noc:" F_S32 "\n",mesg->num_contig_pairs);
@@ -3806,6 +3802,21 @@ static void Clear_FRG_Mesg(void *mesg, int typ)
 static void Clear_OVL_Mesg(void *mesg, int typ)
 { free(((OverlapMesg *) mesg)->delta); }
 
+
+//static void Clear_IMV_Mesg(void *vmesg, int typ)
+//{
+//  IntMultiVar *imv = (IntMultiVar *) vmesg;
+//  if (imv->var_seq)
+//    free (imv->var_seq);
+//}
+
+//static void Clear_VAR_Mesg(void *vmesg, int typ)
+//{
+//  IntMultiVar *smv = (IntMultiVar *) vmesg;
+//  if (smv->var_seq)
+//    free (smv->var_seq);
+//}
+
 static void Clear_IUM_Mesg(void *vmesg, int typ)
 { 
   IntUnitigMesg *mesg = (IntUnitigMesg *) vmesg;
@@ -3862,15 +3873,11 @@ static void Clear_ICM_Mesg(void *vmesg, int typ)
   free(mesg->consensus);
   free(mesg->quality);
   for (i=0; i < mesg->num_pieces; ++i)
-      free(mesg->pieces[i].delta);
+    free(mesg->pieces[i].delta);
   free(mesg->pieces);
   free(mesg->unitigs);
   for (i=0; i < mesg->num_vars; ++i)
-  {
-      FREE(mesg->v_list[i].nr_conf_alleles);
-      FREE(mesg->v_list[i].weights); 
-      FREE(mesg->v_list[i].var_seq);
-  }
+    free(mesg->v_list[i].var_seq);
   free(mesg->v_list);           
 }
 
@@ -3976,7 +3983,7 @@ int ReadProtoMesg_AS(FILE *fin, GenericMesg **pmesg)
 
   errno = 0;
 
-  CurLine[MAX_LINE_LEN-2] = '\n';
+  *Sentinal = '\n';
   MemTop    = 0;
   do {
     //  Can't use ReadLine() here, because we want to return EOF if we
@@ -4000,8 +4007,9 @@ int ReadProtoMesg_AS(FILE *fin, GenericMesg **pmesg)
       len = strlen(CurLine)-1;
       if (CurLine[len] == '\n')
         CurLine[len] = '\0';
-      fprintf(stderr,"ERROR: Unrecognized message type (%d > %d) \"%s\" at line %d\n",
-	      t, NUM_OF_REC_TYPES, CurLine,LineNum);
+      fprintf(stderr,"ERROR: Unrecognized message type (%d > %d) \"%s\"",
+	      t, NUM_OF_REC_TYPES, CurLine);
+      fprintf(stderr," at line %d\n",LineNum);
       exit (1);
     }     
   Mcode = CallTable[t].header+1;

@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 static char CM_ID[] 
-= "$Id: AS_CGB_Bubble.c,v 1.6 2006-09-26 22:21:13 brianwalenz Exp $";
+= "$Id: AS_CGB_Bubble.c,v 1.5 2006-03-09 17:42:34 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -96,7 +96,7 @@ _collect_bubbles(BubGraph_t bg, BubVertexSet *fwd, BubVertexSet *rvs,
   init_nodes  = CreateHashTable_AS(num_valid / 2, 
 				   _hash_vset_hash,
 				   _hash_vset_cmp);
-  bp_ins_keys = (BVSPair *)safe_malloc(sizeof(BVSPair) * num_valid );
+  SAFE_MALLOC(bp_ins_keys, BVSPair, num_valid );
   result.next = NULL;
 
   for (f = 0; f < num_valid; ++f) 
@@ -138,7 +138,7 @@ _collect_bubbles(BubGraph_t bg, BubVertexSet *fwd, BubVertexSet *rvs,
 
       if (i_node) {
 	AS_CGB_Bubble_List_t new_bub = NULL;
-	new_bub = (AS_CGB_Bubble_List *)safe_malloc(sizeof(AS_CGB_Bubble_List));
+	SAFE_MALLOC(new_bub, AS_CGB_Bubble_List, 1);
 	bub_start = *i_node;
 	new_bub->start = bub_start;
 	new_bub->end = top[f];
@@ -149,11 +149,18 @@ _collect_bubbles(BubGraph_t bg, BubVertexSet *fwd, BubVertexSet *rvs,
     }
 
   DeleteHashTable_AS(init_nodes);
-  safe_free(bp_ins_keys);
+  SAFE_FREE(bp_ins_keys);
   return result.next;
 }
  
  
+void 
+_remove_sub_bubbles(BubGraph_t bg, AS_CGB_Bubble_List_t *list_h, 
+		    BubVertexSet *fwd, BubVertexSet *rvs, 
+		    IntFragment_ID *top_order, int num_valid)
+{
+}
+
 
 void
 _process_vertex(BubGraph_t bg, IntFragment_ID f, BubVertexSet *bvs,
@@ -247,7 +254,7 @@ AS_CGB_Bubble_find_bubbles_with_graph(BubGraph_t bg, int sz, int age,
   AS_CGB_Bubble_dfs(bg);
 
   num_frags = GetNumFragments(BG_vertices(bg));
-  top_order = (IntFragment_ID *)safe_calloc(sizeof(IntFragment_ID), num_frags);
+  SAFE_CALLOC(top_order, IntFragment_ID, num_frags);
 
   /* Get a topological ordering of the valid fragments. */
   fprintf(BUB_LOG_G, "  * Step 2: Topological sort of fragment graph\n");
@@ -260,8 +267,8 @@ AS_CGB_Bubble_find_bubbles_with_graph(BubGraph_t bg, int sz, int age,
 #endif
 
   BVS_sysInit();
-  fwd = (BubVertexSet *)safe_malloc(sizeof(BubVertexSet) * num_frags);
-  rvs = (BubVertexSet *)safe_malloc(sizeof(BubVertexSet) * num_frags);
+  SAFE_MALLOC(fwd, BubVertexSet, num_frags);
+  SAFE_MALLOC(rvs, BubVertexSet, num_frags);
   for (f = 0; f < num_frags; ++f) {
     BVS_initialize(&(fwd[f]));
     BVS_initialize(&(rvs[f]));
@@ -290,6 +297,8 @@ AS_CGB_Bubble_find_bubbles_with_graph(BubGraph_t bg, int sz, int age,
   
   if( num_valid != 0 ) { 
     result = _collect_bubbles(bg, fwd, rvs, top_order, num_valid);
+  
+    /*  _remove_sub_bubbles(bg, fwd, rvs, top_order, num_valid); */
   }
   
   {
@@ -384,7 +393,7 @@ AS_CGB_Bubble_find_and_remove_bubbles
 
     bptr = bubs;
     bubs = bubs->next;
-    safe_free(bptr);
+    SAFE_FREE(bptr);
     // release memory as we go.
   }
   // All the memory for bubs is released.

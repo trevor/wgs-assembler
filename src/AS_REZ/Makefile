@@ -106,8 +106,7 @@ include $(LOCAL_WORK)/src/c_make.as
 #-include make.conf
 
 install: $(SCRIPTS)
-	@chmod ugo+x $(SCRIPTS)
-	@cp -f $(SCRIPTS) $(LOCAL_BIN)
+	chmod ugo+x $(SCRIPTS); cp -f $(SCRIPTS) $(LOCAL_BIN)
 
 
 all: $(OBJECTS) $(LIBRARIES) $(PROGS) install
@@ -116,30 +115,30 @@ batchify:  batchify.o libAS_MSG.a libAS_UTL.a
 
 chunk_analyze:  chunk_analyze.o libAS_MSG.a libAS_UTL.a
 
-greedy-overlap : GreedyOverlapMainREZ.o libCA.a
+greedy-overlap : GreedyOverlapMainREZ.o libAS_REZ.a libAS_PER.a libAS_ALN.a libAS_MSG.a  libAS_SDB.a libAS_UTL.a -lm
 
-length-adaption : LengthAdaptionREZ.o libCA.a
+length-adaption : LengthAdaptionREZ.o libAS_REZ.a libAS_PER.a libAS_ALN.a libAS_MSG.a  libAS_SDB.a libAS_UTL.a -lm
 
 getrep : GetRepeats.o libAS_MSG.a
 
-overlap-chunks: OverlapChunks.o libCA.a
+overlap-chunks: OverlapChunks.o libAS_REZ.a libAS_CNS.a libAS_PER.a libAS_ALN.a libAS_MSG.a  libAS_SDB.a libAS_UTL.a -lm
 
 CGW_OBJECTS =  AS_CGW_dataTypes.o GraphCGW_T.o AS_CGW_histo.o DiagnosticsCGW.o Celamy_CGW.o  ScaffoldGraph_CGW.o CIEdgeT_CGW.o CIScaffoldT_CGW.o SEdgeT_CGW.o\
 MergeEdges_CGW.o ContigT_CGW.o LeastSquaresGaps_CGW.o\
 Output_CGW.o Input_CGW.o TransitiveReduction_CGW.o\
 ChunkOverlap_CGW.o SplitScaffolds_CGW.o
 
-extract-quality-uoms : ExtractQualityREZ.o libCA.a
+extract-quality-uoms : ExtractQualityREZ.o libAS_CGW.a libAS_REZ.a  libAS_CNS.a libAS_PER.a libAS_ALN.a libAS_MSG.a  libAS_SDB.a libAS_UTL.a $(LIN_ALG_LIB) -lm
 
 screen-degrees:  screen-degrees.o libAS_MSG.a libAS_UTL.a
 
 screen-olaps:  screen-olaps.o libAS_MSG.a libAS_UTL.a
 
-microhet : MicroHetIUMREZ.o MicroHetREZ.o MicroHetPartitionsREZ.o MicroHetScoreREZ.o MicroHetInterfaceREZ.o  libCA.a
+microhet : MicroHetIUMREZ.o MicroHetREZ.o MicroHetPartitionsREZ.o MicroHetScoreREZ.o MicroHetInterfaceREZ.o  libAS_CNS.a libAS_REZ.a libAS_SDB.a libAS_PER.a libAS_UTL.a libAS_MSG.a libAS_ALN.a
 
-microhet-simulator : MicroHetInterfaceREZ.o MicroHetSimulatorREZ.o MicroHetREZ.o MicroHetPartitionsREZ.o MicroHetScoreREZ.o  libCA.a
+microhet-simulator : MicroHetInterfaceREZ.o MicroHetSimulatorREZ.o MicroHetREZ.o MicroHetPartitionsREZ.o MicroHetScoreREZ.o  libAS_CNS.a libAS_SDB.a libAS_ALN.a libAS_REZ.a libAS_MSG.a libAS_PER.a  libAS_UTL.a
 
-microhet-pairsim : MicroHetInterfaceREZ.o MicroHetPairSimREZ.o MicroHetREZ.o MicroHetPartitionsREZ.o MicroHetScoreREZ.o  libCA.a
+microhet-pairsim : MicroHetInterfaceREZ.o MicroHetPairSimREZ.o MicroHetREZ.o MicroHetPartitionsREZ.o MicroHetScoreREZ.o  libAS_CNS.a libAS_SDB.a libAS_ALN.a libAS_REZ.a libAS_MSG.a libAS_PER.a  libAS_UTL.a
 
 check-distributions: CheckDistributionREZ.o PartitionsREZ.o ScoreREZ.o UtilsREZ.o libAS_MSG.a libAS_SDB.a libAS_UTL.a
 
@@ -149,6 +148,6 @@ microhet-clean :
 	rm  MicroHet*.o ${LOCAL_OBJ}/MicroHet*.o
 
 
-microhet-test3 :  MicroHetIUMREZ_test3.o libCA.a
+microhet-test3 :  MicroHetIUMREZ_test3.o libAS_REZ.a libAS_CGW.a libAS_REZ.a  libAS_CGW.a libAS_CNS.a libAS_SDB.a libAS_PER.a libAS_UTL.a libAS_MSG.a libAS_ALN.a libAS_OVL.a $(LIN_ALG_LIB)
 
-MicroHetIUMdiffsPrint : MicroHetIUMdiffsPrint.o libCA.a
+MicroHetIUMdiffsPrint : MicroHetIUMdiffsPrint.o libAS_REZ.a libAS_CGW.a libAS_REZ.a  libAS_CGW.a libAS_CNS.a libAS_SDB.a libAS_PER.a libAS_UTL.a libAS_MSG.a libAS_ALN.a libAS_OVL.a $(LIN_ALG_LIB)

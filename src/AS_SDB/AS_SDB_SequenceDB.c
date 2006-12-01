@@ -18,23 +18,27 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: AS_SDB_SequenceDB.c,v 1.9 2006-11-14 17:52:18 eliv Exp $";
+static char CM_ID[] = "$Id: AS_SDB_SequenceDB.c,v 1.6 2005-10-28 20:29:52 brianwalenz Exp $";
 
+//#define DEBUG 1
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <assert.h>
-#include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <string.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <string.h>
+#include <errno.h>
 
 #include "AS_global.h"
 #include "AS_UTL_Var.h"
 #include "AS_PER_SafeIO.h"
 #include "AS_SDB_SequenceDB.h"
 
-#undef DEBUG_OUTPUT
+// #define DEBUG_OUTPUT
 
 /* CreateSequenceDB:
    Create a SequenceDB with a single data file, and the index in memory..
@@ -43,48 +47,55 @@ static char CM_ID[] = "$Id: AS_SDB_SequenceDB.c,v 1.9 2006-11-14 17:52:18 eliv E
 */
 tSequenceDB *CreateSequenceDB(char *path, int initialSize, int force){
   int32 size;
-  struct stat dirstat;
+  DIR *dbDir;
   FILE *indexfp, *datafp;
   char buffer[FILENAME_MAX + 30];
-  tSequenceDB *sequenceDB = (tSequenceDB *)safe_calloc(1, sizeof(tSequenceDB));
+  tSequenceDB *sequenceDB = (tSequenceDB *)malloc(sizeof(tSequenceDB));
+  assert(path && sequenceDB);
 
-  errno = 0;
-  if (stat(path, &dirstat) != 0) {
-    errno = 0;
-    if (mkdir(path, (mode_t)(S_IRWXU | S_IRWXG | S_IROTH)))
-      fprintf(stderr, "CreateSequenceDB()-- Failed to create '%s': %s",
-              path, strerror(errno)), exit(1);
+  dbDir = opendir(path);
+  if(dbDir == NULL){
+    mode_t mode = S_IRWXU | S_IRWXG | S_IROTH;
+      if(mkdir(path, mode)){
+	sprintf(buffer,"createSequenceDB: Failure to create directory %s", path);
+	perror(buffer);
+	exit(1);
+      }
+  }else{
+    closedir (dbDir);
   }
 
   sequenceDB->path = strdup(path);
-
+  fprintf(stderr,"* Creating db with path %s\n", sequenceDB->path);
   sprintf(buffer,"%s/seqDB.unitigs.0", path);
-  errno = 0;
   indexfp = fopen(buffer,"w");
-  if (errno)
-    fprintf(stderr, "CreateSequenceDB()-- Failed to create '%s': %s\n",
-            buffer, strerror(errno)), exit(1);
+  if(!indexfp){
+	sprintf(buffer,"createSequenceDB: couldn't open unitig index file %s", buffer);
+	perror(buffer);
+	exit(1);
+  }
   fclose(indexfp);
 
   sprintf(buffer,"%s/seqDB.contigs.0", path);
-  errno = 0;
   indexfp = fopen(buffer,"w");
-  if (errno)
-    fprintf(stderr, "CreateSequenceDB()-- Failed to create '%s': %s\n",
-            buffer, strerror(errno)), exit(1);
+  if(!indexfp){
+	sprintf(buffer,"createSequenceDB: couldn't open contig index file %s", buffer);
+	perror(buffer);
+	exit(1);
+  }
   fclose(indexfp);
 
   sprintf(buffer,"%s/seqDB.data.0", path); 
-  errno = 0;
   datafp = fopen(buffer,"w");  // Initial open is "w", subsequent are w+
-  if (errno)
-    fprintf(stderr, "CreateSequenceDB()-- Failed to create '%s': %s\n",
-            buffer, strerror(errno)), exit(1);
-
+  if(!datafp){
+	sprintf(buffer,"createSequenceDB: couldn't open data file %s", buffer);
+	perror(buffer);
+	exit(1);
+  }
  
   sequenceDB->SubStores = CreateVA_PtrT(10);
   AppendPtrT(sequenceDB->SubStores, (const void *)&datafp);
-  size = MAX(2048,initialSize);
+  size = max(2048,initialSize);
   sequenceDB->Unitigs = CreateVA_tMARecord(size);
   sequenceDB->Contigs = CreateVA_tMARecord(size);
   sequenceDB->UnitigStore = CreateMultiAlignStoreT(size);
@@ -92,6 +103,7 @@ tSequenceDB *CreateSequenceDB(char *path, int initialSize, int force){
   sequenceDB->currentRevision = 0;
   sequenceDB->totalCacheSize = 0;
   sequenceDB->totalCacheLimit = 0;
+  fprintf(stderr,"* Reseting offsetOfEOF\n");
   sequenceDB->offsetOfEOF = 0;
   sequenceDB->positionedAtEnd = 1;
   return sequenceDB;
@@ -125,7 +137,7 @@ void DeleteSequenceDB(tSequenceDB *db){
    for revision+1 is opened r/w.
 */
 tSequenceDB *OpenSequenceDB(char *path, int readWrite, int revision){
-  tSequenceDB *sequenceDB = (tSequenceDB *)safe_calloc(1, sizeof(tSequenceDB));
+  tSequenceDB *sequenceDB = (tSequenceDB *)malloc(sizeof(tSequenceDB));
   char buffer[FILENAME_MAX + 30];
   FILE *datafp;
   FILE *testfp;
@@ -135,58 +147,61 @@ tSequenceDB *OpenSequenceDB(char *path, int readWrite, int revision){
 
   // Load the indicies
 
+
   sprintf(buffer,"%s/seqDB.unitigs.%d",path,revision);
-  errno = 0;
   testfp = fopen(buffer,"r");
-  if (errno)
-    fprintf(stderr, "OpenSequenceDB()-- Failed to open '%s' for reading: %s\n",
-            buffer, strerror(errno)), exit(1);
+  if(!testfp){
+	char newBuffer[FILENAME_MAX + 30];
+	fprintf( stderr, "FILENAME_MAX = %d\n", FILENAME_MAX);
+	sprintf(newBuffer,"createSequenceDB: couldn't open unitig index file %s", buffer);
+	perror(newBuffer);
+	exit(1);
+  }    
+
   sequenceDB->Unitigs = CreateFromFileVA_tMARecord(testfp,10);
   fprintf(stderr,"* Loaded " F_SIZE_T " tMARecords from %s\n",
           GetNumtMARecords(sequenceDB->Unitigs), buffer);
   fclose(testfp);
 
   sprintf(buffer,"%s/seqDB.contigs.%d",path,revision);
-  errno = 0;
   testfp = fopen(buffer,"r");
-  if (errno)
-    fprintf(stderr, "OpenSequenceDB()-- Failed to open '%s' for reading: %s\n",
-            buffer, strerror(errno)), exit(1);
+  if(!testfp){
+	sprintf(buffer,"createSequenceDB: couldn't open contig index file %s", buffer);
+	perror(buffer);
+	exit(1);
+  }    
+
   sequenceDB->Contigs = CreateFromFileVA_tMARecord(testfp,10);
   fprintf(stderr,"* Loaded " F_SIZE_T " tMARecords from %s\n",
           GetNumtMARecords(sequenceDB->Contigs), buffer);
   fclose(testfp);
+
 
   sequenceDB->UnitigStore = CreateMultiAlignStoreT(GetNumtMARecords(sequenceDB->Unitigs));
   sequenceDB->ContigStore = CreateMultiAlignStoreT(GetNumtMARecords(sequenceDB->Contigs));
 
   sequenceDB->SubStores = CreateVA_PtrT(revision+1);
 
-  for(i = 0; i <= revision; i++) {
+  for(i = 0; i <= revision; i++){
+
     sprintf(buffer,"%s/seqDB.data.%d",path,i);
-    errno = 0;
     datafp = fopen(buffer,"r");
-    if (errno)
-      fprintf(stderr, "OpenSequenceDB()-- Failed to open '%s' for reading: %s\n",
-              buffer, strerror(errno)), exit(1);
+    AssertPtr(datafp);
     AppendPtrT(sequenceDB->SubStores, (const void *)&datafp);
   }
 
   sequenceDB->currentRevision = revision;
-
+  fprintf(stderr,"* Reseting offsetOfEOF\n");
   sequenceDB->offsetOfEOF = 0;
   sequenceDB->positionedAtEnd = 1;
   if(readWrite){
     sprintf(buffer,"%s/seqDB.data.%d",path,revision + 1);
-    errno = 0;
     datafp = fopen(buffer,"w+");
-    if (errno)
-      fprintf(stderr, "OpenSequenceDB()-- Failed to open '%s' for write+append (is it read only?): %s\n",
-              buffer, strerror(errno)), exit(1);
+    AssertPtr(datafp);
     AppendPtrT(sequenceDB->SubStores, (const void *)&datafp);
     sequenceDB->currentRevision = revision+1;
   }
-  return sequenceDB;
+    return sequenceDB;
 }
 
 /* SaveSequenceDB
@@ -204,7 +219,7 @@ void SaveSequenceDB(tSequenceDB *db){  // Save the current revision of the indic
   errno = 0;
   indexfp = fopen(buffer,"w");
   if (errno)
-    fprintf(stderr, "SaveSequenceDB()-- Failed to open '%s' for write: %s\n", buffer, strerror(errno)), exit(1);
+    fprintf(stderr, "* Failed to open '%s' for write: %s\n", buffer, strerror(errno)), exit(1);
   CopyToFileVA_tMARecord(db->Unitigs, indexfp);
   fclose(indexfp);
   fprintf(stderr,"* Saved " F_SIZE_T " Unitig records to %s\n",
@@ -214,7 +229,7 @@ void SaveSequenceDB(tSequenceDB *db){  // Save the current revision of the indic
   errno = 0;
   indexfp = fopen(buffer,"w");
   if (errno)
-    fprintf(stderr, "SaveSequenceDB()-- Failed to open '%s' for write: %s\n", buffer, strerror(errno)), exit(1);
+    fprintf(stderr, "* Failed to open '%s' for write: %s\n", buffer, strerror(errno)), exit(1);
   CopyToFileVA_tMARecord(db->Contigs, indexfp);
   fclose(indexfp);
   fprintf(stderr,"* Saved " F_SIZE_T " Contig records to %s\n",
@@ -225,13 +240,13 @@ void SaveSequenceDB(tSequenceDB *db){  // Save the current revision of the indic
   errno = 0;
   fsync(fileno(currentDatafp));
   if (errno)
-    fprintf(stderr, "SaveSequenceDB()-- Failed to sync '%s': %s\n", buffer, strerror(errno)), exit(1);
+    fprintf(stderr, "* Failed to sync '%s': %s\n", buffer, strerror(errno)), exit(1);
   fclose(currentDatafp);
   sprintf(buffer,"%s/seqDB.data.%d",db->path,db->currentRevision);
   errno = 0;
   currentDatafp = fopen(buffer,"r");
   if (errno)
-    fprintf(stderr, "SaveSequenceDB()-- Failed to open '%s' for read: %s\n", buffer, strerror(errno)), exit(1);
+    fprintf(stderr, "* Failed to open '%s' for read: %s\n", buffer, strerror(errno)), exit(1);
   SetPtrT(db->SubStores, db->currentRevision, (const void *) &currentDatafp);
   fprintf(stderr,"* Reopened %s as read only\n", buffer);
 
@@ -244,7 +259,7 @@ void SaveSequenceDB(tSequenceDB *db){  // Save the current revision of the indic
   errno = 0;
   currentDatafp = fopen(buffer,"w+");
   if (errno)
-    fprintf(stderr, "SaveSequenceDB()-- Failed to open '%s' for write: %s\n", buffer, strerror(errno)), exit(1);
+    fprintf(stderr, "* Failed to open '%s' for write: %s\n", buffer, strerror(errno)), exit(1);
   SetPtrT(db->SubStores, db->currentRevision, (const void *)&currentDatafp);
 
   fprintf(stderr,"* Opened %s as write\n", buffer);
@@ -446,6 +461,8 @@ MultiAlignT *LoadMultiAlignTFromSequenceDB(tSequenceDB *db, int index, int isUni
    Otherwise, load reusema from disk, and DO NOT insert in cache
    On Failure, returns Empty reusema.
 */
+//#define DEBUG_OUTPUT
+
 int32 ReLoadMultiAlignTFromSequenceDB(tSequenceDB *db, MultiAlignT *reusema, int index, int isUnitig){
  MultiAlignStoreT *maStore = (isUnitig?db->UnitigStore:db->ContigStore);
  MultiAlignT *ma = GetMultiAlignInStore(maStore,index);

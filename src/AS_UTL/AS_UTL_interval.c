@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: AS_UTL_interval.c,v 1.6 2006-11-14 19:58:23 eliv Exp $";
+static char CM_ID[] = "$Id: AS_UTL_interval.c,v 1.4 2005-03-22 19:49:29 jason_miller Exp $";
 #include "AS_global.h"
 #include "AS_UTL_interval.h"
 
@@ -37,12 +37,12 @@ CDS_COORD_t IntervalsOverlap( CDS_COORD_t a_bgn, CDS_COORD_t a_end,
      of a line segment that covers both of the fragments is less than
      the sum of the lengths of both fragments. */
 
-  a_min = MIN(a_bgn,a_end);
-  a_max = MAX(a_bgn,a_end);
-  b_min = MIN(b_bgn,b_end);
-  b_max = MAX(b_bgn,b_end);
-  themin = MIN(a_min,b_min);
-  themax = MAX(a_max,b_max);
+  a_min = min(a_bgn,a_end);
+  a_max = max(a_bgn,a_end);
+  b_min = min(b_bgn,b_end);
+  b_max = max(b_bgn,b_end);
+  themin = min(a_min,b_min);
+  themax = max(a_max,b_max);
   overlap = ((a_max-a_min)+(b_max-b_min)) - (themax-themin);
 
   if(overlap > minimum_overlap)

@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 static char CM_ID[] 
-= "$Id: AS_CGB_io.c,v 1.8 2006-11-14 17:52:14 eliv Exp $";
+= "$Id: AS_CGB_io.c,v 1.6 2006-02-13 22:16:31 eliv Exp $";
 /* *******************************************************************
  *
  * Module: AS_CGB_io.c
@@ -113,16 +113,16 @@ void output_the_chunks
   for(chunk_index=0;chunk_index < nchunks; chunk_index++){
     const AChunkMesg * const mychunk = GetVA_AChunkMesg(thechunks,chunk_index);
 
-    max_num_frags_per_chunk = MAX(max_num_frags_per_chunk,
+    max_num_frags_per_chunk = max(max_num_frags_per_chunk,
 				  mychunk->num_frags);
-    max_num_ovlps_per_chunk = MAX(max_num_ovlps_per_chunk,
+    max_num_ovlps_per_chunk = max(max_num_ovlps_per_chunk,
 				  mychunk->a_degree_raw 
 				  + mychunk->b_degree_raw);
   }
 
   if(analysis_level > 1 && (fragsrc != NULL)) {
 
-    frag_source_index = safe_malloc(sizeof(size_t) * nfrag);
+    SAFE_MALLOC(frag_source_index, size_t, nfrag);
     newfragsrc = CreateVA_char(2*GetNumVA_char(fragsrc));
 
     // Append to the fragment source field.  This needs to be a separate
@@ -292,7 +292,7 @@ void output_the_chunks
   if( NULL != frag_source_index ) {
     assert(NULL != newfragsrc);
     DeleteVA_char(newfragsrc); newfragsrc = NULL;
-    safe_free(frag_source_index);
+    SAFE_FREE(frag_source_index);
   }
 
   if( output_fom_messages ) {

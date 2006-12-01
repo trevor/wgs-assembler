@@ -82,8 +82,7 @@ concatRegions: concatRegions.o
 dumpMappedBACFragIntervals: dumpMappedBACFragIntervals.o ASMData.o \
 	libAS_MSG.a libAS_PER.a libAS_UTL.a
 
-ofg2asm: ofg2asm.o \
-	libAS_MSG.a libAS_UTL.a
+ofg2asm: ofg2asm.o libAS_MSG.a libAS_UTL.a
 
 dumpMappedMatePairsBinary: dumpMappedMatePairsBinary.o ASMData.o \
 	libAS_MSG.a libAS_PER.a libAS_UTL.a
@@ -142,8 +141,7 @@ dumpClones: dumpClones.o ASMData.o \
 dumpFragScaffCoords: dumpFragScaffoldCoordinates.o ASMData.o \
 	libAS_MSG.a libAS_PER.a libAS_UTL.a
 
-getMDIDataFromASM: getMDIDataFromASM.o \
-	libAS_MSG.a libAS_UTL.a
+getMDIDataFromASM: getMDIDataFromASM.o libAS_MSG.a libAS_UTL.a
 
 dumpContigLengths: dumpContigLengths.o ASMData.o \
 	libAS_MSG.a libAS_PER.a libAS_UTL.a
@@ -172,29 +170,27 @@ extract_from_uids: extract_from_uids.o \
 	AS_CVT_hashtable.o AS_CVT_uid_interface.o \
 	libAS_MSG.a libAS_PER.a libAS_UTL.a
 
-make_cns_list: make_cns_list.o \
-	libAS_MSG.a
+make_cns_list: make_cns_list.o libAS_MSG.a
 
-make_range_file: make_range_file.o \
-	libAS_UTL.a
+make_range_file: make_range_file.o libAS_UTL.a
 
 run_components_thru_grande:
-	@cp -f run_components_thru_grande.sh $(LOCAL_BIN)
-	@chmod 775 $(LOCAL_BIN)/run_components_thru_grande.sh
+	cp -f run_components_thru_grande.sh $(LOCAL_BIN)
+	chmod 775 $(LOCAL_BIN)/run_components_thru_grande.sh
 
 run_grande_on_component:
-	@cp -f run_grande_on_component.sh $(LOCAL_BIN)
-	@chmod 775 $(LOCAL_BIN)/run_grande_on_component.sh
+	cp -f run_grande_on_component.sh $(LOCAL_BIN)
+	chmod 775 $(LOCAL_BIN)/run_grande_on_component.sh
 
 run_grande_on_frgs:
-	@cp -f run_grande_on_frgs.sh $(LOCAL_BIN)
-	@chmod 775 $(LOCAL_BIN)/run_grande_on_frgs.sh
+	cp -f run_grande_on_frgs.sh $(LOCAL_BIN)
+	chmod 775 $(LOCAL_BIN)/run_grande_on_frgs.sh
 
 setup_status_file:
-	@cp -f setup_status_file.sh $(LOCAL_BIN)
-	@chmod 775 $(LOCAL_BIN)/setup_status_file.sh
+	cp -f setup_status_file.sh $(LOCAL_BIN)
+	chmod 775 $(LOCAL_BIN)/setup_status_file.sh
 
 mdi2ps.sh:
-	@cp -f mdi2ps.sh $(LOCAL_BIN)
-	@chmod 775 $(LOCAL_BIN)/mdi2ps.sh
+	cp -f mdi2ps.sh $(LOCAL_BIN)
+	chmod 775 $(LOCAL_BIN)/mdi2ps.sh
 

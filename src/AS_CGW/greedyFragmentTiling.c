@@ -1,24 +1,4 @@
 
-/**************************************************************************
- * This file is part of Celera Assembler, a software program that 
- * assembles whole-genome shotgun reads into contigs and scaffolds.
- * Copyright (C) 1999-2004, Applera Corporation. All rights reserved.
- * 
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received (LICENSE.txt) a copy of the GNU General Public 
- * License along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *************************************************************************/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -30,7 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-
+#include "cds.h"
 #include "AS_global.h"
 #include "AS_UTL_Var.h"
 #include "AS_UTL_timer.h"
@@ -74,10 +54,9 @@ static int restrictIDs=0;
 static int restrictSeeds=0;
 static char iidListFile[250];
 static char seedListFile[250];
-static int *iid2sample=NULL;
+static int *iid2sample;
 static char *seen;
 static int thickestOvlsCountAsSeen=0;
-static int seedSample=-1;
 
 #define DEFAULT_SAMPLE_ADVANTAGE .05
 
@@ -102,12 +81,12 @@ void setup_stores(char *OVL_Store_Path, char *Frg_Store_Path, char *Gkp_Store_Pa
 }
 
 void print_olap(Long_Olap_Data_t olap){
-  printf ("    %8d %8d %c %5d %5d %4.1f %4.1f\n",
-          olap . a_iid,
-          olap . b_iid,
-          olap . flipped ? 'I' : 'N',
-          olap . a_hang, olap . b_hang,
-          olap . orig_erate / 10.0, olap . corr_erate / 10.0);
+        printf ("    %8d %8d %c %5d %5d %4.1f %4.1f\n",
+		olap . a_iid,
+		olap . b_iid,
+		olap . flipped ? 'I' : 'N',
+		olap . a_hang, olap . b_hang,
+		olap . orig_erate / 10.0, olap . corr_erate / 10.0);
 }
 
 
@@ -169,20 +148,20 @@ int get_clr_len(uint32 iid){
 void olap_ref_swap(Long_Olap_Data_t *o){
 
   /*
-    ---->  x
-    ----> y
+                ---->  x
+                  ----> y
 
-    ----> y
-    ---->  x
+                  ----> y
+                ---->  x
 
 
 			 
-    ---->  x
-    <---- y
+           ---->  x
+             <---- y
 			
 
-    ----> y
-    <---- x  
+           ----> y
+             <---- x  
   */            
   int t=o->a_iid;
   o->a_iid=o->b_iid;
@@ -201,22 +180,22 @@ void olap_reverse(Long_Olap_Data_t *o){
 
   /* if we flip the orientation of a fragment then ...
 
-  ---> x
-  ---> y
+          ---> x
+           ---> y
 
-  ---> x
-  <--- y
+           ---> x
+         <--- y
 
 
-  or
+		 or
  
-  ---> x
-  <--- y
+          ---> x
+           <--- y
 
-  ---> x
-  ---> y
+           ---> x
+         ---> y
 
-  so "flipped" gets inverted and we also have to let ah' <- -bh and bh' <- -ah
+       so "flipped" gets inverted and we also have to let ah' <- -bh and bh' <- -ah
   */
   int t=-o->a_hang;
   o->a_hang=-o->b_hang;
@@ -298,7 +277,7 @@ int isDeadEnd(int frg, int offAEnd, double erate, int useCorrected, int skipCont
     // exclude containing overlaps
     if( skipContaining && olap.a_hang < 0 && olap.b_hang > 0)continue;
 
-    if(frglen-MAX(0,olap.a_hang)+MIN(0,olap.b_hang) < minlen)continue;
+    if(frglen-max(0,olap.a_hang)+min(0,olap.b_hang) < minlen)continue;
 
     // if it's off the correct end ...
     if( (offAEnd ? (olap . a_hang < 0) : (olap.b_hang > 0))){
@@ -341,8 +320,8 @@ Long_Olap_Data_t better_olap(Long_Olap_Data_t a, Long_Olap_Data_t b, int startin
       bOtherAEnd = b.flipped;
     }
 
-    aIsDead = isDeadEnd(a.b_iid,aOtherAEnd,erate,useCorrected,skipContaining,minlen,get_clr_len(a.b_iid));
-    bIsDead = isDeadEnd(b.b_iid,bOtherAEnd,erate,useCorrected,skipContaining,minlen,get_clr_len(b.b_iid));
+    aIsDead = isDeadEnd(a.b_iid,aOtherAEnd,erate,useCorrected,skipContaining,minlen,frglen);
+    bIsDead = isDeadEnd(b.b_iid,bOtherAEnd,erate,useCorrected,skipContaining,minlen,frglen);
     
     // if status is different, then prefer the live one ...
     if(aIsDead<bIsDead)return a;
@@ -351,90 +330,90 @@ Long_Olap_Data_t better_olap(Long_Olap_Data_t a, Long_Olap_Data_t b, int startin
 
   switch (bestType){
 
-    case BEST_MEANS_LOWEST_ERROR:
-      if(useCorrected){ 
-        if(a.corr_erate>=b.corr_erate){
-          return b;
-        } else {
-          return a;
-        }
+  case BEST_MEANS_LOWEST_ERROR:
+    if(useCorrected){ 
+      if(a.corr_erate>=b.corr_erate){
+	return b;
       } else {
-        if(a.orig_erate>=b.orig_erate){
-          return b;
-        } else {
-          return a;
-        }
+	return a;
       }
-      break;
-
-    case BEST_MEANS_THICKEST:
-
-      /*  Suppose we want the thickest; considering the fragment of interest to be the reference, and the end we want to extend
-          off as the 3' end, then what we want is the minimal ahang, subject to a positive bhang */
-
-      // so, start the canonicalization relative to overlap a;
-
-      // first, if startingFrg not reference, then swap:
-      if(copy_a.a_iid!=startingFrg){
-        olap_ref_swap(&copy_a);
-      }
-      // next, if startingFrg orientation wrong, then reverse:
-      if(offAEnd){
-        olap_reverse(&copy_a);
-      }
-
-
-      // now, repeat for overlap b:
-
-      // first, if startingFrg not reference, then swap:
-      if(copy_b.a_iid!=startingFrg){
-        olap_ref_swap(&copy_b);
-      }
-      // next, if startingFrg orientation wrong, then reverse:
-      if(offAEnd){
-        olap_reverse(&copy_b);
-      }
-
-
-      // now, verify that the bhangs
-      assert(copy_a.b_hang >0 );
-      assert(copy_b.b_hang >0 );
-      if(copy_a.a_hang>=copy_b.a_hang){
-        return b;
+    } else {
+      if(a.orig_erate>=b.orig_erate){
+	return b;
       } else {
-        return a;
+	return a;
       }
-      break;
+    }
+    break;
+
+  case BEST_MEANS_THICKEST:
+
+    /*  Suppose we want the thickest; considering the fragment of interest to be the reference, and the end we want to extend
+	off as the 3' end, then what we want is the minimal ahang, subject to a positive bhang */
+
+    // so, start the canonicalization relative to overlap a;
+
+    // first, if startingFrg not reference, then swap:
+    if(copy_a.a_iid!=startingFrg){
+      olap_ref_swap(&copy_a);
+    }
+    // next, if startingFrg orientation wrong, then reverse:
+    if(offAEnd){
+      olap_reverse(&copy_a);
+    }
+
+
+    // now, repeat for overlap b:
+
+    // first, if startingFrg not reference, then swap:
+    if(copy_b.a_iid!=startingFrg){
+      olap_ref_swap(&copy_b);
+    }
+    // next, if startingFrg orientation wrong, then reverse:
+    if(offAEnd){
+      olap_reverse(&copy_b);
+    }
+
+
+    // now, verify that the bhangs
+    assert(copy_a.b_hang >0 );
+    assert(copy_b.b_hang >0 );
+    if(copy_a.a_hang>=copy_b.a_hang){
+      return b;
+    } else {
+      return a;
+    }
+    break;
 
   
-    case BEST_MEANS_BEST_UPPER_BOUND:
+  case BEST_MEANS_BEST_UPPER_BOUND:
 
-      // we will take the length of the overlap plus the number of errors observed and compute the
-      // 95% confidence interval on the lower bound of the true mismatch rate, favoring whichever
-      // gives a lower result.
+    // we will take the length of the overlap plus the number of errors observed and compute the
+    // 95% confidence interval on the lower bound of the true mismatch rate, favoring whichever
+    // gives a lower result.
 
-      {  double upperA,errorsA;
-      double upperB,errorsB;
-      // compute length of overlap
-      // overlap = frglen - MAX(0,ahang) + MIN(0,bhang)
-      int  olenA = frglen - MAX(0,a.a_hang) + MIN(0,a.b_hang);
-      int  olenB = frglen - MAX(0,b.a_hang) + MIN(0,b.b_hang);
+    {  double upperA,errorsA;
+    double upperB,errorsB;
+    // compute length of overlap
+    // overlap = frglen - max(0,ahang) + min(0,bhang)
+    int  olenA = frglen - max(0,a.a_hang) + min(0,a.b_hang);
+    int  olenB = frglen - max(0,b.a_hang) + min(0,b.b_hang);
 
-      if(useCorrected){
-        upperA = get_95pct_upper(olenA, (a.corr_erate+.9)/1000.);
-        upperB = get_95pct_upper(olenB, (b.corr_erate+.9)/1000.);
-      } else {
-        upperA = get_95pct_upper(olenA, (a.orig_erate+.9)/1000.);
-        upperB = get_95pct_upper(olenB, (b.orig_erate+.9)/1000.);
-      }
+    if(useCorrected){
+      upperA = get_95pct_upper(olenA, (a.corr_erate+.9)/1000.);
+      upperB = get_95pct_upper(olenB, (b.corr_erate+.9)/1000.);
+    } else {
+      upperA = get_95pct_upper(olenA, (a.orig_erate+.9)/1000.);
+      upperB = get_95pct_upper(olenB, (b.orig_erate+.9)/1000.);
+    }
     
 
-      }
-      break;
+    }
+    break;
 
-    default:
-      fprintf(stderr,"Unknown criterion for best overlap! exit \n");
-      exit(-1);
+  default:
+    fprintf(stderr,"Unknown criterion for best overlap! exit \n");
+    exit(-1);
       break;
   }
 }
@@ -453,17 +432,13 @@ int lowestErrorSort(const void *A,const void *B){
     if(a->orig_erate!=b->orig_erate){
       return a->orig_erate-b->orig_erate;
     }
-    /* in case of a tie in uncorrected ... */
-    if(a->corr_erate!=b->corr_erate){
-      return a->corr_erate-b->corr_erate;
-    }
   }
 
   { // sort by thickness
     int laa = get_clr_len(a->a_iid);
-    int  olenA = laa - MAX(0,a->a_hang) + MIN(0,a->b_hang);
+    int  olenA = laa - max(0,a->a_hang) + min(0,a->b_hang);
     int lba = get_clr_len(b->a_iid);
-    int  olenB = lba - MAX(0,b->a_hang) + MIN(0,b->b_hang);
+    int  olenB = lba - max(0,b->a_hang) + min(0,b->b_hang);
     if(olenA!=olenB)return olenA-olenB;
   }
 
@@ -474,7 +449,7 @@ int lowestErrorSort(const void *A,const void *B){
 // setupolaps() returns a count of usable olaps and sets *retolaps to point to
 // a block of memory containing them ... but the memory is static (i.e. the 
 // calling routine does not own the memory) and should not be freed!
-int setupolaps(int id, int offAEnd,BestMeasure bestType,double erate,int useCorrected,int skipContaining,int minlen, int frglen,int avoidDeadEnds,Long_Olap_Data_t **retolaps, double favorSameSample,double favorSameSampleAsSeed){
+int setupolaps(int id, int offAEnd,BestMeasure bestType,double erate,int useCorrected,int skipContaining,int minlen, int frglen,int avoidDeadEnds,Long_Olap_Data_t **retolaps, double favorSameSample){
 
   OVL_Stream_t  * my_stream = New_OVL_Stream ();
   static Long_Olap_Data_t  *olaps=NULL;
@@ -504,7 +479,7 @@ int setupolaps(int id, int offAEnd,BestMeasure bestType,double erate,int useCorr
     if( skipContaining && olap.a_hang < 0 && olap.b_hang > 0)continue;
 
     // exclude too-short overlaps
-    if(frglen-MAX(0,olap.a_hang)+MIN(0,olap.b_hang) < minlen)continue;
+    if(frglen-max(0,olap.a_hang)+min(0,olap.b_hang) < minlen)continue;
 
     // if it's off the correct end ...
     if( (offAEnd ? (olap . a_hang < 0) : (olap.b_hang > 0))){
@@ -524,48 +499,9 @@ int setupolaps(int id, int offAEnd,BestMeasure bestType,double erate,int useCorr
       if(bestType==BEST_MEANS_LOWEST_ERROR&&favorSameSample>0){
 	if(iid2sample[olap.a_iid]==iid2sample[olap.b_iid]){
 	  if(useCorrected){
-	    if( ((int)olap.corr_erate)-favorSameSample >= 0 ){
-	      olap.corr_erate-=favorSameSample;
-	    } else {
-	      olap.corr_erate=0;
-	    }
+	    olap.corr_erate-=favorSameSample;
 	  } else {
-	    if( ((int)olap.orig_erate)-favorSameSample >= 0 ){
-	      olap.orig_erate-=favorSameSample;
-	    } else {
-	      olap.orig_erate=0;
-	    }
-	  }
-	}
-      }
-      if(bestType==BEST_MEANS_LOWEST_ERROR&&favorSameSampleAsSeed>0){
-	if(seedSample==iid2sample[olap.b_iid]){
-	  if(useCorrected){
-	    if( ((int)olap.corr_erate)-favorSameSampleAsSeed >= 0 ){
-	      olap.corr_erate-=favorSameSampleAsSeed;
-	    } else {
-	      olap.corr_erate=0;
-	    }
-	    if(seedSample!=iid2sample[olap.a_iid]){
-	      if( ((int)olap.corr_erate)-favorSameSampleAsSeed >= 0 ){
-		olap.corr_erate-=favorSameSampleAsSeed;
-	      } else {
-		olap.corr_erate=0;
-	      }
-	    }
-	  } else {
-	    if( ((int)olap.orig_erate)-favorSameSampleAsSeed >= 0 ){
-	      olap.orig_erate-=favorSameSampleAsSeed;
-	    } else {
-	      olap.orig_erate=0;
-	    }
-	    if(seedSample!=iid2sample[olap.a_iid]){
-	      if( ((int)olap.orig_erate)-favorSameSampleAsSeed >= 0 ){
-		olap.orig_erate-=favorSameSampleAsSeed;
-	      } else {
-		olap.orig_erate=0;
-	      }
-	    }
+	    olap.orig_erate-=favorSameSample;
 	  }
 	}
       }
@@ -594,9 +530,9 @@ int best_overlap_off_end(int id, int offAEnd,BestMeasure bestType,Long_Olap_Data
 		    || (i < maxOvlsToConsider)
 		    || (useCorrectedErate ? (olaps[i].corr_erate == olaps[maxOvlsToConsider].corr_erate) :  (olaps[i].orig_erate == olaps[maxOvlsToConsider].orig_erate)))){
 		    
-    /*
-      while(i<numOvls&&(maxOvlsToConsider == -1 || i<maxOvlsToConsider)){
-    */
+  /*
+  while(i<numOvls&&(maxOvlsToConsider == -1 || i<maxOvlsToConsider)){
+  */
 
     Long_Olap_Data_t olap = olaps[i];
     
@@ -665,38 +601,34 @@ void setUpRestrictions(int last_stored_frag,char *listfile,int *usabilityArray){
 
 
 void usage(char *pgm){
-  fprintf (stderr, 
-           "USAGE:  %s -f <FragStoreName> -g <GkpStoreName> -o <full_ovlStore> -n <startingFrgNum> [-C] [-e <erate cutoff>] [-E] [-m <minlen>] [-Q] [-D] [-N <maxovls>] [-i <file specifying IIDs to use> | -I <file specifying IIDs to use>] [-R] [-s <uid2sample file> [-S <same-sample bonus> | -T <same-sample-as-seed bonus>]] [-P] [-5 | -3]\n"
-           "\t-n startingFrgNum = fragment to walk out from\n"
-           "\t-e specifies the maximum mismatch rate (as a fraction, i.e. .01 means one percent)\n"
-           "\t-B specifies that the overlap with the lowest upper bound on the mismatch rate will be used\n"
-           "\t-C specifies to use containing fragments (default is only dovetails\n"
-           "\t-D specifies that best quality should win over avoiding dead ends; by default, a fragment that is not a dead end wins over one that is\n"
-           "\t-E specifies that the corrected error rate rather than the original is to be used\n"
-           "\t-N specifies that only the maxovls lowest-error overlaps will be evaluated\n"
-           "\t-Q specifies that the lowest error rate overlap will be used (in place of thickest)\n"
-           "\t-i specifies a file specifying a comma or \\n separated list\n"
-           "\t\tof either single IIDs or <start>-<end> ranges; IIDs thus\n"
-           "\t\tspecified can be used in an assembly--others not!\n"
-           "\t-I is like -i except that the restriction only applies to seeds,\n"
-           "\t\tnot extensions\n"
-           "\t-P causes error rate to be printed\n"
-           "\t-R specifies that fragments involved in thicker overlaps than the one chosen at a given extension will count as used\n"
-           "\t-s species the name of a file containing a uid to sample (integer) mapping\n"
-           "\t-S specifies the amount (in percent error) that a same-sample overlap is preferred to a different-sample overlap\n"
-           "\t-T specifies the amount (in percent error) that an overlap is preferred if it is to a fragment whose sample matches that of the seed\n"
-           "\t-5 specifies that only the 5' end of the seed be extended\n"
-           "\t-3 specifies that only the 3' end of the seed be extended\n"
-           ,pgm);
+	fprintf (stderr, 
+		 "USAGE:  %s -f <FragStoreName> -g <GkpStoreName> -o <full_ovlStore> -n <startingFrgNum> [-C] [-e <erate cutoff>] [-E] [-m <minlen>] [-Q] [-D] [-N <maxovls>] [-i <file specifying IIDs to use> | -I <file specifying IIDs to use>] [-R] [-s <uid2sample file> [-S <same-sample bonus>]]\n"
+		 "\t-n startingFrgNum = fragment to walk out from\n"
+		 "\t-e specifies the maximum mismatch rate (as a fraction, i.e. .01 means one percent)\n"
+		 "\t-B specifies that the overlap with the lowest upper bound on the mismatch rate will be used\n"
+		 "\t-C specifies to use containing fragments (default is only dovetails\n"
+		 "\t-D specifies that best quality should win over avoiding dead ends; by default, a fragment that is not a dead end wins over one that is\n"
+		 "\t-E specifies that the corrected error rate rather than the original is to be used\n"
+		 "\t-N specifies that only the maxovls lowest-error overlaps will be evaluated\n"
+		 "\t-Q specifies that the lowest error rate overlap will be used (in place of thickest)\n"
+		 "\t-i specifies a file specifying a comma or \\n separated list\n"
+		 "\t\tof either single IIDs or <start>-<end> ranges; IIDs thus\n"
+		 "\t\tspecified can be used in an assembly--others not!\n"
+		 "\t-I is like -i except that the restriction only applies to seeds,\n"
+		 "\t\tnot extensions\n"
+		 "\t-R specifies that fragments involved in thicker overlaps than the one chosen at a given extension will count as used\n"
+		 "\t-s species the name of a file containing a uid to sample (integer) mapping\n"
+		 "\t-S specifies the amount (in percent error) that a same-sample overlap is preferred to a different-sample overlap\n",
+		 pgm);
 }
 
 int uid2iid(uint64 uid){
   PHashValue_AS value;
   static firstFailure=1;
   if(HASH_FAILURE == LookupInPHashTable_AS(my_gkp_store.hashTable, 
-                                           UID_NAMESPACE_AS,
-                                           uid,
-                                           &value)){
+					       UID_NAMESPACE_AS,
+					       uid,
+					       &value)){
     if(firstFailure){
       fprintf(stderr,"Tried to look up iid of unknown uid: " F_UID "; this may reflect trying to use a deleted fragment; further instances will not be reported.\n",uid);
       firstFailure=0;
@@ -709,8 +641,8 @@ int uid2iid(uint64 uid){
 int ovlThickness(Long_Olap_Data_t o, int frglen, int afrg, int Aend){
 
   /* thickness is afrg's length minus
-     bhang (from afrg's perspective) if Aend
-     ahang (from afrg's perspective) if Bend
+          bhang (from afrg's perspective) if Aend
+          ahang (from afrg's perspective) if Bend
 
      N.B. this makes thickness > frglen if relevant hang is negative
   */
@@ -755,7 +687,6 @@ int main (int argc , char * argv[] ) {
   char full_gkpPath[1000];
   char sampleFileName[1000];
   double favorSameSample=0;
-  double favorSameSampleAsSeed=0;
   FILE *sampleFile;
   int setFullFrg=0;
   int setFullGkp=0;
@@ -768,12 +699,6 @@ int main (int argc , char * argv[] ) {
   int currFrg=-1;
   int firstExtend=-1;
 
-  int fivePonly=0;
-  int threePonly=0;
-
-  int printpid=0;
-  double pid=-1.;
-
   int last_stored_frag;
   int ahang,bhang;
   int rightEnd,leftEnd;
@@ -783,7 +708,6 @@ int main (int argc , char * argv[] ) {
   int minlen=40;
   int avoidDeadEnds=1;
   fsread = new_ReadStruct();
-
 
   GlobalData  = data = CreateGlobal_CGW();
   data->stderrc = stderr;
@@ -796,99 +720,89 @@ int main (int argc , char * argv[] ) {
   { /* Parse the argument list using "man 3 getopt". */ 
     int ch,errflg=0;
     optarg = NULL;
-    while (!errflg && ((ch = getopt(argc, argv,"BCDe:Ef:g:m:n:N:o:PQs:S:T:i:I:R53")) != EOF)){
+    while (!errflg && ((ch = getopt(argc, argv,"BCDe:Ef:g:m:n:N:o:Qs:S:i:I:R")) != EOF)){
       switch(ch) {
-        case 'B':
-          bestType=BEST_MEANS_BEST_UPPER_BOUND;
-          break;
-        case 'C':
-          skipContaining = 0;
-          break;
-        case 'D':
-          avoidDeadEnds=0;
-          break;
-        case 'e':
-          maxError = atof(optarg);
-          break;
-        case 'E':
-          useCorrectedErate=1;
-          break;
-        case 'f':
-          strcpy( full_frgPath, argv[optind - 1]);
-          setFullFrg = TRUE;
-          break;
-        case 'g':
-          strcpy( full_gkpPath, argv[optind - 1]);
-          setFullGkp = TRUE;
-          break;
-        case 'i':
-          restrictIDs=1;
-          {
-            int n ;
-            char *c= strncpy(iidListFile,optarg,249);
-            n = strlen(c);
-            if(n==249&&optarg[249]!='\0'){
-              fprintf(stderr,"Not enough memory for iid list path!\n");
-              exit(-4);
-            }
-          }
-          break;
-        case 'I':
-          restrictSeeds=1;
-          {
-            char *c = strncpy(seedListFile,optarg,249);
-            int n;
-            n = strlen(c);
-            if(n==249&&optarg[249]!='\0'){
-              fprintf(stderr,"Not enough memory for iid list path!\n");
-              exit(-4);
-            }
-          }
-          break;
-        case 'm':
-          minlen=atoi(optarg);
-          break;
-        case 'n':
-          startingFrgNum = atoi(argv[optind - 1]);
-          break;
-        case 'N':
-          maxOvlsToConsider = atoi(argv[optind-1]);
-          break;
-        case 'o':
-          strcpy(full_ovlPath,argv[optind-1]);
-          setFullOvl=1;
-          break;
-        case 'P':
-          printpid=1;
-          break;
-        case 'Q':
-          bestType=BEST_MEANS_LOWEST_ERROR;
-          break;
-        case 'R':
-          thickestOvlsCountAsSeen=1;
-          break;
-        case 's':
-          strcpy(sampleFileName,argv[optind-1]);
-          assert(strlen(sampleFileName)<=999);
-          break;
-        case 'S':
-          favorSameSample=atof(argv[optind-1]);
-          assert(favorSameSample>0);
-          break;
-        case 'T':
-          favorSameSampleAsSeed=atof(argv[optind-1]);
-          assert(favorSameSampleAsSeed>0);
-          break;
-        case '3':
-          threePonly=1;
-          break;
-        case '5':
-          fivePonly=1;
-          break;
-        case '?':
-          fprintf(stderr,"Unrecognized option -%c",optopt);
-        default :
-          errflg++;
+      case 'B':
+	bestType=BEST_MEANS_BEST_UPPER_BOUND;
+	break;
+      case 'C':
+	skipContaining = 0;
+	break;
+      case 'D':
+	avoidDeadEnds=0;
+	break;
+      case 'e':
+	maxError = atof(optarg);
+	break;
+      case 'E':
+	useCorrectedErate=1;
+	break;
+      case 'f':
+	strcpy( full_frgPath, argv[optind - 1]);
+	setFullFrg = TRUE;
+	break;
+      case 'g':
+	strcpy( full_gkpPath, argv[optind - 1]);
+	setFullGkp = TRUE;
+	break;
+      case 'i':
+	restrictIDs=1;
+	{
+	  int n ;
+	  char *c= strncpy(iidListFile,optarg,249);
+	  n = strlen(c);
+	  if(n==249&&optarg[249]!='\0'){
+	    fprintf(stderr,"Not enough memory for iid list path!\n");
+	    exit(-4);
+	  }
+	}
+	break;
+      case 'I':
+	restrictSeeds=1;
+	{
+	  char *c = strncpy(seedListFile,optarg,249);
+	  int n;
+	  n = strlen(c);
+	  if(n==249&&optarg[249]!='\0'){
+	    fprintf(stderr,"Not enough memory for iid list path!\n");
+	    exit(-4);
+	  }
+	}
+	break;
+      case 'm':
+	minlen=atoi(optarg);
+	break;
+      case 'n':
+	startingFrgNum = atoi(argv[optind - 1]);
+	break;
+      case 'N':
+	maxOvlsToConsider = atoi(argv[optind-1]);
+	break;
+      case 'o':
+	strcpy(full_ovlPath,argv[optind-1]);
+	setFullOvl=1;
+	break;
+      case 'Q':
+	bestType=BEST_MEANS_LOWEST_ERROR;
+	break;
+      case 'R':
+	thickestOvlsCountAsSeen=1;
+	break;
+      case 's':
+	strcpy(sampleFileName,argv[optind-1]);
+	assert(strlen(sampleFileName)<=999);
+	if(favorSameSample==0){
+	  favorSameSample=DEFAULT_SAMPLE_ADVANTAGE;
+	}
+	break;
+      case 'S':
+	favorSameSample=atof(argv[optind-1]);
+	assert(favorSameSample>0);
+	break;
+      case '?':
+	fprintf(stderr,"Unrecognized option -%c",optopt);
+      default :
+	errflg++;
       }
     }
 
@@ -899,8 +813,6 @@ int main (int argc , char * argv[] ) {
       }
   }
   
-  assert(! (fivePonly&&threePonly) );
-
   setup_stores(full_ovlPath,full_frgPath,full_gkpPath);
   last_stored_frag = getLastElemFragStore (my_frg_store);
 
@@ -914,10 +826,7 @@ int main (int argc , char * argv[] ) {
     setUpRestrictions(last_stored_frag,seedListFile,SeedUsability);
   }
 
-  if(favorSameSample>0||favorSameSampleAsSeed>0){
-    if(favorSameSampleAsSeed>0){
-      favorSameSample=0;
-    }
+  if(favorSameSample>0){
     assert(sampleFileName[0]!='\0');
   }
   if(sampleFileName[0]!='\0'){
@@ -934,9 +843,6 @@ int main (int argc , char * argv[] ) {
     while(fscanf(sampleFile,F_UID " " F_IID,&uid,&smp)==2){
       int iid=uid2iid(uid);
       if(iid>0) iid2sample[iid]=smp;
-    }
-    if(favorSameSample==0&&favorSameSampleAsSeed==0){
-      favorSameSample=DEFAULT_SAMPLE_ADVANTAGE;
     }
   }
 
@@ -965,7 +871,6 @@ int main (int argc , char * argv[] ) {
     Long_Olap_Data_t *olaps;
 
 
-
     // skip deleted fragments
     GateKeeperFragmentRecord gkpFrag;
     if(getGateKeeperFragmentStore(my_gkp_store.frgStore,seediid,&gkpFrag)!=0)
@@ -983,12 +888,6 @@ int main (int argc , char * argv[] ) {
 
     printf("Seed %d\n",seediid);
 
-    // keep track of the sample the seed comes from
-    if(favorSameSampleAsSeed){
-      seedSample=iid2sample[seediid];
-    }
-
-
     // do forward extensions
     stillGoing=1;
     Aend=1;
@@ -999,26 +898,16 @@ int main (int argc , char * argv[] ) {
 
     getClearRegion_ReadStruct(fsread, &clr_bgn,&clr_end, READSTRUCT_LATEST);
     frglen=clr_end-clr_bgn;
-    numFwdOvls = numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample,favorSameSampleAsSeed);
-    if(numOvls==0||threePonly){
+    numFwdOvls = numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample);
+    if(numOvls==0){
       stillGoing=0;
     }
     while(stillGoing){
       Long_Olap_Data_t o;
-      if(printpid){
-	if(iid2sample!=NULL){
-	  printf("%d  %d %d %s %f %d\n",currFrg,ahang,ahang+frglen, Aend?"<--":"-->",pid/1000.,iid2sample[currFrg]);
-	} else {
-	  printf("%d  %d %d %s %f\n",currFrg,ahang,ahang+frglen, Aend?"<--":"-->",pid/1000.);
-	}
-      } else {
-	printf("%d  %d %d %s\n",currFrg,ahang,ahang+frglen, Aend?"<--":"-->");
-      }
+      printf("%d  %d %d %s\n",currFrg,ahang,ahang+frglen, Aend?"<--":"-->");
       if(numOvls>0){
 	stillGoing = best_overlap_off_end(currFrg, Aend, bestType,&o,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,olaps,numOvls);
 	if(stillGoing){
-
-	  pid=o.orig_erate;
 
 	  if(thickestOvlsCountAsSeen){
 	    int idx;
@@ -1074,7 +963,7 @@ int main (int argc , char * argv[] ) {
 	  getFragStore(my_frg_store,currFrg,FRAG_S_ALL,fsread);
 	  getClearRegion_ReadStruct(fsread, &clr_bgn,&clr_end, READSTRUCT_LATEST);
 	  frglen=clr_end-clr_bgn;
-	  numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample,favorSameSampleAsSeed);
+	  numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample);
 	} else {
 	  printf("SEEN: %d  %d %d %s\n",currFrg,ahang,ahang+frglen, Aend?"<--":"-->");
 	  stillGoing=0;
@@ -1102,30 +991,19 @@ int main (int argc , char * argv[] ) {
     getClearRegion_ReadStruct(fsread, &clr_bgn,&clr_end, READSTRUCT_LATEST);
     frglen=clr_end-clr_bgn;
 
-    numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample,favorSameSampleAsSeed);
-    if(numOvls==0||fivePonly){stillGoing=0;}
+    numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample);
+    if(numOvls==0){stillGoing=0;}
 
     rightEnd=frglen; /* should be frglen of seed fragment */
     leftEnd=0;
 
     while(stillGoing){
       Long_Olap_Data_t o;
-      if(currFrg!=seediid&&currFrg!=firstExtend){
-	if(printpid){
-	  if(iid2sample!=NULL){
-	    printf("%d %d %d %s %f %d\n",currFrg,leftEnd,rightEnd,!Aend?"<--":"-->",pid/1000.,iid2sample[currFrg]);
-	  } else {
-	    printf("%d %d %d %s %f\n",currFrg,leftEnd,rightEnd,!Aend?"<--":"-->",pid/1000.);
-	  }
-	} else {
-	  printf("%d %d %d %s\n",currFrg,leftEnd,rightEnd,!Aend?"<--":"-->");
-	}
-      }
+      if(currFrg!=seediid&&currFrg!=firstExtend)  printf("%d %d %d %s\n",currFrg,leftEnd,rightEnd,!Aend?"<--":"-->");
 
       if(numOvls>0){
 	stillGoing = best_overlap_off_end(currFrg, Aend, bestType,&o,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,olaps,numOvls);
 	if(stillGoing){
-	  pid=o.orig_erate;
 
 	  if(thickestOvlsCountAsSeen){
 	    int idx;
@@ -1177,7 +1055,7 @@ int main (int argc , char * argv[] ) {
 	  getFragStore(my_frg_store,currFrg,FRAG_S_ALL,fsread);
 	  getClearRegion_ReadStruct(fsread, &clr_bgn,&clr_end, READSTRUCT_LATEST);
 	  frglen=clr_end-clr_bgn;
-	  numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample,favorSameSampleAsSeed);
+	  numOvls = setupolaps(currFrg, Aend, bestType,maxError,useCorrectedErate,skipContaining,minlen,frglen,avoidDeadEnds,&olaps,favorSameSample);
 	} else {
 	  stillGoing=0;
 	  printf("SEEN: %d  %d %d %s\n",currFrg,leftEnd,rightEnd, Aend?"<--":"-->");

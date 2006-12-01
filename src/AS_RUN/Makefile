@@ -52,6 +52,12 @@ SCRIPTS = runCA-OBT.pl \
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
 
+#  all: builds the usual binaries, then explicitly copies scripts to
+#  the bin directory.
+#	cp -f getCloneLengths.sh $(LOCAL_BIN)
+#	chmod 775 $(LOCAL_BIN)/getCloneLengths.sh
+
+
 all: $(OBJECTS) $(LIBRARIES) $(PROGS) $(SCRIPTS)
 
 install: all
@@ -72,41 +78,43 @@ RUNCAOBTUTIL = runCA-OBT/runCAutil/applyOverlapCorrection.pl \
                runCA-OBT/runCAutil/scaffolder.pl \
                runCA-OBT/runCAutil/terminate.pl \
                runCA-OBT/runCAutil/unitigger.pl \
-               runCA-OBT/runCAutil/bogUnitigger.pl
+               runCA-OBT/runCAutil/bogUnitigger.pl \
+               runCA-OBT/runCAutil/util.pl \
+               runCA-OBT/runCAutil/scheduler.pm
 
-runCA-OBT.pl: runCA-OBT/runCA.pl.head runCA-OBT/runCAutil/util.pl runCA-OBT/runCA.pl $(RUNCAOBTUTIL) runCA-OBT/runCAutil/scheduler.pm
-	@cat runCA-OBT/runCA.pl.head runCA-OBT/runCAutil/util.pl $(RUNCAOBTUTIL) runCA-OBT/runCA.pl runCA-OBT/runCAutil/scheduler.pm > $(LOCAL_BIN)/runCA-OBT.pl
-	@chmod 775 $(LOCAL_BIN)/runCA-OBT.pl
+runCA-OBT.pl: runCA-OBT/runCA.pl $(RUNCAOBTUTIL)
+	cat runCA-OBT/runCA.pl $(RUNCAOBTUTIL) > $(LOCAL_BIN)/runCA-OBT.pl
+	chmod 775 $(LOCAL_BIN)/runCA-OBT.pl
 
 caqc.pl: asmQC/caqc.pl
-	@cp $< $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp $< $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 assemblyCompare: testing/assemblyCompare.pl
-	@cp testing/assemblyCompare.pl $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp testing/assemblyCompare.pl $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 qcCompare: testing/qcCompare.pl
-	@cp testing/qcCompare.pl $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp testing/qcCompare.pl $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 tampaCompare: testing/tampaCompare.pl
-	@cp testing/tampaCompare.pl $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp testing/tampaCompare.pl $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 mummerCompare: testing/mummerCompare.pl
-	@cp testing/mummerCompare.pl $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp testing/mummerCompare.pl $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 apply_assembler: testing/apply_assembler.pl
-	@cp testing/apply_assembler.pl $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp testing/apply_assembler.pl $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 testVersionOnPlatform.sh: testing/$@
-	@cp testing/$@ $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp testing/$@ $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 glen_est_truncadjusted.pl: dataQC/$@
-	@cp dataQC/$@ $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	cp dataQC/$@ $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 

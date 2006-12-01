@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 static char CM_ID[] 
-= "$Id: AS_CGB_cga.c,v 1.9 2006-11-14 19:58:20 eliv Exp $";
+= "$Id: AS_CGB_cga.c,v 1.5 2006-03-24 21:38:26 eliv Exp $";
 /*********************************************************************
  *
  * Module: AS_CGB_cga.c
@@ -57,6 +57,7 @@ static int TIMINGS = TRUE;
 #define DEBUG_VISUAL
 #undef DEBUG_VISUAL
 
+#define DEBUG_1
 #ifdef DEBUGGING
 #define ORDERING
 #define DEBUG01
@@ -312,9 +313,9 @@ static void exhale_term_rep
   IntFragment_ID * fragment_ranking = NULL;
   IntFragment_ID * fragment_visited = NULL;
 
-  fragment_mapping = safe_malloc(sizeof(Arec) * nfrag);
-  fragment_ranking = safe_malloc(sizeof(IntFragment_ID) * nfrag);
-  fragment_visited = safe_malloc(sizeof(IntFragment_ID) * nfrag);
+  SAFE_MALLOC(fragment_mapping, Arec, nfrag);
+  SAFE_MALLOC(fragment_ranking, IntFragment_ID, nfrag);
+  SAFE_MALLOC(fragment_visited, IntFragment_ID, nfrag);
 
   {
     time_t tp1,tp2;
@@ -504,9 +505,9 @@ static void exhale_term_rep
   fprintf(fp,"]\n");    /* ending the graph */
   }
 
-  safe_free(fragment_ranking);
-  safe_free(fragment_mapping);
-  safe_free(fragment_visited);
+  SAFE_FREE(fragment_ranking);
+  SAFE_FREE(fragment_mapping);
+  SAFE_FREE(fragment_visited);
 }
 
 
@@ -769,8 +770,8 @@ static void annotate_the_chunks_with_coordinate_info
       chunkinfo[ichunk].btip = btip;
 
       if( (ivote_repeat_essential == 0) &&
-	  ((MIN(atip,btip) != lowest_genome_coordinate) ||
-	   (MAX(atip,btip) != highest_genome_coordinate))) {
+	  ((min(atip,btip) != lowest_genome_coordinate) ||
+	   (max(atip,btip) != highest_genome_coordinate))) {
 	fprintf(stderr,"CGA simulator coordinate problem with ichunk=" F_IID "\n",ichunk);
 	fprintf(stderr,"    atip=" BPFORMAT ",btip=" BPFORMAT "\n", atip, btip);
 	fprintf(stderr,"    lowest_genome_coordinate=" BPFORMAT ",highest_genome_coordinate=" BPFORMAT "\n",
@@ -1947,9 +1948,9 @@ static void analyze_the_chunks
 		   myindexdata,mysetdata,myaggregate,myprintdata);
 #endif /*GENINFO*/
 
-  fragment_visited = (IntFragment_ID *)safe_malloc(nfrag*sizeof(IntFragment_ID));
+  fragment_visited = (IntFragment_ID *)malloc(nfrag*sizeof(IntFragment_ID));
   afr_to_avx = create_FragmentHash((max_frag_iid+1));
-  fragment_timesinchunks = (int *)safe_malloc(nfrag*sizeof(int));
+  fragment_timesinchunks = (int *)malloc(nfrag*sizeof(int));
 
   assert(fragment_visited != NULL);
   assert(fragment_timesinchunks != NULL);
@@ -2633,8 +2634,8 @@ static void analyze_the_chunks
   }
 #endif /*SIMINFO*/
 #endif //NEVER
-  safe_free(fragment_visited);
-  safe_free(fragment_timesinchunks);
+  SAFE_FREE(fragment_visited);
+  SAFE_FREE(fragment_timesinchunks);
   destroy_FragmentHash(afr_to_avx);
 } 
 
@@ -2671,7 +2672,7 @@ void chunk_graph_analysis
   const IntChunk_ID nchunks = (IntChunk_ID)GetNumVA_AChunkMesg(thechunks);
 
   ChunkAnnotation *chunkinfo
-    = (ChunkAnnotation *)safe_malloc((nchunks)*sizeof(ChunkAnnotation));
+    = (ChunkAnnotation *)malloc((nchunks)*sizeof(ChunkAnnotation));
 
 #ifdef DEBUG
   time_t tp1,tp2;
@@ -3300,8 +3301,8 @@ void chunk_graph_analysis
 	  assert(bp_length > 0);
 	  assert(a_branch_point >= 0);
 	  assert(b_branch_point >= 0);
-	  a_branch_point = MIN(a_branch_point,bp_length);
-	  b_branch_point = MIN(b_branch_point,bp_length);
+	  a_branch_point = min(a_branch_point,bp_length);
+	  b_branch_point = min(b_branch_point,bp_length);
 	  pos_left_end  = gen_low_coord;
 	  pos_right_end = pos_left_end + bp_length;
 
@@ -3309,7 +3310,7 @@ void chunk_graph_analysis
           {
             // Plot unitigs with sum of overhangs length instead of maximal length.
             BPTYPE slop_a = bp_length - (GetVA_AChunkMesg(thechunks,ichunk)->rho);
-            BPTYPE slop_b = MAX(slop_a,0);
+            BPTYPE slop_b = max(slop_a,0);
             BPTYPE slop_l = slop_b / 2;
             BPTYPE slop_r = slop_b - slop_l;
             
@@ -3462,7 +3463,7 @@ void chunk_graph_analysis
 #endif
 #endif /*DEBUG_VISUAL*/
 
-  safe_free(chunkinfo);
+  SAFE_FREE(chunkinfo);
   if( ProcessFragmentAnnotationsForSimulatorCoordinates ) {
     DeleteVA_Afraginfo(fraginfo);
   }

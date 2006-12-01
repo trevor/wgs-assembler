@@ -37,7 +37,7 @@ typedef struct
   FragOrient orient;
 } OrientHolder;
 
-VA_DEF(OrientHolder);
+VA_DEF(OrientHolder)
 
 
 typedef struct
@@ -79,7 +79,7 @@ void PopulateChunkEdgeBasics(ScaffoldGraphT * graph,
                              ChunkInstanceT * chunkB,
                              DistT * dist,
                              EdgeCGW_T * edge);
-void ValidateAllContigEdges(ScaffoldGraphT * graph, int fixBadOnes);
+int ValidateAllContigEdges(ScaffoldGraphT * graph, int fixBadOnes);
 
 
 void DestroyContigOrientChecker(ContigOrientChecker * coc);

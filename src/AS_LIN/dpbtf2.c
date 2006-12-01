@@ -49,9 +49,9 @@
             j-th column of A is stored in the j-th column of the array AB 
   
             as follows:   
-            if UPLO = 'U', AB(kd+1+i-j,j) = A(i,j) for MAX(1,j-kd)<=i<=j; 
+            if UPLO = 'U', AB(kd+1+i-j,j) = A(i,j) for max(1,j-kd)<=i<=j; 
   
-            if UPLO = 'L', AB(1+i-j,j)    = A(i,j) for j<=i<=MIN(n,j+kd). 
+            if UPLO = 'L', AB(1+i-j,j)    = A(i,j) for j<=i<=min(n,j+kd). 
   
 
             On exit, if INFO = 0, the triangular factor U or L from the   
@@ -150,7 +150,7 @@
 
 /* Computing MAX */
     i__1 = 1, i__2 = *ldab - 1;
-    kld = MAX(i__1,i__2);
+    kld = max(i__1,i__2);
 
     if (upper) {
 
@@ -174,7 +174,7 @@
 
    Computing MIN */
 	    i__2 = *kd, i__3 = *n - j;
-	    kn = MIN(i__2,i__3);
+	    kn = min(i__2,i__3);
 	    if (kn > 0) {
 		d__1 = 1. / ajj;
 		dscal_(&kn, &d__1, &AB(*kd,j+1), &kld);
@@ -206,7 +206,7 @@
 
    Computing MIN */
 	    i__2 = *kd, i__3 = *n - j;
-	    kn = MIN(i__2,i__3);
+	    kn = min(i__2,i__3);
 	    if (kn > 0) {
 		d__1 = 1. / ajj;
 		dscal_(&kn, &d__1, &AB(2,j), &c__1);

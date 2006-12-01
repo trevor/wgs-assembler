@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 static char CM_ID[] 
-= "$Id: AS_CGB_unitigger.c,v 1.7 2006-10-16 16:49:34 brianwalenz Exp $";
+= "$Id: AS_CGB_unitigger.c,v 1.5 2005-09-15 15:20:15 eliv Exp $";
 /*********************************************************************
  *
  * Module: AS_CGB_unitigger.c
@@ -57,6 +57,7 @@ static char CM_ID[]
 
 #include "AS_CGB_all.h"
 #include "AS_UTL_version.h"
+#include "AS_UTL_systemdebug.h"
 #include "AS_CGB_unitigger_globals.h"
 #include "AS_CGB_Bubble.h"
 #ifdef REPAIR_BREAKERS
@@ -1008,7 +1009,7 @@ static int ParseCommandLine
             // Now a global variable to be placed into a ADL record.
             char *param_string = NULL;
             if(GlobalParamText != NULL) free(GlobalParamText);
-            GlobalParamText = (char *)safe_malloc(strlen(allParams)+100);
+            GlobalParamText = (char *)malloc(strlen(allParams)+100);
             sprintf(GlobalParamText,
                     "Parameters from parameter file are:\n%s\n",
                     allParams);
@@ -1510,7 +1511,7 @@ static void StandardUnitigger
       {
         int ierr;
         char * checkpoint99 = NULL;
-        checkpoint99 = (char *)safe_malloc(100+2*sizeof(rg->Output_Graph_Store));
+        checkpoint99 = (char *)malloc(100+2*sizeof(rg->Output_Graph_Store));
         sprintf(checkpoint99,"cp -r %s %s.99", rg->Output_Graph_Store, rg->Output_Graph_Store);
         // Using "mv" causes the following error during the final output.
         // AS_FGB_main.c Jan 16 2002 09:22:37

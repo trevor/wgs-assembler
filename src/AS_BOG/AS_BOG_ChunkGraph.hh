@@ -36,14 +36,14 @@
 *************************************************/
 
 /* RCS info
- * $Id: AS_BOG_ChunkGraph.hh,v 1.8 2006-11-13 20:58:53 eliv Exp $
- * $Revision: 1.8 $
+ * $Id: AS_BOG_ChunkGraph.hh,v 1.4 2006-03-22 16:39:26 eliv Exp $
+ * $Revision: 1.4 $
 */
 
 #ifndef INCLUDE_AS_BOG_CHUNKGRAPH
 #define INCLUDE_AS_BOG_CHUNKGRAPH
 
-static char AS_BOG_CHUNK_GRAPH_HH_CM_ID[] = "$Id: AS_BOG_ChunkGraph.hh,v 1.8 2006-11-13 20:58:53 eliv Exp $";
+static char AS_BOG_CHUNK_GRAPH_HH_CM_ID[] = "$Id: AS_BOG_ChunkGraph.hh,v 1.4 2006-03-22 16:39:26 eliv Exp $";
 
 #include "AS_BOG_Datatypes.hh"
 #include "AS_BOG_BestOverlapGraph.hh"
@@ -53,9 +53,6 @@ namespace AS_BOG{
 	struct ChunkGraph{
 
 	    public:
-
-        // Number of frags edges to cross in 
-        static const short FRAG_WALK_NUM = 101;
 
 		// Constructor
 		ChunkGraph(void);
@@ -67,9 +64,15 @@ namespace AS_BOG{
 		void build(BestOverlapGraph *bovlg);		
 
 		// Chunkability rule
-        bool isChunkable( BestEdgeOverlap *beo );
+		bool isChunkable(iuid frag_id, fragment_end_type whichEnd);
 
-	    virtual bool isChunkable( iuid frag_a_id, fragment_end_type which_end);
+	        bool isChunkable(
+			BestEdgeOverlap *beo,
+			BestOverlapGraph *bovlg);
+
+	        bool isChunkable(
+			iuid frag_a_id, fragment_end_type which_end,
+			BestOverlapGraph *bovlg);
 
 		// Returns IUID of 5' or 3' end of specified frag_id
 		//  Since there should only be one out/incoming connection
@@ -89,15 +92,7 @@ namespace AS_BOG{
 
 		friend std::ostream& operator<< (std::ostream& os, ChunkGraph &cg);
 
-		void checkInDegree();
-
-        iuid nextFragByChunkLength();
-
-        // follows the graph path to the next frag end
-        FragmentEnd followPath(FragmentEnd);
-
-        protected:
-		    BestOverlapGraph *bovlg;
+		void checkInDegree(BestOverlapGraph *bovlg);
 
 	    private:
 
@@ -105,28 +100,11 @@ namespace AS_BOG{
 			iuid five_prime;
 			iuid three_prime;
 		};
-        struct _chunk_length {
-            iuid fragId;
-            short cnt;
-//            short fpCnt;
-//            short tpCnt;
-        };
-
-        short countChunkWidth(iuid, fragment_end_type );
-        iuid countFullWidth(iuid, fragment_end_type );
-
-        static int sortChunkLens(const void*,const void*);
 
 		_chunk_unit_struct *_chunkable_array;
-		iuid *_edgePathLen;
-		_chunk_length *_chunk_lengths;
 		iuid _max_fragments;
 
 	};
-
-    struct PromiscuousChunkGraph : public ChunkGraph {
-         bool isChunkable( iuid frag_id, fragment_end_type which_end);
-    };
 
 } //AS_BOG namespace
 

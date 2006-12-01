@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* 	$Id: Globals_CGW.h,v 1.10 2006-10-11 08:51:39 brianwalenz Exp $	 */
+/* 	$Id: Globals_CGW.h,v 1.6 2006-06-14 19:57:22 brianwalenz Exp $	 */
 #ifndef GLOBALS_CGW_H
 #define GLOBALS_CGW_H
 
@@ -35,7 +35,7 @@ typedef struct Global_CGW_tag {
   int verbose;
   MesgReader reader;
   MesgWriter writer;
-
+  MesgWriter errorWriter;
   float transQualityCutoff; // quality cutoff for TransChunkEdges
   uint64 maxSequencedbSize; // maximum size of a sequencedb between checkpoints
   uint64 maxSequencedbCacheSize; // maximum size of cache before flushing
@@ -45,8 +45,14 @@ typedef struct Global_CGW_tag {
   int outputCalculatedOffsets;
   int saveCheckPoints;
   int repeatRezLevel;
-  int walkLevel;   // a variable that contains different alternatives of gap walking
-  int stoneLevel;  // a variable that contains different alternatives of stone throwing //
+  int  write_rock_log;  // create log files for rocks iff true
+  int walkLevel;   
+  /* a variable that contains different alternatives of 
+     gap walking */
+  int stoneLevel;
+  /* a variable that contains different alternatives of 
+     stone throwing */
+  int  write_stone_log;  // create log files for stones iff true
   int walkScaffoldsBiggestFirst;
   int ignoreChaffUnitigs;
   int performCleanupScaffolds;
@@ -59,10 +65,10 @@ typedef struct Global_CGW_tag {
   float cgbMicrohetProb;
   int  annotateUnitigs;
   int  doInterleavedScaffoldMerging;
-  FILE *cgwfp;    // .cgw            frags, unitigs
-  FILE *ctgfp;    // .cgw_contigs    all contigs (input for post-cgw consensus)
-  FILE *scffp;    // .cgw_scaffolds  all scaffolds
-  FILE *timefp;   // .timing
+  FILE *outfp;  // .cgw    frags, unitigs, singleton contigs and degenerate scaffolds
+  FILE *outfp1;  // .cgw_contigs   input for post-cgw consensus
+  FILE *outfp2;  // .cgw_scaffolds non-degenerate scaffolds
+  FILE *timefp;  // .timing
   FILE *stderrc;  // current - initially set to stderr
 #ifdef NEVER
   HISTOGRAM *scaffold_unique;   
@@ -84,7 +90,7 @@ typedef struct Global_CGW_tag {
   TimerT StoneThrowingTimer;
   TimerT BccTimer;
   TimerT ConsensusTimer;
-
+  char TempFileName[1024];
   char Input_File_Name[1024];
   char File_Name_Prefix[1024];
   char Output_File_Name[1024];
@@ -101,27 +107,25 @@ Global_CGW *GlobalData;
 extern Global_CGW *CreateGlobal_CGW(void);
 extern void DeleteGlobal_CGW(Global_CGW *);
 
-extern int  SetFileNamePrefix_CGW(Global_CGW *data, char *name);
-
 /****************************************************************************/
 static FILE *  File_Open
-(const char * Filename, const char * Mode, int exitOnFailure)
+    (const char * Filename, const char * Mode, int exitOnFailure)
 
-     /* Open  Filename  in  Mode  and return a pointer to its control
-      *  block.  If fail, print a message and exit. */
+/* Open  Filename  in  Mode  and return a pointer to its control
+*  block.  If fail, print a message and exit. */
 
-{
-  FILE  *  fp;
+  {
+   FILE  *  fp;
 
-  fp = fopen (Filename, Mode);
-  if  (fp == NULL && exitOnFailure)
-    {
-      fprintf (stderr, "ERROR:  Could not open file  %s \n", Filename);
-      exit (EXIT_FAILURE);
-    }
+   fp = fopen (Filename, Mode);
+   if  (fp == NULL && exitOnFailure)
+       {
+        fprintf (stderr, "ERROR:  Could not open file  %s \n", Filename);
+        exit (EXIT_FAILURE);
+       }
 
-  return  fp;
-}
+   return  fp;
+  }
 
 #ifdef NEVER
 void ResetHistograms_CGW(struct Global_CGW_tag *);

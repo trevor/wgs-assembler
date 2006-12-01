@@ -22,17 +22,19 @@
 #define OUTPUT_CGW_H
 
 void MarkContigEdges(void);
-
 void OutputMateDists(ScaffoldGraphT *graph);
-
 void OutputFrags(ScaffoldGraphT *graph);
+void OutputUnitigs(ScaffoldGraphT *graph);
+void OutputUnitigLinks(ScaffoldGraphT *graph);
+void OutputContigs(ScaffoldGraphT *graph);
+void OutputContigLinks(ScaffoldGraphT *graph, int outputOverlapOnlyContigEdges);
+void OutputScaffolds(ScaffoldGraphT *graph);
+void OutputScaffoldLinks(ScaffoldGraphT *graph);
+
+void OutputUnitigLinksFromMultiAligns(void);
+void OutputContigLinksFromMultiAligns(int outputOverlapOnlyContigEdges);
 void OutputContigsFromMultiAligns(void);
 void OutputUnitigsFromMultiAligns(void);
-void OutputScaffolds(ScaffoldGraphT *graph);
-
-void OutputUnitigLinks(ScaffoldGraphT *graph);
-void OutputContigLinks(ScaffoldGraphT *graph, int outputOverlapOnlyContigEdges);
-void OutputScaffoldLinks(ScaffoldGraphT *graph);
 
 #endif
 

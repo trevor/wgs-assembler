@@ -1,5 +1,5 @@
 #
-# $Id: site_name.as,v 1.6 2006-11-15 13:27:18 eliv Exp $
+# $Id: site_name.as,v 1.4 2006-04-29 05:16:26 brianwalenz Exp $
 #
 # Set the name of the site/location where the assembler is buing built.
 #

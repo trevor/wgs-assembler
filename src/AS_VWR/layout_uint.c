@@ -18,20 +18,17 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: layout_uint.c,v 1.6 2006-10-08 08:47:40 brianwalenz Exp $ */
+/* $Id: layout_uint.c,v 1.5 2006-03-08 20:43:10 eliv Exp $ */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <ctype.h>
 #include <string.h>
-#include <inttypes.h>
-
 #include "button.h"
 #include "hash.h"
 #include "agrep.h"
-
-#include "AS_global.h"  //  F_S64 and int64, used to be cds.h
+#include "cds.h"
 
 #undef  DEBUG_READ
 #undef  DEBUG_SORT

@@ -25,7 +25,7 @@
    Assumptions:  libAS_UTL.a
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignStore_CNS.c,v 1.22 2006-11-14 19:58:21 eliv Exp $";
+static char CM_ID[] = "$Id: MultiAlignStore_CNS.c,v 1.15 2006-07-07 16:20:10 mcschatz Exp $";
 
 
 #include <assert.h>
@@ -131,16 +131,16 @@ CompareUnitigPos (const void *c1, const void *c2)
   IntUnitigPos *u1 = (IntUnitigPos *)c1;
   IntUnitigPos *u2 = (IntUnitigPos *)c2;
   int diff;
-  int32 bgn1 = MIN(u1->position.bgn, u1->position.end);
-  int32 bgn2 = MIN(u2->position.bgn, u2->position.end);
+  int32 bgn1 = min(u1->position.bgn, u1->position.end);
+  int32 bgn2 = min(u2->position.bgn, u2->position.end);
   int32 end1, end2;
 
   diff = bgn1 - bgn2;
   if(diff)
     return diff;
 
-  end1 = MAX(u1->position.bgn, u1->position.end);
-  end2 = MAX(u2->position.bgn, u2->position.end);
+  end1 = max(u1->position.bgn, u1->position.end);
+  end2 = max(u2->position.bgn, u2->position.end);
 
   diff = end2 - end1;
   if(diff)
@@ -254,7 +254,7 @@ CopyMultiAlignT(MultiAlignT *newma, MultiAlignT *ma)
   newma->source_alloc = ma->source_alloc;
   {/* Adjust the delta pointers in the clone */
     int i;
-    char *old_source, *old_var_seq, *old_nr_conf_alleles, *old_weights;
+    char *old_source, *old_var_seq;
     int src_len;
     int32 *oldbase = Getint32(ma->delta, 0);
     int32 *newbase = Getint32(newma->delta, 0);
@@ -268,16 +268,9 @@ CopyMultiAlignT(MultiAlignT *newma, MultiAlignT *ma)
     for(i = 0; i < numv; i++)
     {
       IntMultiVar *nvar = GetIntMultiVar(newma->v_list,i);
-      old_nr_conf_alleles = nvar->nr_conf_alleles;
-      old_weights         = nvar->weights;
-      old_var_seq         = nvar->var_seq;
+      old_var_seq = nvar->var_seq;
       nvar->var_seq = (char *) safe_malloc((strlen(old_var_seq)+1)*sizeof(char));
-      nvar->nr_conf_alleles = (char *) safe_malloc((strlen(old_nr_conf_alleles)+1)
-           *sizeof(char));
-      nvar->weights = (char *) safe_malloc((strlen(old_weights)+1)*sizeof(char));
-      strcpy(nvar->nr_conf_alleles, old_nr_conf_alleles);
-      strcpy(nvar->weights,         old_weights);
-      strcpy(nvar->var_seq,         old_var_seq);
+      strcpy(nvar->var_seq, old_var_seq);
     }
   }
   {/* Adjust the delta pointers in the clone */
@@ -359,7 +352,7 @@ GetBendUnitigPos(MultiAlignT *ma)
   for(i = numu -1; i>= 0; i--)
     {
       IntUnitigPos *pos = GetIntUnitigPos(ma->u_list,i);
-      if( MAX(pos->position.bgn,pos->position.end) == length )
+      if( max(pos->position.bgn,pos->position.end) == length )
 	{
 	  result = pos;
 	  found = TRUE;
@@ -643,24 +636,16 @@ CreateMultiAlignTFromICM(IntConConMesg *icm, int localID, int sequenceOnly)
       {
          IntMultiVar *cvr_mesg = icm->v_list + cvr;
          IntMultiVar tmp;
-         int         na  = (cvr_mesg->num_conf_alleles < 2) ? 2 : cvr_mesg->num_conf_alleles;
 
          tmp = *cvr_mesg;
-         tmp.position         = cvr_mesg->position;
-         tmp.num_reads        = cvr_mesg->num_reads;
-         tmp.num_conf_alleles = cvr_mesg->num_conf_alleles;
-         tmp.anchor_size      = cvr_mesg->anchor_size;
-         tmp.var_length       = cvr_mesg->var_length;
-         tmp.nr_conf_alleles  = (char *) safe_malloc(4*sizeof(char)*na + 1);
-         tmp.weights          = (char *) safe_malloc(7*sizeof(char)*na + 1);
-         tmp.var_seq          = (char *) safe_malloc((cvr_mesg->var_length+1)*sizeof(char)*na + 1);
-         strcpy(tmp.nr_conf_alleles, cvr_mesg->nr_conf_alleles);
-         strcpy(tmp.weights, cvr_mesg->weights);
+         tmp.position = cvr_mesg->position;
+         tmp.num_reads = cvr_mesg->num_reads;
+         tmp.num_alleles = cvr_mesg->num_alleles;
+         tmp.window_size = cvr_mesg->window_size;
+         tmp.var_length = cvr_mesg->var_length;
+         tmp.var_seq = (char *) safe_malloc(((tmp.var_length+1)*tmp.num_alleles+1)*sizeof(char));
          strcpy(tmp.var_seq, cvr_mesg->var_seq);
          SetIntMultiVar(ma->v_list, cvr, &tmp);
-         FREE(tmp.nr_conf_alleles);
-         FREE(tmp.weights);
-         FREE(tmp.var_seq);
       }
     }
 
@@ -734,8 +719,8 @@ CreateMultiAlignTFromCCO(SnapConConMesg *cco, int localID, int sequenceOnly)
       ma->f_list = CreateVA_SnapMultiPos(cco->num_pieces);
       ma->v_list = CreateVA_IntMultiVar(cco->num_vars);  
       ma->udelta = CreateVA_int32(0);
-      ma->u_list = CreateVA_UnitigPos(cco->num_unitigs);
-
+      ma->u_list = CreateVA_UnitigPos(0);
+      
 
       for(cfr = 0,delta_len=0; cfr < cco->num_pieces; cfr++){
 	SnapMultiPos *cfr_mesg = cco->pieces + cfr;
@@ -776,19 +761,14 @@ CreateMultiAlignTFromCCO(SnapConConMesg *cco, int localID, int sequenceOnly)
       {
          IntMultiVar *cvr_mesg = cco->vars + cvr;
          IntMultiVar tmp;
-         int         na  = (cvr_mesg->num_conf_alleles < 2) ? 2 : cvr_mesg->num_conf_alleles;
 
          tmp = *cvr_mesg;
-         tmp.position         = cvr_mesg->position;
-         tmp.num_reads        = cvr_mesg->num_reads;
-         tmp.num_conf_alleles = cvr_mesg->num_conf_alleles;
-         tmp.anchor_size      = cvr_mesg->anchor_size;
-         tmp.var_length       = cvr_mesg->var_length;
-         tmp.nr_conf_alleles  = (char *) safe_malloc(4*sizeof(char)*na + 1);
-         tmp.weights          = (char *) safe_malloc(7*sizeof(char)*na + 1);
-         tmp.var_seq          = (char *) safe_malloc((cvr_mesg->var_length+1)*sizeof(char)*na + 1);
-         strcpy(tmp.nr_conf_alleles, cvr_mesg->nr_conf_alleles);
-         strcpy(tmp.weights, cvr_mesg->weights);
+         tmp.position = cvr_mesg->position;
+         tmp.num_reads = cvr_mesg->num_reads;
+         tmp.num_alleles = cvr_mesg->num_alleles;
+         tmp.window_size = cvr_mesg->window_size;
+         tmp.var_length = cvr_mesg->var_length;
+         tmp.var_seq = (char *) safe_malloc(((tmp.var_length+1)*tmp.num_alleles+1)*sizeof(char));
          strcpy(tmp.var_seq, cvr_mesg->var_seq);
          SetIntMultiVar(ma->v_list, cvr, &tmp);
       }
@@ -864,9 +844,7 @@ DeleteMultiAlignT(MultiAlignT *ma)
     if (n_frags > 0) t=GetIntMultiPos(ma->f_list,0);
     if (n_vars > 0) v=GetIntMultiVar(ma->v_list, 0);
     for (i=0;i<n_vars;i++){
-       if (v->nr_conf_alleles) free(v->nr_conf_alleles);
-       if (v->weights) free(v->weights);
-       if (v->var_seq) free(v->var_seq);
+       if ( v->var_seq) free(v->var_seq);
        v++;
     }
   }   

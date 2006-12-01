@@ -34,7 +34,7 @@
 
  **********************************************************************/
 
-static char fileID[] = "$Id: FbacREZ.c,v 1.9 2006-11-14 19:58:22 eliv Exp $";
+static char fileID[] = "$Id: FbacREZ.c,v 1.6 2006-06-14 19:57:23 brianwalenz Exp $";
 
 #define FBACDEBUG 2
 
@@ -242,36 +242,36 @@ int getLocalesInNode(NodeCGW_T* node, localeInfoT** localeInfo, int end,
 		if (end == A_END)
 		{
 		  if (surrogateOrientation == 0) // non-surrogate case
-			basesFromEnd = MIN((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
+			basesFromEnd = min((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
 		  else
 		  {
-			basesFromEnd = MIN( tempFragContigOffset5p, tempFragContigOffset3p);
+			basesFromEnd = min( tempFragContigOffset5p, tempFragContigOffset3p);
 			// if (surrogateOrientation == 1) // surrogate is AB in contig
-			  // basesFromEnd = surrogateOffset + MIN((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
+			  // basesFromEnd = surrogateOffset + min((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
 			// else // surrogate is BA in contig
 			  // basesFromEnd = surrogateOffset + 
-			  //			(originalUnitig->bpLength.mean - MAX((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean));
-			//basesFromEnd = MAX(tempFragContigOffset5p, tempFragContigOffset3p);
+			  //			(originalUnitig->bpLength.mean - max((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean));
+			//basesFromEnd = max(tempFragContigOffset5p, tempFragContigOffset3p);
 		  }
 		}
 		else if (end == B_END)
 		{
 		  if (surrogateOrientation == 0) // non-surrogate case
 		  {
-			basesFromEnd = MIN(node->bpLength.mean - (int) frag->contigOffset5p.mean,
+			basesFromEnd = min(node->bpLength.mean - (int) frag->contigOffset5p.mean,
 							   node->bpLength.mean - (int) frag->contigOffset3p.mean);
 		  }
 		  else
 		  {
-			basesFromEnd = MIN(node->bpLength.mean - tempFragContigOffset5p,
+			basesFromEnd = min(node->bpLength.mean - tempFragContigOffset5p,
 							   node->bpLength.mean - tempFragContigOffset3p);
 			//if (surrogateOrientation == 1) // surrogate is AB in contig
 			//basesFromEnd = node->bpLength.mean - 
-			//(surrogateOffset + MAX((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean));
+			//(surrogateOffset + max((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean));
 			//else // surrogate is BA in contig
 			//basesFromEnd = node->bpLength.mean - 
 			//(surrogateOffset + 
-			// (originalUnitig->bpLength.mean - MIN((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean)));
+			// (originalUnitig->bpLength.mean - min((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean)));
 		  }
 		}
 		
@@ -564,7 +564,7 @@ int FindCommonLocales( ContigT * lcontig, int lcontigGapEnd,
 	numRightLocales = getLocalesInNode(rcontig, &localeInfoRcontig, rcontigGapEnd, BASES_FROM_END_CUTOFF);  
   }
   
-  tmp_size = MIN( numLeftLocales, numRightLocales);
+  tmp_size = min( numLeftLocales, numRightLocales);
   if  (tmp_size < 1)
       tmp_size = 1;
   gapInfoArrayTemp = (GapInfoT *) malloc (tmp_size * sizeof( GapInfoT));
@@ -682,9 +682,9 @@ int compChunks( const void *s1, const void *s2)
   assert( t1 == s1 );
   assert( t2 == s2 );
   
-  if (MIN (t1->aEndOffset.mean, t1->bEndOffset.mean) < MIN( t2->aEndOffset.mean, t2->bEndOffset.mean))
+  if (min (t1->aEndOffset.mean, t1->bEndOffset.mean) < min( t2->aEndOffset.mean, t2->bEndOffset.mean))
 	return -1;
-  else if (MIN (t1->aEndOffset.mean, t1->bEndOffset.mean) > MIN( t2->aEndOffset.mean, t2->bEndOffset.mean))
+  else if (min (t1->aEndOffset.mean, t1->bEndOffset.mean) > min( t2->aEndOffset.mean, t2->bEndOffset.mean))
 	return 1;
   else 
 	return 0;
@@ -1316,21 +1316,21 @@ ChunkInsertInfoT* BuildLocaleOverlaps(GapInfoT *gapInfo,
 		{
 		  // fprintf( stderr, "1 succNodeBeg: %f, succNodeEnd: %f\n", succNodeBeg, succNodeEnd);		  
 		  currentWalkedChunk->aEndOffset.mean = succNodeBeg;
-		  currentWalkedChunk->aEndOffset.variance = MIN( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
-			ComputeFudgeVariance( succNodeBeg - MIN( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
+		  currentWalkedChunk->aEndOffset.variance = min( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
+			ComputeFudgeVariance( succNodeBeg - min( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
 		  currentWalkedChunk->bEndOffset.mean = succNodeEnd;
-		  currentWalkedChunk->bEndOffset.variance = MIN( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
-			ComputeFudgeVariance( succNodeEnd - MIN( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
+		  currentWalkedChunk->bEndOffset.variance = min( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
+			ComputeFudgeVariance( succNodeEnd - min( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
 		}
 		else
 		{
 		  // fprintf( stderr, "2 succNodeBeg: %f, succNodeEnd: %f\n", succNodeBeg, succNodeEnd);
 		  currentWalkedChunk->aEndOffset.mean = succNodeEnd;
-		  currentWalkedChunk->aEndOffset.variance = MIN( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
-			ComputeFudgeVariance( succNodeEnd - MIN( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
+		  currentWalkedChunk->aEndOffset.variance = min( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
+			ComputeFudgeVariance( succNodeEnd - min( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
 		  currentWalkedChunk->bEndOffset.mean = succNodeBeg;
-		  currentWalkedChunk->bEndOffset.variance = MIN( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
-			ComputeFudgeVariance( succNodeBeg - MIN( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
+		  currentWalkedChunk->bEndOffset.variance = min( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance) +
+			ComputeFudgeVariance( succNodeBeg - min( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean));
 		}
 
 		// temp checking code
@@ -1532,16 +1532,16 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 	  // fprintf( stderr, "CheckWalkOverlaps j loop: walkedContigs[%d]: %d\n", j, walkedContigs[j].contigID);
 
 	  // is walkedContigs[i] to the right of walkedContigs[j]?  if so, skip walkedContigs[j]
-	  if (MIN (walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean) >
-		  MIN (walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean))
+	  if (min (walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean) >
+		  min (walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean))
 	  {
 		// fprintf( stderr, "skipping walkedContigs[%d]: %d\n", j, walkedContigs[j].contigID);
 		continue;
 	  }
 	  
 	  // see if we have positive bhang
-	  if (MAX (walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean) < 
-		  MAX (walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean))
+	  if (max (walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean) < 
+		  max (walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean))
 		positiveBhang = TRUE;
 	  
 	  // have already done pairwise so skip ahead one if contigs are adjacent as indicated by insertOrder
@@ -1559,8 +1559,8 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 	  //	   walkedContigs[j].contigID, walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean);
 
       // determine if contigs overlap
-      computedOverlap = MAX ( walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean) -	
-		MIN ( walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean);
+      computedOverlap = max ( walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean) -	
+		min ( walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean);
 	  
 	  // fprintf( stderr, "computedOverlap: %f\n", computedOverlap);
 
@@ -1586,8 +1586,8 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 		}
 		
 		// compute expected ahang
-		computedAhang = MIN ( walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean) -
-		  MIN (walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean);
+		computedAhang = min ( walkedContigs[j].aEndOffset.mean, walkedContigs[j].bEndOffset.mean) -
+		  min (walkedContigs[i].aEndOffset.mean, walkedContigs[i].bEndOffset.mean);
 		min_ahang = computedAhang - 60;
 		max_ahang = computedAhang + 60;
 		
@@ -1625,8 +1625,8 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 		  fprintf( stderr, "fixing stack overlap failure\n");
 
 		  // set the position of walkedContig2 so there's a 20 base pair overlap with walkedContig1
-		  newPos = MAX( walkedContigs[i].aEndOffset.mean,  walkedContigs[i].bEndOffset.mean) - 20;
-		  delta = newPos - MIN( tempContig->aEndOffset.mean, tempContig->bEndOffset.mean);
+		  newPos = max( walkedContigs[i].aEndOffset.mean,  walkedContigs[i].bEndOffset.mean) - 20;
+		  delta = newPos - min( tempContig->aEndOffset.mean, tempContig->bEndOffset.mean);
 		  fprintf( stderr, "moving contig %d from (%f, %f) to (%f, %f)\n",
 				   tempContig->contigID,
 				   tempContig->aEndOffset.mean, tempContig->bEndOffset.mean,
@@ -1709,22 +1709,22 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 // 	}
 // 
 // 	// did we move walkedContig1 to the right of walkedContig2?  if so, skip walkedContig2
-// 	while (MIN (walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) > 
-// 		   MIN (walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean))
+// 	while (min (walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) > 
+// 		   min (walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean))
 // 	{
 // 	  if (walkedContig2->next == NULL)
 // 		break;
 // 	  walkedContig2 = walkedContig2->next;
 // 	}
-// 	if (MIN (walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) > 
-// 		MIN (walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean))
+// 	if (min (walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) > 
+// 		min (walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean))
 // 	  break;
 // 
 //     contig2 = GetGraphNode(ScaffoldGraph->ContigGraph, walkedContig2->contigID);
 // 	
 //     // determine if bhang is positive
-//     computedOverlap = MAX ( walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) -
-//       MIN ( walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean);
+//     computedOverlap = max ( walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) -
+//       min ( walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean);
 //     if (computedOverlap < (int) contig2->bpLength.mean)
 //       negativeBhang = FALSE;
 //     else
@@ -1737,8 +1737,8 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 //     do
 //     {
 //       // determine if contigs overlap
-//       computedOverlap = MAX ( walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) -
-// 		MIN ( walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean);
+//       computedOverlap = max ( walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean) -
+// 		min ( walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean);
 // 	  
 //       fprintf( stderr, "CheckWalkOverlaps: inner loop, contig2: %d, computedOverlap: %d\n", 
 // 			   contig2->id, computedOverlap);
@@ -1767,8 +1767,8 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 // 		}
 // 		
 // 		// compute expected ahang
-// 		computedAhang = MIN ( walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean) -
-// 		  MIN (walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean);
+// 		computedAhang = min ( walkedContig2->aEndOffset.mean, walkedContig2->bEndOffset.mean) -
+// 		  min (walkedContig1->aEndOffset.mean, walkedContig1->bEndOffset.mean);
 // 		min_ahang = computedAhang - 60;
 // 		max_ahang = computedAhang + 60;
 // 		
@@ -1806,8 +1806,8 @@ int CheckWalkOverlaps( ChunkInsertInfoT *walkedContigs,
 // 		  fprintf( stderr, "fixing stack overlap failure\n");
 // 
 // 		  // set the position of walkedContig2 so there's a 20 base pair overlap with walkedContig1
-// 		  newPos = MAX( walkedContig1->aEndOffset.mean,  walkedContig1->bEndOffset.mean) - 20;
-// 		  delta = newPos - MIN( tempContig->aEndOffset.mean, tempContig->bEndOffset.mean);
+// 		  newPos = max( walkedContig1->aEndOffset.mean,  walkedContig1->bEndOffset.mean) - 20;
+// 		  delta = newPos - min( tempContig->aEndOffset.mean, tempContig->bEndOffset.mean);
 // 		  fprintf( stderr, "moving contig %d from (%f, %f) to (%f, %f)\n",
 // 				   tempContig->contigID,
 // 				   tempContig->aEndOffset.mean, tempContig->bEndOffset.mean,
@@ -1862,11 +1862,11 @@ int CheckRchunkContainment( ChunkInsertInfoT *walkedChunks,
   {
 	// check to make sure the rchunk is not contained by any chunk
 	// on entry previousChunk points to lchunk
-	if ( MIN ( lastWalkedChunk->aEndOffset.mean, lastWalkedChunk->bEndOffset.mean) >
-		 MIN ( previousChunk->aEndOffset.mean, previousChunk->bEndOffset.mean)
+	if ( min ( lastWalkedChunk->aEndOffset.mean, lastWalkedChunk->bEndOffset.mean) >
+		 min ( previousChunk->aEndOffset.mean, previousChunk->bEndOffset.mean)
 		 &&
-		 MAX ( lastWalkedChunk->aEndOffset.mean, lastWalkedChunk->bEndOffset.mean) <
-		 MAX ( previousChunk->aEndOffset.mean, previousChunk->bEndOffset.mean))
+		 max ( lastWalkedChunk->aEndOffset.mean, lastWalkedChunk->bEndOffset.mean) <
+		 max ( previousChunk->aEndOffset.mean, previousChunk->bEndOffset.mean))
 	  return 1;
 	previousChunk = previousChunk->next;
   }
@@ -1888,19 +1888,19 @@ int FragOutOfBounds(CIFragT* frag, int unitigID)
 
   if (unitig->flags.bits.isWalkSurrogate || unitig->flags.bits.isStoneSurrogate)
   {
-	surrogateOffset = (int) MAX( unitig->offsetAEnd.mean, unitig->offsetAEnd.mean);
+	surrogateOffset = (int) max( unitig->offsetAEnd.mean, unitig->offsetAEnd.mean);
 	// unitig = GetGraphNode( ScaffoldGraph->CIGraph, unitig->info.CI.baseID);
   }
   else
 	surrogateOffset = 0;
 
-  distToAEnd = surrogateOffset + MIN( frag->contigOffset5p.mean, frag->contigOffset3p.mean);
-  distToBEnd = MIN( contig->bpLength.mean - (frag->contigOffset5p.mean + surrogateOffset), 
+  distToAEnd = surrogateOffset + min( frag->contigOffset5p.mean, frag->contigOffset3p.mean);
+  distToBEnd = min( contig->bpLength.mean - (frag->contigOffset5p.mean + surrogateOffset), 
 					   contig->bpLength.mean - (frag->contigOffset3p.mean + surrogateOffset));
   
-  if ( MIN( distToAEnd, distToBEnd) > (double) BASES_FROM_END_CUTOFF)
+  if ( min( distToAEnd, distToBEnd) > (double) BASES_FROM_END_CUTOFF)
   {
-	fprintf( stderr, "frag->iid: %d, distance to end: %f\n", frag->iid, MIN( distToAEnd, distToBEnd));
+	fprintf( stderr, "frag->iid: %d, distance to end: %f\n", frag->iid, min( distToAEnd, distToBEnd));
 	return 1;
   }
   else
@@ -2045,10 +2045,10 @@ void CheckOrientation( ContigT* lchunk, ContigT* rchunk,
 void AdjustRightContigPos( ContigT* lchunk, ContigT* rchunk, LengthT rchunk_delta, CIScaffoldT* scaff)
 {
   LengthT rchunkNewAEndOffset, rchunkNewBEndOffset;
-  float64 lchunkMaxVariance = MAX( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance);
-  float64 lchunkMaxMean     = MAX( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean);
-  float64 rchunkMinVariance = MIN( rchunk->offsetAEnd.variance, rchunk->offsetBEnd.variance);
-  float64 rchunkMinMean     = MIN( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
+  float64 lchunkMaxVariance = max( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance);
+  float64 lchunkMaxMean     = max( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean);
+  float64 rchunkMinVariance = min( rchunk->offsetAEnd.variance, rchunk->offsetBEnd.variance);
+  float64 rchunkMinMean     = min( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
   int startingContigIndex, scaffoldIndex;
   
   // rchunk_delta.mean has already been computed
@@ -2153,8 +2153,8 @@ void InsertWalkedChunks( ChunkInsertInfoT* chunksWalked,
 
 	// don't insert chunks contained by the lchunk
 	if (0)
-	  if ( MAX( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean) < 
-		   MAX( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean))
+	  if ( max( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean) < 
+		   max( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean))
 	  {
 		currentWalkedChunk = currentWalkedChunk->next;
 		continue;
@@ -2167,13 +2167,13 @@ void InsertWalkedChunks( ChunkInsertInfoT* chunksWalked,
 	  // they make walking from the rchunk to the next gap difficult
 	  // have to adjust to gap coordiante system
 
-	  //fprintf( stderr, "lchunk->offsetAEnd.mean + MIN( currentWalkedChunk->{a,b}EndOffset.mean): %f\n",
-	  //	   lchunk->offsetAEnd.mean + MIN( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean));
-	  //fprintf( stderr, "MIN( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean): %f\n",
-	  //	   MIN( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean));
+	  //fprintf( stderr, "lchunk->offsetAEnd.mean + min( currentWalkedChunk->{a,b}EndOffset.mean): %f\n",
+	  //	   lchunk->offsetAEnd.mean + min( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean));
+	  //fprintf( stderr, "min( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean): %f\n",
+	  //	   min( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean));
 	  
-	  if ( lchunk->offsetAEnd.mean + MIN( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean) > 
-		   MIN( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean))
+	  if ( lchunk->offsetAEnd.mean + min( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean) > 
+		   min( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean))
 	  {
 		currentWalkedChunk = currentWalkedChunk->next;
 		continue;
@@ -2187,8 +2187,8 @@ void InsertWalkedChunks( ChunkInsertInfoT* chunksWalked,
 		continue;
 	}
 	
-	if ( MAX( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean) 
-		 - MIN( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) > 60)
+	if ( max( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean) 
+		 - min( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) > 60)
 	  foundSufficientOverlap = TRUE;
 	  
 	// fprintf( stderr, "during InsertWalkedChunks, foundSufficientOverlap:%d\n", foundSufficientOverlap);
@@ -2341,11 +2341,11 @@ void InsertWalkedChunks( ChunkInsertInfoT* chunksWalked,
 	  // that is the amount we want to adjust the gap size by
 	{
 	  LengthT delta;	
-	  float64 lchunkMaxVariance = MAX( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance);
-	  float64 lchunkMaxMean     = MAX( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean);
-	  float64 rchunkMinVariance = MIN( rchunk->offsetAEnd.variance, rchunk->offsetBEnd.variance);
-	  float64 rchunkMinMean     = MIN( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
-	  int currentChunkBegPos    = MIN( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean);
+	  float64 lchunkMaxVariance = max( lchunk->offsetAEnd.variance, lchunk->offsetBEnd.variance);
+	  float64 lchunkMaxMean     = max( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean);
+	  float64 rchunkMinVariance = min( rchunk->offsetAEnd.variance, rchunk->offsetBEnd.variance);
+	  float64 rchunkMinMean     = min( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
+	  int currentChunkBegPos    = min( currentWalkedChunk->aEndOffset.mean, currentWalkedChunk->bEndOffset.mean);
 	  
 	  delta.mean = currentChunkBegPos - rchunkMinMean;
 	  delta.variance = lchunkMaxVariance                                   // the variance at the left of the gap
@@ -2404,10 +2404,10 @@ void MergeWalkedScaffolds( CIScaffoldT* scaff, CIScaffoldT* nextScaff,
 	  orient = B_A;
   }
   
-  offset.mean = MIN (nextScaffExtremeContigAEnd, nextScaffExtremeContigBEnd);
-  offset.variance = MAX( scaffExtremeContig->offsetAEnd.variance, scaffExtremeContig->offsetBEnd.variance) +
-	ComputeFudgeVariance( MIN( nextScaffExtremeContigAEnd, nextScaffExtremeContigBEnd) -
-						  MAX( scaffExtremeContig->offsetAEnd.mean, scaffExtremeContig->offsetBEnd.mean));
+  offset.mean = min (nextScaffExtremeContigAEnd, nextScaffExtremeContigBEnd);
+  offset.variance = max( scaffExtremeContig->offsetAEnd.variance, scaffExtremeContig->offsetBEnd.variance) +
+	ComputeFudgeVariance( min( nextScaffExtremeContigAEnd, nextScaffExtremeContigBEnd) -
+						  max( scaffExtremeContig->offsetAEnd.mean, scaffExtremeContig->offsetBEnd.mean));
 
   // the orient below is either A_B or B_A
   // the offset is where the min end of the scaffold goes
@@ -2687,8 +2687,8 @@ int ComputeOverlapSize( CIFragT *currFrag, ChunkInstanceT *contigCurrFrag,
 	succAEndDist = fragSucc->contigOffset5p.mean;
 	succBEndDist = contigSucc->bpLength.mean - fragSucc->contigOffset3p.mean;
 
-	computedOverlap = MIN( currBEndDist + (currLength - shredOverlap), succAEndDist) + shredOverlap +
-	  MIN( currAEndDist, succBEndDist + (succLength - shredOverlap));
+	computedOverlap = min( currBEndDist + (currLength - shredOverlap), succAEndDist) + shredOverlap +
+	  min( currAEndDist, succBEndDist + (succLength - shredOverlap));
   }
   else if (overlapOrientation == BA_BA)
   {
@@ -2697,8 +2697,8 @@ int ComputeOverlapSize( CIFragT *currFrag, ChunkInstanceT *contigCurrFrag,
 	succAEndDist = fragSucc->contigOffset3p.mean;
 	succBEndDist = contigSucc->bpLength.mean - fragSucc->contigOffset5p.mean;
 
-	computedOverlap = MIN( currBEndDist + (currLength - shredOverlap), succBEndDist) + shredOverlap + 
-	  MIN( currAEndDist, succAEndDist + (succLength - shredOverlap));
+	computedOverlap = min( currBEndDist + (currLength - shredOverlap), succBEndDist) + shredOverlap + 
+	  min( currAEndDist, succAEndDist + (succLength - shredOverlap));
   }
   return ((int) computedOverlap);
 }
@@ -3008,8 +3008,8 @@ void dumpContigInfo(ChunkInstanceT *contig)
   fprintf( stderr, "contig orientation: %d\t length: %d  ", contigOrientation, (int) contig->bpLength.mean);
   fprintf( stderr, "contig offsetAEnd: %d\t offsetBEnd: %d\n", (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
 
-  offset = contigLeftEnd = MIN( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
-  contigRightEnd = MAX( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
+  offset = contigLeftEnd = min( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
+  contigRightEnd = max( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
 
   // now some contig info
   ma = LoadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, contig->id, ScaffoldGraph->RezGraph->type == CI_GRAPH); 
@@ -3492,8 +3492,8 @@ void localeCam(char *middleName)
 	  else
 		contigOrientation = 1;
 	  
-	  contigOffset = contigLeftEnd = MIN( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
-	  contigRightEnd = MAX( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
+	  contigOffset = contigLeftEnd = min( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
+	  contigRightEnd = max( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
 	  
 	  if (contig->scaffoldID >= 0)
 		fprintf(cam_file,
@@ -3654,7 +3654,7 @@ void localeCam(char *middleName)
 			  fragDisplayed = FALSE;
 
 			  // do A end first
-			  basesFromEnd = MIN((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
+			  basesFromEnd = min((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
 			  if ( basesFromEnd < BASES_FROM_END_CUTOFF)
 			  {
 				if (contigOrientation == 0)
@@ -3697,7 +3697,7 @@ void localeCam(char *middleName)
 			  }
 
 			  // now do B end
-			  basesFromEnd = MIN(contig->bpLength.mean - (int) frag->contigOffset5p.mean,
+			  basesFromEnd = min(contig->bpLength.mean - (int) frag->contigOffset5p.mean,
 								 contig->bpLength.mean - (int) frag->contigOffset3p.mean);
 			  if ( basesFromEnd < BASES_FROM_END_CUTOFF && !fragDisplayed)
 			  {
@@ -3747,7 +3747,7 @@ void localeCam(char *middleName)
 	  fprintf( cam_file, "%d ", contigIDs[i]);
 	fprintf( cam_file, "A0ScaffoldColor\n");
 	
-	scaffoldOffset += MAX( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean) + 20;
+	scaffoldOffset += max( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean) + 20;
 	if (0) fprintf( stderr, "setting scaffoldOffset to %d\n", scaffoldOffset);
   }
 
@@ -3876,8 +3876,8 @@ void localeSimCam()
 	// ma = GetMultiAlignInStore(ScaffoldGraph->ContigGraph->maStore, contig->id);
 	numFrags = GetNumIntMultiPoss(ma->f_list);
 	
-	min = MIN( contig->aEndCoord, contig->bEndCoord);
-	max = MAX( contig->aEndCoord, contig->bEndCoord);  
+	min = min( contig->aEndCoord, contig->bEndCoord);
+	max = max( contig->aEndCoord, contig->bEndCoord);  
 	
 	// if (contains_fbac(contig))
 	{
@@ -4084,12 +4084,12 @@ void CheckScaffoldOverlaps( void )
 	  assert(lchunk != NULL);
 	  assert(rchunk != NULL);
 
-	  while (MIN ( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) < 
-			 MAX ( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean))
+	  while (min ( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) < 
+			 max ( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean))
 	  {
 		// determine chunks overlap size
-		double computedOverlap = MAX ( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean) -
-		  MIN ( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
+		double computedOverlap = max ( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean) -
+		  min ( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
 
 		if (computedOverlap <= 40.0)
 		  break;
@@ -4111,8 +4111,8 @@ void CheckScaffoldOverlaps( void )
 		}
 		
 		// compute expected ahang
-		computedAhang = MIN ( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) -
-		  MIN (lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean);
+		computedAhang = min ( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) -
+		  min (lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean);
 		min_ahang = computedAhang - 30;
 		max_ahang = computedAhang + 30;
 		
@@ -4194,8 +4194,11 @@ void CheckAlteredScaffolds( int *checkScaffold, int checkScaffoldCount)
   
   for (icnt = 0; icnt < checkScaffoldCount; icnt++)
   {
-	fprintf( stderr, "checking scaffold %d for connectivity\n", checkScaffold[icnt]);
-	CheckScaffoldConnectivityAndSplit( ScaffoldGraph, checkScaffold[icnt], ALL_EDGES, FALSE);
+	CIScaffoldT *scaff= GetCIScaffoldT(ScaffoldGraph->CIScaffolds, checkScaffold[icnt]);
+	
+	fprintf( stderr, "checking scaffold %d for connectivity\n", scaff->id);
+	
+	CheckScaffoldConnectivityAndSplit( ScaffoldGraph, scaff, ALL_EDGES, FALSE);
   }
 }
 
@@ -4738,8 +4741,8 @@ void FreeContigInformation( ScaffoldInfoT *scaffoldContigs)
 **** 	ma = GetMultiAlignInStore(graph->maStore, contig->id);
 **** 	numFrags = GetNumIntMultiPoss(ma->f_list);
 **** 	
-**** 	min = MIN( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
-**** 	max = MAX( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
+**** 	min = min( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
+**** 	max = max( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
 **** 	
 **** 	fprintf(cam_file,
 **** 			"%d: %d A%d %d # contig: %d, containing scaffold: %d\n",
@@ -4753,7 +4756,7 @@ void FreeContigInformation( ScaffoldInfoT *scaffoldContigs)
 **** 	if( !contains_fbac(contig))
 **** 	  continue;
 **** 	
-**** 	offset = MIN( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
+**** 	offset = min( (int) contig->offsetAEnd.mean, (int) contig->offsetBEnd.mean);
 **** 	for (i = 0; i < numFrags; i++)
 **** 	{
 **** 	  mp   = GetIntMultiPos(ma->f_list, i);
@@ -4763,8 +4766,8 @@ void FreeContigInformation( ScaffoldInfoT *scaffoldContigs)
 **** 	  /*
 		**** 	  if (contig->id == 98) 
 		**** 		fprintf( stderr, "%d, %d, contig: %d, frag: %d, frag->locale: %d, celsim coords: %d, %d\n",
-		**** 				 MIN ((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean),
-		**** 				 MAX ((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean),
+		**** 				 min ((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean),
+		**** 				 max ((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean),
 		**** 				 contig->id,
 		**** 				 frag->iid,
 		**** 				 frag->locale,
@@ -4816,7 +4819,7 @@ void FreeContigInformation( ScaffoldInfoT *scaffoldContigs)
 **** 		  fragOrientationInContig = 1;
 **** 
 **** 		// do A end first
-**** 		basesFromEnd = MIN((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
+**** 		basesFromEnd = min((int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
 **** 		if ( basesFromEnd < )
 **** 		{
 **** 		  if (contigOrientation == 0)
@@ -4857,7 +4860,7 @@ void FreeContigInformation( ScaffoldInfoT *scaffoldContigs)
 **** 		}
 **** 
 **** 		// now do B end
-**** 		basesFromEnd = MIN(contig->bpLength.mean - (int) frag->contigOffset5p.mean,
+**** 		basesFromEnd = min(contig->bpLength.mean - (int) frag->contigOffset5p.mean,
 **** 						   contig->bpLength.mean - (int) frag->contigOffset3p.mean);
 **** 		if ( basesFromEnd < 1000)
 **** 		{

@@ -34,7 +34,7 @@
  **********************************************************************/
 
 
-static char fileID[] = "$Id: GWDriversREZ.c,v 1.7 2006-11-14 19:58:22 eliv Exp $";
+static char fileID[] = "$Id: GWDriversREZ.c,v 1.5 2006-06-14 19:57:23 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -522,8 +522,8 @@ void Intra_Scaffold_Path_Finding( int startWalkFrom, double gapSizeStdDevs, int 
 	  // fprintf( stderr, "tail iterator, gap to walk: lchunk: %d, rchunk: %d\n", lchunkTemp->id, rchunkTemp->id);
 
 	  numGapsBeforeWalking++;
-	  basesInThisGap = MIN (rchunkTemp->offsetAEnd.mean, rchunkTemp->offsetBEnd.mean) - 
-		MAX (lchunkTemp->offsetAEnd.mean, lchunkTemp->offsetBEnd.mean);
+	  basesInThisGap = min (rchunkTemp->offsetAEnd.mean, rchunkTemp->offsetBEnd.mean) - 
+		max (lchunkTemp->offsetAEnd.mean, lchunkTemp->offsetBEnd.mean);
 	  if (basesInThisGap > 0)
 		basesInGapsBeforeWalking += basesInThisGap;
 	}	
@@ -572,8 +572,8 @@ void Intra_Scaffold_Path_Finding( int startWalkFrom, double gapSizeStdDevs, int 
 	  // if the rchunk is contained by the lchunk keep going until we are past end of lchunk
 	  // otherwise we end trying to walk a gap up "inside of" rchunk
 	  atScaffoldEnd = FALSE;
-	  while ( MAX( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) < 
-			  MAX( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean))
+	  while ( max( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean) < 
+			  max( lchunk->offsetAEnd.mean, lchunk->offsetBEnd.mean))
 	  {
 		fprintf( stderr, "skipping contig %d, setting rchunk to %d\n",
 				 rchunk->id, rchunk->BEndNext);
@@ -741,8 +741,8 @@ void Intra_Scaffold_Path_Finding( int startWalkFrom, double gapSizeStdDevs, int 
 		  
 		  if (completeOverlapPath == 1)
 		  {
-			rchunk_delta.mean = MIN( rchunkNewAEnd, rchunkNewBEnd) - 
-			  MIN( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
+			rchunk_delta.mean = min( rchunkNewAEnd, rchunkNewBEnd) - 
+			  min( rchunk->offsetAEnd.mean, rchunk->offsetBEnd.mean);
 			if (chunksWalked->contigID == rchunk->id)
 			{
 			  //fprintf( stderr, "before CheckOrientation, rchunk %d: AEndOffset.mean: %f, BEndOffset.mean: %f\n",
@@ -2084,8 +2084,8 @@ void ComputeGapStatisitics(void)
 	  assert(lchunkTemp != NULL);
 	  assert(rchunkTemp != NULL);
 	  
-	  basesInThisGap = MIN (rchunkTemp->offsetAEnd.mean, rchunkTemp->offsetBEnd.mean) - 
-		MAX (lchunkTemp->offsetAEnd.mean, lchunkTemp->offsetBEnd.mean);
+	  basesInThisGap = min (rchunkTemp->offsetAEnd.mean, rchunkTemp->offsetBEnd.mean) - 
+		max (lchunkTemp->offsetAEnd.mean, lchunkTemp->offsetBEnd.mean);
 	  // don't include "gaps" where contigs overlap
 	  if (basesInThisGap > BASE_CUTOFF)
 	  {
@@ -2095,8 +2095,8 @@ void ComputeGapStatisitics(void)
 	  
 	  if (scaffoldContainsBACFrags)
 	  {
-		basesInThisGap = MIN (rchunkTemp->offsetAEnd.mean, rchunkTemp->offsetBEnd.mean) - 
-		  MAX (lchunkTemp->offsetAEnd.mean, lchunkTemp->offsetBEnd.mean);
+		basesInThisGap = min (rchunkTemp->offsetAEnd.mean, rchunkTemp->offsetBEnd.mean) - 
+		  max (lchunkTemp->offsetAEnd.mean, lchunkTemp->offsetBEnd.mean);
 		// don't include "gaps" where contigs overlap
 		if (basesInThisGap > BASE_CUTOFF)
 		{

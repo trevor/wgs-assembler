@@ -28,8 +28,8 @@
 
 
 /* RCS info
- * $Id: AS_OVL_delcher.h,v 1.5 2006-09-26 21:07:45 brianwalenz Exp $
- * $Revision: 1.5 $
+ * $Id: AS_OVL_delcher.h,v 1.4 2005-03-22 19:49:16 jason_miller Exp $
+ * $Revision: 1.4 $
 */
 
 
@@ -66,10 +66,16 @@ FILE *  File_Open
     (const char *, const char *);
 int  File_Exists
     (const char *);
+void *  Safe_calloc
+    (size_t, size_t);
 size_t  Safe_fread
     (void * ptr, size_t size, size_t ct, FILE * fp);
 size_t  Safe_fwrite
     (const void * ptr, size_t size, size_t ct, FILE * fp);
+void *  Safe_malloc
+    (size_t);
+void *  Safe_realloc
+    (void *, size_t);
 int  Safe_remove
     (char * filename);
 int  Safe_rename

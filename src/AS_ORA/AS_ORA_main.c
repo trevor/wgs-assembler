@@ -20,7 +20,7 @@
  *************************************************************************/
 /**********************************************************************
 $Source: /work/NIGHTLY/wgs-assembler-cvs/src/AS_ORA/Attic/AS_ORA_main.c,v $
-$Revision: 1.7 $
+$Revision: 1.5 $
 **********************************************************************/
 
 /**********************************************************************
@@ -883,7 +883,7 @@ int ComputeGaps( FragmentArrayp fragments, OverlapStatisticsp stats )
         stats->seq_gap_bases += fragments->ptrs[focus]->begin - end_base;
       }
     }
-    end_base = MAX( end_base, fragments->ptrs[focus]->end );
+    end_base = max( end_base, fragments->ptrs[focus]->end );
 
     if( end_frag < focus )
       stats->num_chunks++;
@@ -891,7 +891,7 @@ int ComputeGaps( FragmentArrayp fragments, OverlapStatisticsp stats )
     ovl = fragments->ptrs[focus]->overlaps;
     while( ovl != NULL )
     {
-      end_frag = MAX( end_frag,
+      end_frag = max( end_frag,
                       fragments->data[ovl->frag_id - fragments->min_id].ptr_index );
       ovl = ovl->next;
     }
@@ -979,9 +979,9 @@ int CompareOverlaps( FragmentArrayp fragments,
         UpdateRepeatStats( stats, fragments, osp );
         overlap_size = fragments->data[osp->aifrag - fragments->min_id].end -
           fragments->data[osp->aifrag - fragments->min_id].begin - osp->ahg;
-        overlap_size = MIN( overlap_size, overlap_size - osp->bhg );
+        overlap_size = min( overlap_size, overlap_size - osp->bhg );
         overlap_size =
-          MAX( overlap_size, stats->min_overlap ) - stats->min_overlap;
+          max( overlap_size, stats->min_overlap ) - stats->min_overlap;
         stats->histo_false_positives->bins[overlap_size]++;
       }
       else
@@ -1095,9 +1095,9 @@ int32 MinHangDeltaSum( FragmentArrayp fragments,
   {
     // fragments are nearly the same
     // compute favorable comparison for overlapper
-    return( MIN( abs( oop->a_hang - osp->ahg ) +
+    return( min( abs( oop->a_hang - osp->ahg ) +
                  abs( oop->b_hang - osp->bhg ),
-                 MIN( abs( oop->b_hang - osp->ahg ) +
+                 min( abs( oop->b_hang - osp->ahg ) +
                       abs( oop->a_hang - osp->bhg ),
                       abs( oop->b_hang + osp->ahg ) +
                       abs( oop->a_hang + osp->bhg ) ) ) );
@@ -1152,7 +1152,7 @@ int32 MinHangDeltaSum( FragmentArrayp fragments,
             break;
           case 1:
             // exactly one was reversed - give overlapper benefit of doubt
-            return( MIN( abs( oop->a_hang - osp->ahg ) +
+            return( min( abs( oop->a_hang - osp->ahg ) +
                          abs( oop->b_hang - osp->bhg ),
                          abs( oop->a_hang + osp->bhg ) +
                          abs( oop->b_hang + osp->ahg ) ) );
@@ -1200,7 +1200,7 @@ int32 MinHangDeltaSum( FragmentArrayp fragments,
         oop->type == AS_DOVETAIL )
     {
       // punt for now - give overlapper benefit of the doubt
-      return( MIN( abs( oop->a_hang - osp->ahg ) +
+      return( min( abs( oop->a_hang - osp->ahg ) +
                    abs( oop->b_hang + osp->bhg ),
                    abs( oop->a_hang - osp->bhg ) +
                    abs( oop->b_hang - osp->ahg ) ) );
@@ -1290,7 +1290,7 @@ int GenerateOverlapFile( char * output_ovl_filename,
     // regressor ADL message
     auditLine2.complete = time(0);
     auditLine2.name = "overlap_regressor";
-    auditLine2.version = "$Revision: 1.7 $ $Date: 2006-11-14 19:58:22 $";
+    auditLine2.version = "$Revision: 1.5 $ $Date: 2005-09-15 15:20:16 $";
     auditLine2.comment = "(empty)";
     auditLine2.next = NULL;
 

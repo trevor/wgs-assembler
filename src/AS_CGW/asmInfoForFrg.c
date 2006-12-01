@@ -19,7 +19,7 @@
  *************************************************************************/
 
 
-static char CM_ID[] = "$Id: asmInfoForFrg.c,v 1.7 2006-10-08 08:47:39 brianwalenz Exp $";
+static char CM_ID[] = "$Id: asmInfoForFrg.c,v 1.4 2006-06-14 19:57:23 brianwalenz Exp $";
 
 
 /*********************************************************************/
@@ -35,7 +35,7 @@ static char CM_ID[] = "$Id: asmInfoForFrg.c,v 1.7 2006-10-08 08:47:39 brianwalen
 #include <sys/stat.h>
 #include <unistd.h>
 
-
+#include "cds.h"
 #include "AS_global.h"
 #include "AS_CGW_dataTypes.h"
 #include "ScaffoldGraph_CGW.h"
@@ -54,6 +54,7 @@ int main( int argc, char *argv[])
   char *prefix;
   MesgReader reader;
   MesgWriter writer;
+  MesgWriter errorWriter;
   FILE *myerr = stderr; 
   FILE *myout = stdout; 
   char *outputPath = NULL;
@@ -77,28 +78,28 @@ int main( int argc, char *argv[])
     while (!errflg && ((ch = getopt(argc, argv,
 				    "c:f:g:n:i")) != EOF)){
       switch(ch) {
-        case 'i':
-          useIndexRatherThanIID=1;
-          break;
-        case 'c':
-          strcpy( data->File_Name_Prefix, argv[optind - 1]);
-          setPrefixName = TRUE;		  
-          break;
-        case 'f':
-          strcpy( data->Frag_Store_Name, argv[optind - 1]);
-          setFragStore = TRUE;
-          break;
-        case 'g':
-          strcpy( data->Gatekeeper_Store_Name, argv[optind - 1]);
-          setGatekeeperStore = TRUE;
-          break;	  
-        case 'n':
-          ckptNum = atoi(argv[optind - 1]);
-          break;
-        case '?':
-          fprintf(stderr,"Unrecognized option -%c",optopt);
-        default :
-          errflg++;
+      case 'i':
+	useIndexRatherThanIID=1;
+	break;
+      case 'c':
+	strcpy( data->File_Name_Prefix, argv[optind - 1]);
+	setPrefixName = TRUE;		  
+	break;
+      case 'f':
+	strcpy( data->Frag_Store_Name, argv[optind - 1]);
+	setFragStore = TRUE;
+	break;
+      case 'g':
+	strcpy( data->Gatekeeper_Store_Name, argv[optind - 1]);
+	setGatekeeperStore = TRUE;
+	break;	  
+      case 'n':
+	ckptNum = atoi(argv[optind - 1]);
+	break;
+      case '?':
+	fprintf(stderr,"Unrecognized option -%c",optopt);
+      default :
+	errflg++;
       }
     }
 

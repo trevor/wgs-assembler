@@ -22,8 +22,6 @@
 #ifndef UID_COMMON_H
 #define UID_COMMON_H
 
-#include "AS_global.h"
-
 /*  New UID server/client disabled/modified the original
  *  code.  This enables those changes.
  *
@@ -93,6 +91,9 @@
 extern "C" {
 #endif
 
+// MCS: Put cds.h before arpa/inet.h for C++ builds on alpha
+#include <cds.h>
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -139,3 +140,9 @@ void       SYS_UIDlogMessage(const char* message);
 #endif
 
 #endif
+
+
+
+
+
+

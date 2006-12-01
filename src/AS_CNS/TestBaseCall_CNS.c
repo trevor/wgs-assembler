@@ -25,7 +25,7 @@
                  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: TestBaseCall_CNS.c,v 1.14 2006-10-08 08:47:39 brianwalenz Exp $";
+static char CM_ID[] = "$Id: TestBaseCall_CNS.c,v 1.11 2005-12-16 14:28:10 gdenisov Exp $";
 
 // Operating System includes:
 #include <stdlib.h>
@@ -46,6 +46,7 @@ static char CM_ID[] = "$Id: TestBaseCall_CNS.c,v 1.14 2006-10-08 08:47:39 brianw
 #include "AS_PER_genericStore.h"
 #include "AS_UTL_Var.h"
 #include "AS_UTL_ID_store.h"
+#include "PrimitiveVA.h"
 #include "PrimitiveVA_MSG.h"
 #include "AS_UTL_version.h"
 #include "AS_SDB_SequenceDBPartition.h"
@@ -71,14 +72,14 @@ int main (int argc, char *argv[])
    char qlt[LINE_MAX];
    char frag_type[LINE_MAX];
    char unitig_type[LINE_MAX];
-   VarRegion  vr;  
+   AlPair ap;  
    char base;
    int cid=-1;
    int display_keys=0;
    int ch,errflg=0,illegal_use=0,iflags=0;
    double var = 0.;
 
-   vr.nr = 0;       
+   ap.nr = 0;       
    InitializeAlphTable();
    optarg = NULL;
    while (!errflg && ((ch = getopt(argc, argv, "q:d:hPim")) != EOF)) {
@@ -155,7 +156,7 @@ int main (int argc, char *argv[])
    ResetStores(LINE_MAX,20);
    cid = SetupSingleColumn(seq,qlt,frag_type,unitig_type, NULL);
    
-   BaseCall(cid,CNS_USE_QVS, &var, &vr, vr.alleles[0].id, &base, 1, 0, NULL);
+   BaseCall(cid,CNS_USE_QVS, &var, &ap, ap.best_allele, &base, 1, 0, NULL);
    ShowColumn(cid);
    fprintf(stdout,"\nparameters:\n");
    fprintf(stdout,"             CNS_USE_QVS = %d\n",CNS_USE_QVS); 

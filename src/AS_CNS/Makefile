@@ -20,6 +20,10 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 ###########################################################################
+#
+# gmake Makefile for AS_CNS
+#VERBOSE=1
+REQD_LIBS = libAS_PER.a libAS_UTL.a libAS_MSG.a libAS_ALN.a libAS_CNS.a libAS_REZ.a libAS_CGW.a
 
 LIB_SOURCES = MultiAlignment_CNS.c MultiAlignStore_CNS.c Array_CNS.c
 LIB_OBJECTS = $(LIB_SOURCES:.c=.o)
@@ -30,7 +34,7 @@ LOCAL_WORK = $(shell cd ../..; pwd)
 AS_CNS_SRCS = $(LIB_SOURCES) Consensus_CNS.c null_scaffolder.c quality_assess.c \
               placed_contigs.c TestBaseCall_CNS.c TestAlign_CNS.c \
 		RebuildMultiAlign_CNS.c RebuildScaffolds_CNS.c ScaffoldUnitigProfile_CNS.c \
-	      colCorr_CNS.c post_analysis.c AS_CNS_asmReBaseCall.c dumpUnitigConsensusFromIUM.c
+	      colCorr_CNS.c post_analysis.c AS_CNS_asmReBaseCall.c
 # AlignStats_CNS.c
 
 AS_CNS_OBJS = $(AS_CNS_SRCS:.c=.o)
@@ -38,19 +42,7 @@ AS_CNS_OBJS = $(AS_CNS_SRCS:.c=.o)
 SOURCES = $(AS_CNS_SRCS)
 OBJECTS = $(AS_CNS_OBJS)
 
-PROGS = consensus \
-        null_scaffolder \
-        quality_assess \
-        placed_contigs \
-        testbasecall \
-        testalignment \
-        rebuildalignment \
-        rebuildscaffolds \
-        scaffoldunitigs \
-        post_analysis \
-        asmReBaseCall \
-        dumpUnitigConsensusFromIUM
-
+PROGS = consensus null_scaffolder quality_assess placed_contigs testbasecall testalignment rebuildalignment rebuildscaffolds scaffoldunitigs post_analysis asmReBaseCall
 
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
@@ -62,7 +54,9 @@ install: all
 
 libAS_CNS.a: $(LIB_OBJECTS)
 
-LIBS =  libCA.a
+LIBS =  libAS_CGW.a libAS_REZ.a libAS_CGW.a libAS_PER.a libAS_MSG.a \
+        libAS_CNS.a libAS_SDB.a libAS_ALN.a libAS_OVL.a \
+	libAS_CGW.a libAS_REZ.a libAS_CGW.a libAS_REZ.a libAS_CGW.a libAS_OVL.a  libAS_ALN.a libAS_UTL.a libAS_PER.a libAS_LIN.a libAS_MSG.a 
 
 consensus: Consensus_CNS.o  MultiAlignment_CNS.o MultiAlignStore_CNS.o \
 	Array_CNS.o $(LIBS) 
@@ -86,9 +80,6 @@ post_analysis: post_analysis.o \
          $(LIBS)
 
 asmReBaseCall: AS_CNS_asmReBaseCall.o \
-         $(LIBS)
-
-dumpUnitigConsensusFromIUM: dumpUnitigConsensusFromIUM.o \
          $(LIBS)
 
 

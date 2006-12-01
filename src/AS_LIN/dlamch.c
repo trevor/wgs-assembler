@@ -550,40 +550,40 @@ flow;
 erflow;   
                 e.g., IEEE standard followers ) */
 	    } else {
-		lemin = MIN(ngpmin,gpmin);
+		lemin = min(ngpmin,gpmin);
 /*            ( A guess; no known machine ) */
 		iwarn = TRUE_;
 	    }
 
 	} else if (ngpmin == gpmin && ngnmin == gnmin) {
 	    if ((i__1 = ngpmin - ngnmin, abs(i__1)) == 1) {
-		lemin = MAX(ngpmin,ngnmin);
+		lemin = max(ngpmin,ngnmin);
 /*            ( Twos-complement machines, no gradual underflow
 ;   
                 e.g., CYBER 205 ) */
 	    } else {
-		lemin = MIN(ngpmin,ngnmin);
+		lemin = min(ngpmin,ngnmin);
 /*            ( A guess; no known machine ) */
 		iwarn = TRUE_;
 	    }
 
 	} else if ((i__1 = ngpmin - ngnmin, abs(i__1)) == 1 && gpmin == gnmin)
 		 {
-	    if (gpmin - MIN(ngpmin,ngnmin) == 3) {
-		lemin = MAX(ngpmin,ngnmin) - 1 + lt;
+	    if (gpmin - min(ngpmin,ngnmin) == 3) {
+		lemin = max(ngpmin,ngnmin) - 1 + lt;
 /*            ( Twos-complement machines with gradual underflo
 w;   
                 no known machine ) */
 	    } else {
-		lemin = MIN(ngpmin,ngnmin);
+		lemin = min(ngpmin,ngnmin);
 /*            ( A guess; no known machine ) */
 		iwarn = TRUE_;
 	    }
 
 	} else {
 /* Computing MIN */
-	    i__1 = MIN(ngpmin,ngnmin), i__1 = MIN(i__1,gpmin);
-	    lemin = MIN(i__1,gnmin);
+	    i__1 = min(ngpmin,ngnmin), i__1 = min(i__1,gpmin);
+	    lemin = min(i__1,gnmin);
 /*         ( A guess; no known machine ) */
 	    iwarn = TRUE_;
 	}

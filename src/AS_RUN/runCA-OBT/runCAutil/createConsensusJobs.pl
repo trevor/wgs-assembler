@@ -6,6 +6,7 @@ use strict;
 
 sub createPostScaffolderConsensusJobs ($) {
     my $cgwDir   = shift @_;
+    my $pstats   = getGlobal("processStats");
 
     return if (-e "$wrk/8-consensus/jobsCreated.success");
 
@@ -20,28 +21,33 @@ sub createPostScaffolderConsensusJobs ($) {
     my $lastckpt = findLastCheckpoint($cgwDir);
     die "Didn't find any checkpoints in '$cgwDir'\n" if (!defined($lastckpt));
 
-    if (! -e "$wrk/8-consensus/partitionSDB.success") {
+    if (! -e "$wrk/8-consensus/partitionSDB1.success") {
         my $cmd;
-        $cmd  = "$bin/PartitionSDB -all -seqstore $cgwDir/$asm.SeqStore -version $lastckpt -fragsper $partitionSize -input $cgwDir/$asm.cgw_contigs ";
-        $cmd .= "> $wrk/8-consensus/partitionSDB.err 2>&1";
+        $cmd  = "cd $wrk/8-consensus && ";
+        $cmd .= "$bin/PartitionSDB1 $cgwDir/$asm.SeqStore $lastckpt $partitionSize $cgwDir/$asm.cgw_contigs ";
+        $cmd .= "> $wrk/8-consensus/partitionSDB1.err 2>&1";
 
-        die "Failed.\n" if (runCommand("$wrk/8-consensus", $cmd));
-        touch("$wrk/8-consensus/partitionSDB.success");
+        die "Failed.\n" if (runCommand($cmd));
+        touch("$wrk/8-consensus/partitionSDB1.success");
     }
 
-    if (-z "$wrk/8-consensus/UnitigPartition.txt") {
-        print STDERR "WARNING!  Nothing for consensus to do!  Forcing consensus to skip!\n";
-        touch("$wrk/8-consensus/partitionFragStore.success");
-        touch("$wrk/8-consensus/jobsCreated.success");
-        return;
-    }
+    if (! -e "$wrk/8-consensus/partitionSDB2.success") {
+        my $cmd;
+        $cmd  = "cd $wrk/8-consensus && ";
+        $cmd .= "$bin/PartitionSDB2 $cgwDir/$asm.SeqStore $lastckpt $wrk/8-consensus/UnitigPartition.txt ";
+        $cmd .= "> $wrk/8-consensus/partitionSDB2.err 2>&1";
 
+        die "Failed.\n" if (runCommand($cmd));
+        touch("$wrk/8-consensus/partitionSDB2.success");
+    }
+    
     if (! -e "$wrk/8-consensus/partitionFragStore.success") {
         my $cmd;
-        $cmd  = "$bin/partitionFragStore $wrk/8-consensus/FragPartition.txt $wrk/$asm.frgStore $wrk/$asm.frgStore_cns2part ";
+        $cmd  = "cd $wrk/8-consensus && ";
+        $cmd .= "$bin/partitionFragStore $wrk/8-consensus/FragPartition.txt $wrk/$asm.frgStore $wrk/$asm.frgStore_cns2part ";
         $cmd .= "> $wrk/8-consensus/partitionFragStore.out 2>&1";
 
-        die "Failed.\n" if (runCommand("$wrk/8-consensus", $cmd));
+        die "Failed.\n" if (runCommand($cmd));
         touch("$wrk/8-consensus/partitionFragStore.success");
     }
 
@@ -95,6 +101,7 @@ sub createPostScaffolderConsensusJobs ($) {
     print F "  $cgwDir/$asm.cgw_contigs.\$jobp \\\n";
     print F " \\> $wrk/8-consensus/$asm.cns_contigs.\$jobp.err 2\\>\\&1\n";
     print F "\n";
+    print F "$pstats \\\n" if (defined($pstats));
     print F "$gin/consensus \\\n";
     print F "  -P \\\n";
     print F "  -s $cgwDir/$asm.SeqStore \\\n";
@@ -114,28 +121,17 @@ sub createPostScaffolderConsensusJobs ($) {
     chmod 0755, "$wrk/8-consensus/consensus.sh";
 
     if (getGlobal("cnsOnGrid") && getGlobal("useGrid")) {
-        my $sge          = getGlobal("sge");
-        my $sgeConsensus = getGlobal("sgeConsensus");
-
-        my $SGE;
-        $SGE  = "qsub $sge $sgeConsensus -r y -N cns2_$asm ";
-        $SGE .= "-t 1-$jobs ";
-        $SGE .= "-j y -o /dev/null ";
-        $SGE .= "$wrk/8-consensus/consensus.sh\n";
-
-        if (runningOnGrid()) {
-            touch("$wrk/8-consensus/jobsCreated.success");
-            system($SGE) and die "Failed to submit consensus jobs.\n";
-            submitScript("cns2_$asm");
-            exit(0);
-        } else {
-            pleaseExecute($SGE);
-            touch("$wrk/8-consensus/jobsCreated.success");
-            exit(0);
-        }
+        my $cmd;
+        $cmd  = "qsub -p 0 -r y -N cns2_${asm} ";
+        $cmd .= "-t 1-$jobs ";
+        $cmd .= "-j y -o /dev/null ";
+        $cmd .= "$wrk/8-consensus/consensus.sh\n";
+        pleaseExecute($cmd);
+        touch("$wrk/8-consensus/jobsCreated.success");
+        exit(0);
     } else {
         for (my $i=1; $i<=$jobs; $i++) {
-            &scheduler::schedulerSubmit("sh $wrk/8-consensus/consensus.sh $i > /dev/null 2>&1");
+            &scheduler::schedulerSubmit("sh $wrk/8-consensus/consensus.sh $i");
         }
 
         &scheduler::schedulerSetNumberOfProcesses(getGlobal("cnsConcurrency"));
@@ -167,8 +163,7 @@ sub postScaffolderConsensus ($) {
         chomp;
 
         if (m/cgw_contigs.(\d+)/) {
-            if ((-e "$wrk/8-consensus/$asm.cns_contigs.$1.failed") ||
-                ((! -z $_) && (! -e "$wrk/8-consensus/$asm.cns_contigs.$1.success"))) {
+            if (! -e "$wrk/8-consensus/$asm.cns_contigs.$1.success") {
                 print STDERR "$wrk/8-consensus/$asm.cns_contigs.$1 failed.\n";
                 $failedJobs++;
             }

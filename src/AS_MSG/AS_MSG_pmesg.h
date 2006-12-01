@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: AS_MSG_pmesg.h,v 1.24 2006-10-15 08:03:59 brianwalenz Exp $   */
+/* $Id: AS_MSG_pmesg.h,v 1.21 2006-05-24 14:06:13 eliv Exp $   */
 
 #ifndef AS_MSG_PMESG_INCLUDE
 #define AS_MSG_PMESG_INCLUDE
@@ -27,6 +27,7 @@
 #include <time.h>
 
 #include "AS_global.h"
+#include "GlobalConstants.h"
 
 extern int novar;
 
@@ -841,13 +842,13 @@ typedef struct IntMultiPos {
 
 typedef struct IntMultiVar {
   SeqInterval     position;
-  int32           num_reads;
-  int32           num_conf_alleles;
-  int32           anchor_size;
   int32           var_length;
-  char           *nr_conf_alleles;
-  char           *weights;
   char           *var_seq;
+  int32           num_reads;
+  int32           nr_best_allele;
+  float           ratio;     
+  int32           num_alleles;
+  int32           window_size;  
 } IntMultiVar;
 
 /* This is a variant of IntMultiPos to handle deltas in a longer (unitig) sequence */
@@ -856,8 +857,8 @@ typedef struct {
   IntUnitig_ID  ident;
   SeqInterval   position;
   int32         delta_length;
-  int32         wordPad;
-  int32        *delta;
+  int32                 wordPad;
+  int32         *delta;
 #ifdef i386
   int32 ptrPad;
 #endif
@@ -1150,9 +1151,9 @@ typedef struct {
   Contig_ID                   eaccession;
   IntContig_ID                iaccession;
   ContigPlacementStatusType   placed;
-  CDS_COORD_t                 length;
-  char                       *consensus;
-  char                       *quality;
+  CDS_COORD_t              length;
+  char                        *consensus;
+  char                        *quality;
   int32                       forced;
   int32                       num_pieces;
   int32                       num_unitigs;
@@ -1341,161 +1342,169 @@ typedef enum {
   AS_PROTO_OUTPUT   = (int) 'P'
 } OutputType;
 
+/* External Routines */
 
-//  External Routines
-
+#undef TODELETE
+#ifdef TODELETE
+#endif
 
 typedef int (*MesgReader)(FILE *, GenericMesg **);
 typedef int (*MesgWriter)(FILE *, GenericMesg *);
 
+#if 0
 
-//  Function: DuplicateProtoMesg_AS 
-//
-//  Description: Copies the generic message structure including all of
-//  its variable length data. The variable length data must be released
-//  by free_mesg().
-//
-//  Return Value: A pointer to a copy of the generic message that has a
-//  lifetime determined by the client.
-//
-//  Inputs: omesg - A pointer to a generic message.
-//
-//  This function is no longer supported.
-//
-//GenericMesg *DuplicateProtoMesg_AS(GenericMesg *omesg);
+/* Function: DuplicateProtoMesg_AS 
 
+   Description: Copies the generic message structure including all of
+   its variable length data. The variable length data must be released
+   by free_mesg().
+   
+   Return Value: A pointer to a copy of the generic message that has a
+   lifetime determined by the client.
 
-//  Function: FreeProtoMesg_AS 
-//
-//  Description: Frees the memory for a generic message structure.
-//
-//  Input/Outputs: omesg - A pointer to a generic message.
-//
-//  This function is no longer supported.
-//
-//void FreeProtoMesg_AS(GenericMesg *omesg);
+   Inputs: omesg - A pointer to a generic message.
 
+*/
 
-//  Function: InputFileType_AS
-//
-//  Description: The file cursor for fin must be at the start of the file
-//  when this routine is called.  The routine examines the first byte of
-//  the file and decides whether it is a binary or proto file.  It then
-//  returns a pointer to either ReadProtoMesg_AS or ReadBinaryMesg_AS
-//  accordingly.
-//
-MesgReader InputFileType_AS(FILE *fin);
+extern GenericMesg *DuplicateProtoMesg_AS(GenericMesg *omesg);
 
+/* Function: FreeProtoMesg_AS 
 
-//  Function: OutputFileType_AS
-//  Description: This routine
-//  returns a pointer to either WriteProtoMesg_AS or WriteBinaryMesg_AS
-//  as a function of its input.
-//
-MesgWriter OutputFileType_AS(OutputType type);
+   Description: Frees the memory for a generic message structure.
+
+   Input/Outputs: omesg - A pointer to a generic message.
+
+*/
+   
+extern void FreeProtoMesg_AS(GenericMesg *omesg);
+
+#endif
+
+/* Function: InputFileType_AS
+
+   Description: The file cursor for fin must be at the start of the file
+   when this routine is called.  The routine examines the first byte of
+   the file and decides whether it is a binary or proto file.  It then
+   returns a pointer to either ReadProtoMesg_AS or ReadBinaryMesg_AS
+   accordingly.
+*/
+
+extern MesgReader InputFileType_AS(FILE *fin);
 
 
-//  Functions: ReadProtoMesg_AS 
-//             ReadBinaryMesg_AS
-//
-//  Description: Reads the next message from the file "fin" and a
-//  returns the memory location of a generic message.  This memory is
-//  managed by the routine only. This memory location and all of its
-//  variable data will go out of scope or be trashed by the next call
-//  to the routine.  The first routine is for reading proto ASCI input
-//  and the second for reading binary encoded input.
-//  
-//  Return Value: The return value is EOF if an end of file is
-//  encountered occurs, otherwise the return value is zero indicating
-//  success.
-//  
-//  Outputs: mesg - A handle to a generic message.
-//  
-//  Input/Outputs: fin - A file openned for text reading. 
-//
-int ReadProtoMesg_AS(FILE *fin, GenericMesg **pmesg);
-int ReadBinaryMesg_AS(FILE *fin, GenericMesg **pmesg);
+/* Function: OutputFileType_AS
+   Description: This routine
+   returns a pointer to either WriteProtoMesg_AS or WriteBinaryMesg_AS
+   as a function of its input.
+*/
+
+extern MesgWriter OutputFileType_AS(OutputType type);
 
 
-//  Functions:  WriteProtoMesg_AS 
-//              WriteBinaryMesg_AS
-//
-//  Description: Writes a generic message to the file "fout" in either
-//  ASCII or binary mode depending on the routine. 
-//
-//  Return Value: The return value is negative if an error occured.
-//
-//  Inputs: mesg - A pointer to the generic message to be output. 
-//
-//  Input/Outputs: fout - A file openned for text writing.
-//
-int WriteProtoMesg_AS(FILE *fout, GenericMesg *mesg);
-int WriteBinaryMesg_AS(FILE *fout, GenericMesg *mesg);
+#if 0
 
+/* Functions: ReadProtoMesg_AS 
+              ReadBinaryMesg_AS
 
-//  Function: Transfer_XXX_to_YYY
-//
-//  Description: Transfers the fields of an XXX message to that of a
-//  YYY message.  Note carefully that second level memory is not duplicated,
-//  so that such items (e.g. sequence) are *shared* between the two structures.
-//  A kludge to allow items to be throughput without assignment of internal
-//  IDs, should no longer be in use!
-//
-void Transfer_FRG_to_IFG_AS(FragMesg         *frg_mesg,
+   Description: Reads the next message from the file "fin" and a
+   returns the memory location of a generic message.  This memory is
+   managed by the routine only. This memory location and all of its
+   variable data will go out of scope or be trashed by the next call
+   to the routine.  The first routine is for reading proto ASCI input
+   and the second for reading binary encoded input.
+   
+   Return Value: The return value is EOF if an end of file is
+   encountered occurs, otherwise the return value is zero indicating
+   success.
+   
+   Outputs: mesg - A handle to a generic message.
+   
+   Input/Outputs: fin - A file openned for text reading. 
+*/
+
+#endif
+extern int ReadProtoMesg_AS(FILE *fin, GenericMesg **pmesg);
+extern int ReadBinaryMesg_AS(FILE *fin, GenericMesg **pmesg);
+#if 0
+
+/* Functions:  WriteProtoMesg_AS 
+               WriteBinaryMesg_AS
+
+   Description: Writes a generic message to the file "fout" in either
+   ASCII or binary mode depending on the routine. 
+
+   Return Value: The return value is negative if an error occured.
+
+   Inputs: mesg - A pointer to the generic message to be output. 
+
+   Input/Outputs: fout - A file openned for text writing.
+*/
+
+#endif
+extern int WriteProtoMesg_AS(FILE *fout, GenericMesg *mesg);
+extern int WriteBinaryMesg_AS(FILE *fout, GenericMesg *mesg);
+#if 0
+/* Function: Transfer_XXX_to_YYY
+
+   Description: Transfers the fields of an XXX message to that of a
+   YYY message.  Note carefully that second level memory is not duplicated,
+   so that such items (e.g. sequence) are *shared* between the two structures.
+   A kludge to allow items to be throughput without assignment of internal
+   IDs, should no longer be in use!
+*/
+
+extern void Transfer_FRG_to_IFG_AS(FragMesg         *frg_mesg,
                                    InternalFragMesg *ifg_mesg);
 
-void Transfer_IFG_to_SFG_AS(InternalFragMesg *ifg_mesg,
+extern void Transfer_IFG_to_SFG_AS(InternalFragMesg *ifg_mesg,
                                    ScreenedFragMesg *sfg_mesg);
 
-void Transfer_SFG_to_OFG_AS(ScreenedFragMesg *sfg_mesg,
+extern void Transfer_SFG_to_OFG_AS(ScreenedFragMesg *sfg_mesg,
                                    OFGMesg *ofg_mesg);
 
-void Transfer_SFG_to_OFR_AS(ScreenedFragMesg *sfg_mesg,
+extern void Transfer_SFG_to_OFR_AS(ScreenedFragMesg *sfg_mesg,
                                    OFRMesg *ofr_mesg);
 
-void Transfer_DST_to_IDT_AS(DistanceMesg     *dst_mesg,
+extern void Transfer_DST_to_IDT_AS(DistanceMesg     *dst_mesg,
                                    InternalDistMesg *idt_mesg);
 
-void Transfer_LKG_to_ILK_AS(LinkMesg         *lkg_mesg,
+extern void Transfer_LKG_to_ILK_AS(LinkMesg         *lkg_mesg,
                                    InternalLinkMesg *ilk_mesg);
 
-void Transfer_SCN_to_ISN_AS(ScreenItemMesg         *scn_mesg,
+extern void Transfer_SCN_to_ISN_AS(ScreenItemMesg         *scn_mesg,
                                    InternalScreenItemMesg *isn_mesg);
 
-void AppendAuditLine_AS(AuditMesg *adt_mesg,
+extern void AppendAuditLine_AS(AuditMesg *adt_mesg,
                                AuditLine *auditLine,
                                time_t t, char *name,
                                char *version, char *comment);
 
+/* Function: GetProtoLineNum_AS
 
-//  Function: GetProtoLineNum_AS
-//
-//  Description: When reading in proto mode, this function will return
-//  the line number the input is currently on.  This function operates
-//  correctly only when a single input is being read.  The return value
-//  in all other cases is the sum of the number of lines read in all
-//  proto files thus far.
-//
-int GetProtoLineNum_AS(void);
+   Description: When reading in proto mode, this function will return
+   the line number the input is currently on.  This function operates
+   correctly only when a single input is being read.  The return value
+   in all other cases is the sum of the number of lines read in all
+   proto files thus far.
+*/
 
+extern int GetProtoLineNum_AS(void);
 
-//  GetMessageType:
-//  Returns a number in the range [1, NUM_OF_REC_TYPES -1]
-//  as a function of the first 3 characters of the passed string.
-//
+/* GetMessageType:
+   Returns a number in the range [1, NUM_OF_REC_TYPES -1]
+   as a function of the first 3 characters of the passed string.
+*/
 int GetMessageType(char *string);
 
-
-//  GetMessageName:
-//   Returns a string as a function of message type
-//
+/* GetMessageName:
+   Returns a string as a function of message type
+*/
 const char  *GetMessageName(int type);
 
+/* Free all memory allocated by the Proto IO Package */
 
-//  Free all memory allocated by the Proto IO Package
-//
-void ResetProto_AS(void);
-void ResetBinary_AS(void);
+extern void ResetProto_AS(void);
+extern void ResetBinary_AS(void);
 
-
-#endif  /* AS_MSG_PMESG_INCLUDE */
+#endif
+#endif /* AS_MSG_PMESG_INCLUDE */

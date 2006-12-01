@@ -22,32 +22,38 @@ sub import () {
 #
 my $numberOfProcesses       = 0;
 my $numberOfProcessesToWait = 0;
-my @processQueue            = ();
-my @processesRunning        = ();
-my $printProcessCommand     = 1;
+my @processQueue;
+my @processesRunning;
+my $printProcessCommand = 0;
+my $printProcessStatus  = 0;
 
 sub schedulerSetNumberOfProcesses {
-    $numberOfProcesses = shift @_;
+    ($numberOfProcesses) = @_;
 }
 
 sub schedulerSetNumberOfProcessesToWaitFor {
-    $numberOfProcessesToWait = shift @_;
+    ($numberOfProcessesToWait) = @_;
 }
 
 sub schedulerSetShowCommands {
-    print STDERR "RESET PRINT COMMAND!\n";
-    $printProcessCommand = shift @_;
+    ($printProcessCommand) = @_;
+}
+
+sub schedulerSetShowStatus {
+    ($printProcessStatus) = @_;
 }
 
 
+#  Submit a task to the scheduler
+#
 sub schedulerSubmit {
     chomp @_;
     push @processQueue, @_;
 }
 
 sub forkProcess {
-    my $process = shift @_;
-    my $pid;
+    my($process) = @_;
+    my($pid);
 
     #  From Programming Perl, page 167
   FORK: {
@@ -70,7 +76,7 @@ sub forkProcess {
 }
 
 sub reapProcess {
-    my $pid = shift @_;
+    my($pid) = @_;
 
     if (waitpid($pid, &WNOHANG) > 0) {
         return(1);
@@ -80,7 +86,7 @@ sub reapProcess {
 }
 
 sub schedulerRun {
-    my @newProcesses;
+    my(@newProcesses);
 
     #  Reap any processes that have finished
     #
@@ -95,12 +101,45 @@ sub schedulerRun {
 
     #  Run processes in any available slots
     #
-    while ((scalar(@processesRunning) < $numberOfProcesses) &&
-           (scalar(@processQueue) > 0)) {
+    while (((scalar @processesRunning) < $numberOfProcesses) &&
+           ((scalar @processQueue) > 0)) {
         my $process = shift @processQueue;
-        print STDERR "$process\n";
+
+        if ($printProcessCommand) {
+            print "sched()-- starting '$process'";
+        }
+
         push @processesRunning, forkProcess($process);
+
+        if ($printProcessStatus) {
+            my $remain = scalar(@processQueue);
+            my $prefix;
+
+            if ($printProcessCommand) {
+                $prefix = " -- ";
+            } else {
+                $prefix = "sched()-- ";
+            }
+
+            if ($remain == 0) {
+                print "${prefix}No jobs remain in the queue.\n";
+            } elsif ($remain == 1) {
+                print "${prefix}1 job remains in the queue.\n";
+            } else {
+                print "${prefix}$remain jobs remain in the queue.\n";
+            }
+        } elsif ($printProcessCommand) {
+            print "\n";
+        }
     }
+}
+
+
+#  Wait for all processes in the scheduler to finish.
+#
+sub schedulerFinishStatusReport {
+    my ($remain) = @_;
+
 }
 
 sub schedulerFinish {
@@ -108,18 +147,14 @@ sub schedulerFinish {
     my @newProcesses;
     my $remain;
 
-    my $t = localtime();
-    my $d = time();
-    print STDERR "----------------------------------------START CONCURRENT $t\n";
-
-    $remain = scalar(@processQueue);
+    $remain = scalar @processQueue;
 
     #  Run all submitted jobs
     #
     while ($remain > 0) {
         schedulerRun();
 
-        $remain = scalar(@processQueue);
+        $remain = scalar @processQueue;
 
         if ($remain > 0) {
             $child = waitpid -1, 0;
@@ -133,14 +168,32 @@ sub schedulerFinish {
         }
     }
 
+    if ($printProcessStatus) {
+        print "sched()-- All jubs submitted.  Waiting for completion.\n";
+    }
+
     #  Wait for them to finish, if requested
     #
-    while (scalar(@processesRunning) > $numberOfProcessesToWait) {
+    while ((scalar @processesRunning) > $numberOfProcessesToWait) {
+        if ($printProcessStatus) {
+            my $remain = scalar(@processesRunning);
+
+            if ($remain == 0) {
+                print "sched()-- No jobs running.\n";
+            } elsif ($remain == 1) {
+                print "sched()-- 1 job running.\n";
+            } else {
+                print "sched()-- $remain jobs running.\n";
+            }
+        }
+
         waitpid(shift @processesRunning, 0);
     }
 
-    $t = localtime();
-    print STDERR "----------------------------------------END CONCURRENT $t (", time() - $d, " seconds)\n";
+    if ($printProcessStatus) {
+        print "sched()-- All done!\n";
+    }
 }
+
 
 1;

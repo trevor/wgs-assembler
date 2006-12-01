@@ -34,7 +34,10 @@
 *
 *************************************************/
 
-static char fileID[] = "$Id: GapFillREZ.c,v 1.17 2006-11-14 19:58:22 eliv Exp $";
+
+
+
+static char fileID[] = "$Id: GapFillREZ.c,v 1.12 2006-06-14 19:57:23 brianwalenz Exp $";
 
 
 #include <stdio.h>
@@ -53,7 +56,6 @@ static char fileID[] = "$Id: GapFillREZ.c,v 1.17 2006-11-14 19:58:22 eliv Exp $"
 #include "AS_CGW_dataTypes.h"
 #include "Globals_CGW.h"
 #include "ScaffoldGraph_CGW.h"
-#include "ChiSquareTest_CGW.h"
 
 //
 // AS_REZ
@@ -92,6 +94,9 @@ static char fileID[] = "$Id: GapFillREZ.c,v 1.17 2006-11-14 19:58:22 eliv Exp $"
     // don't throw a rock off the end unless it's:  path-confirmed
     // or indicates a scaffold join.  Only allow ONE rock for
     // each indicated scaffold join.
+#define  ALLOW_STONE_CHECKPOINTS   1
+    // If  1  do all stone-processing steps on each scaffold separately
+    // and print a checkpoint at appropriate intervals
 #define  MAX_DIFF_SCAFFS           3
     // Most different scaffolds that a unitig can have links to without being
     // rejected.
@@ -125,8 +130,7 @@ static char fileID[] = "$Id: GapFillREZ.c,v 1.17 2006-11-14 19:58:22 eliv Exp $"
     // more) scaffolds
 #define  USE_MY_INSERT             0
     // If  1  use simple insert function for rocks instead of
-    // old  Update_Scaffold_Graph -- this might not do anything,
-    // look for the comments below (search for USE_MY_INSERT)
+    // old  Update_Scaffold_Graph
 #define  VERBOSE                   0
     // If  1  print out lots of extra stuff
 
@@ -3946,7 +3950,7 @@ static void  Choose_Safe_Chunks
                                    cid, diff);
                           cam_colour = MISPLACED_COLOUR;
                          }
-#endif
+#endif                               
 #if  MAKE_CAM_FILE && SHOW_CALC_COORDS
                      scaff_id = REF (stack [0] . chunk_id) . scaff_id;
                      if  (Scaffold_Start [scaff_id] < Scaffold_End [scaff_id])
@@ -5028,7 +5032,7 @@ fprintf (stderr, "### Scaff %d  gap %d  to_pv = %.1f  far_pv = %.1f  st_pv = %.1
 #ifdef DEBUG_DETAILED
 fprintf (stderr, "     adjv = %.1f  minvadj = %.1f\n",
          this_gap -> adjustment . variance, min_var_adjustment);
-#endif
+#endif 
 
                        }                     
                   }
@@ -5645,13 +5649,11 @@ fprintf (stderr, "Determine_Components:\n");
         {
          ct ++;
          path_info [i] . hit = TRUE;
-#if  VERBOSE
          fprintf (stderr,
             "%3d (%5d)  hi_pos = %6d  AEnd = (%6.0f,%6.0f)  BEnd = (%6.0f,%6.0f)\n",
                   i, node [i] -> chunk_id, path_info [i] . hi_position,
                   node [i] -> start . mean, sqrt (node [i] -> start . variance),
                   node [i] -> end . mean, sqrt (node [i] -> end . variance));
-#endif
          if  (i == start_sub)
              hit_start = TRUE;
         }
@@ -5690,21 +5692,17 @@ fprintf (stderr, "Determine_Components:\n");
           break;
     if  (i < 0)
         {
-#if  VERBOSE
          fprintf (stderr, "Component:  links = %d\n",
                   path_info [hi_unhit] . path_len);
-#endif
 
          ct = 0;
          for  (i = hi_unhit;  i >= 0;  i = path_info [i] . from)
            {
-#if  VERBOSE
             fprintf (stderr,
                "%3d (%5d)  hi_pos = %6d  AEnd = (%6.0f,%6.0f)  BEnd = (%6.0f,%6.0f)\n",
                      i, node [i] -> chunk_id, path_info [i] . hi_position,
                      node [i] -> start . mean, sqrt (node [i] -> start . variance),
                      node [i] -> end . mean, sqrt (node [i] -> end . variance));
-#endif
             if  (i == start_sub && i != hi_unhit)
                 is_start_component = TRUE;
               else
@@ -5741,10 +5739,8 @@ fprintf (stderr, "Determine_Components:\n");
         && (hit_start || hit_target))
      (* complete_path) = TRUE;
 
-#if  VERBOSE
  fprintf (stderr, "num_good_components = %d  num_kept = %d  complete_path = %c\n",
           num_good_components, num_kept, (* complete_path) ? 'T' : 'F');
-#endif
 
  if  ((* complete_path) || start_sub == -1 || target_sub == -1
         || num_kept <= 0)
@@ -5977,7 +5973,6 @@ fprintf (stderr, "Determine_Components:\n");
         else
           {
            // set left position
-#if  VERBOSE
            for  (i = 0;  i < num_kept;  i ++)
              fprintf (stderr, "left = [%6.0f,%6.0f]  lo_position = %d\n",
                       node [list [i]] -> flipped ?
@@ -5986,7 +5981,6 @@ fprintf (stderr, "Determine_Components:\n");
                       sqrt (Min_double (node [list [i]] -> start . variance,
                                         node [list [i]] -> start . variance)),
                       path_info [list [i]] . lo_position);
-#endif
            num_kept = 0;  // temporary until do other cases
           }
 
@@ -6261,7 +6255,7 @@ PRALLOC (check_size * sizeof (double));
 
       if  (var_adjust > 0.0 && make_adjustments)
           {
-           //fprintf (stderr, ">>> Adjusting insertion variances <<<\n");
+fprintf (stderr, ">>> Adjusting insertion variances <<<\n");
            for  (k = 0;  k < ct;  k ++)
              {
               check [k] -> start . variance += adjustment [k];
@@ -6271,7 +6265,7 @@ PRALLOC (check_size * sizeof (double));
 
       if  (prev_adjust > 0.0 && make_adjustments && left_chunk != NULL)
           {
-           //fprintf (stderr, ">>> Adjusting scaffold variances <<<\n");
+fprintf (stderr, ">>> Adjusting scaffold variances <<<\n");
            left_chunk -> offsetAEnd . variance += prev_adjust;
            left_chunk -> offsetBEnd . variance += prev_adjust;
           }
@@ -7384,7 +7378,7 @@ void  Force_Increasing_Variances_One_Scaffold
        {
         prev_chunk -> offsetAEnd . variance += incr;
         prev_chunk -> offsetBEnd . variance += incr;
-		scaff->bpLength.variance = MAX( prev_chunk->offsetAEnd.variance, 
+		scaff->bpLength.variance = max( prev_chunk->offsetAEnd.variance, 
 										prev_chunk->offsetBEnd.variance);
        }
 
@@ -8194,7 +8188,7 @@ PALLOC (n * sizeof (Scaff_Join_t *));
                         p [i] -> chunk_id, diff);
                cam_colour = MISPLACED_COLOUR;
               }
-#endif
+#endif                               
 #if  MAKE_CAM_FILE && SHOW_CALC_COORDS
           if  (Scaffold_Start [p [i] -> insert_scaff]
                  < Scaffold_End [p [i] -> insert_scaff])
@@ -8425,7 +8419,7 @@ static void UnJigglePositions(void)
                         scaffold->info.Scaffold.AEndCI);
 
       // work on scaffolds where cis are off
-      if(MIN(ci->offsetAEnd.mean, ci->offsetBEnd.mean) != 0.0)
+      if(min(ci->offsetAEnd.mean, ci->offsetBEnd.mean) != 0.0)
       {
         LengthT delta;
 
@@ -9019,13 +9013,11 @@ if  (use_all && Use_Partial_Stone_Paths)   // for stones only
         target_sub = i;
    }
 
-#if  VERBOSE
  fprintf (stderr, "\nScaff %d  Gap %d\n", scaff_id, j);
  fprintf (stderr, "Before Build_Path_Subgraph\n");
  fprintf (stderr, "  Gap start = (%.0f,%.0f)  end = (%.0f,%.0f)\n",
           this_gap -> start . mean, sqrt (this_gap -> start . variance),
           this_gap -> end . mean, sqrt (this_gap -> end . variance));
-#endif
 
  Build_Path_Subgraph
      (start_sub, target_sub,
@@ -12691,24 +12683,6 @@ static void  Sort_Insertions_One_Scaffold
 
 
 
-#if VERBOSE
-void
-Throw_Stones_Debug(char *msg,
-                   FILE *log_file,
-                   Scaffold_Fill_t *fill_stones,
-                   int scaff_id,
-                   int *total_entries,
-                   int *keep_entries) {
-  fprintf (log_file, "\n\n>>>> fill_stones %s <<<<\n", msg);
-  *total_entries = *keep_entries = 0;
-  Print_Fill_Info_One_Scaffold (log_file, fill_stones, scaff_id, total_entries, keep_entries);
-  fflush (log_file);
-}
-#else
-#define Throw_Stones_Debug(A,B,C,D,E,F) ;
-#endif
-
-
 int Throw_Stones
     (char * prefix, int level, int use_partial)
 
@@ -12730,10 +12704,9 @@ int Throw_Stones
    time_t  now;
    int  inserted = 0, total_stones = 0;
    int  stones_last_chkpt = 0;
+   int  checkpoint_ct = 0;
    int  i, scaff_id;
-
-   int  splitscaffolds = 0;
-
+     
    Num_Scaffolds = GetNumGraphNodes (ScaffoldGraph -> ScaffoldGraph);
    if (Num_Scaffolds == 0)
      return 0;
@@ -12758,7 +12731,7 @@ int Throw_Stones
 
    Filename_Prefix = prefix;
 
-   fprintf (stderr, "### Throw_Stones iteration #%d\n", iteration);
+fprintf (stderr, "### Throw_Stones iteration #%d\n", iteration);
 
    sprintf (iter_string, "%d", iteration ++);
 
@@ -12837,17 +12810,7 @@ PALLOC (Num_Scaffolds * sizeof (char));
    Add_Gap_Ends (fill_stones);
 
 
-   //  The original, very old, version did each step "sequentially" --
-   //  we would do New_Confirm_Stones() on all scaffolds, then
-   //  Disqualify_Scaff_Chunks(), etc.  Sometime before version 1.1 in
-   //  sourceforge that original version was replaced with one that
-   //  does each scaffold separately, and lets us checkpoint.
-   //
-   //  Removing the original version allows us to cleanup (ha, ha)
-   //  AS_CGW_main by removing a duplicate CleanupScaffolds() call,
-   //  without danger that somebody would reenable the historical
-   //  code.
-
+#if  ALLOW_STONE_CHECKPOINTS
    fprintf (stderr, "### starting_stone_scaffold = %d\n",
             GlobalData -> starting_stone_scaffold);
 
@@ -12861,24 +12824,65 @@ PALLOC (Num_Scaffolds * sizeof (char));
       if  (fill_stones [scaff_id] . added_to_ct > 0)
           continue;
 
-      Throw_Stones_Debug("Before New_Confirm_Stones", log_file, fill_stones, scaff_id, &total_entries, &keep_entries);
+#if  VERBOSE
+      fprintf (stderr, "### Before New_Confirm_Stones ###\n");
+      fprintf (log_file, "\n\n>>>> fill_stones BEFORE New_Confirm_Stones <<<<\n");
+      total_entries = keep_entries = 0;
+      Print_Fill_Info_One_Scaffold
+          (log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
+      fflush (log_file);
+#endif
       New_Confirm_Stones_One_Scaffold (log_file, fill_stones, TRUE, scaff_id);
-      Throw_Stones_Debug("After New_Confirm_Stones", log_file, fill_stones, scaff_id, &total_entries, &keep_entries);
+#if  VERBOSE
+      fprintf (stderr, "### After New_Confirm_Stones ###\n");
+      fprintf (log_file, "\n\n>>>> fill_stones AFTER New_Confirm_Stones <<<<\n");
+      total_entries = keep_entries = 0;
+      Print_Fill_Info_One_Scaffold
+          (log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
+      fflush (log_file);
+#endif
 
       Disqualify_Scaff_Chunks_One_Scaffold (fill_stones, scaff_id);
 
       Set_Split_Flags_One_Scaffold (fill_stones, FALSE_IFF_SINGLETON, scaff_id);
 
-      Throw_Stones_Debug("Before Jiggle_Positions", log_file, fill_stones, scaff_id, &total_entries, &keep_entries);
+#if  VERBOSE
+      fprintf (log_file, "\n\n>>>> fill_stones BEFORE Jiggle_Positions <<<<\n");
+      total_entries = keep_entries = 0;
+      Print_Fill_Info_One_Scaffold
+          (log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
+      fflush (log_file);
+#endif
       Jiggle_Positions_One_Scaffold (fill_stones, scaff_id);
-      Throw_Stones_Debug("After Jiggle_Positions", log_file, fill_stones, scaff_id, &total_entries, &keep_entries);
+#if  VERBOSE
+      fprintf (stderr, "### After Jiggle_Positions ###\n");
+      fprintf (log_file, "\n\n>>>> fill_stones AFTER Jiggle_Positions <<<<\n");
+      total_entries = keep_entries = 0;
+      Print_Fill_Info_One_Scaffold
+          (log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
+      fflush (log_file);
+#endif
 
       Adjust_By_Ref_Variance_One_Scaffold (fill_stones, scaff_id);
-      Throw_Stones_Debug("After Adjust_By_Ref_Variance", log_file, fill_stones, scaff_id, &total_entries, &keep_entries);
+#if  VERBOSE
+      fprintf (stderr, "### After Adjust_By_Ref_Variance ###\n");
+      fprintf (log_file, "\n\n>>>> fill_stones AFTER Adjust_By_Ref_Variance <<<<\n");
+      total_entries = keep_entries = 0;
+      Print_Fill_Info_One_Scaffold
+          (log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
+      fflush (log_file);
+#endif
 
       Sort_Insertions_One_Scaffold (fill_stones, By_Keep_And_Low_Position, scaff_id);
 
-      Throw_Stones_Debug("Before Doublecheck_Positions", log_file, fill_stones, scaff_id, &total_entries, &keep_entries);
+#if  VERBOSE
+      fprintf (stderr, "### Before Doublecheck_Positions ###\n");
+      fprintf (log_file, "\n\n>>>> fill_stones BEFORE Doublecheck_Positions <<<<\n");
+      total_entries = keep_entries = 0;
+      Print_Fill_Info_One_Scaffold
+          (log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
+      fflush (log_file);
+#endif
       Doublecheck_Positions_One_Scaffold (fill_stones, TRUE, scaff_id);
 
       if  (level == 1)
@@ -12897,73 +12901,30 @@ PALLOC (Num_Scaffolds * sizeof (char));
 
       Kill_Duplicate_Stones_One_Scaffold (fill_stones, scaff_id);
 
+#if  VERBOSE
       fprintf (log_file, "\n\n>>>> Stones <<<<\n");
-
+#endif
       total_entries = keep_entries = 0;
-      Print_Fill_Info_One_Scaffold(log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
+      Print_Fill_Info_One_Scaffold
+          (log_file, fill_stones, scaff_id, & total_entries, & keep_entries);
 
-      if  (keep_entries > 0) {
-        int  components0 = 0;
-        int  components1 = 0;
+      if  (keep_entries > 0)
+          {
+           inserted = Insert_Chunks_In_Graph_One_Scaffold
+                          (ScaffoldGraph, fill_stones, scaff_id, STONES);
+           fprintf (stderr, ">>> Threw %d stones into scaffold %d\n",
+                    inserted, scaff_id);
 
-#if 1
-        components0 = IsScaffoldInternallyConnected(ScaffoldGraph,
-                                                    GetGraphNode(ScaffoldGraph->ScaffoldGraph, scaff_id),
-                                                    ALL_EDGES);
-#endif
+           if  (inserted > 0)
+               {
+                CIScaffoldT  * scaff;
 
-        //  XXXXX: Even though USE_MY_INSERT is not defined, we still
-        //  use the "my insert" function here.  On human, this made no
-        //  difference in scaffold lengths....
-
-        inserted = Insert_Chunks_In_Graph_One_Scaffold(ScaffoldGraph,
-                                                       fill_stones,
-                                                       scaff_id,
-                                                       STONES);
-
-        fprintf (stderr, ">>> Threw %d stones into scaffold %d\n", inserted, scaff_id);
-
-        //  Occasionally we insert stones and get bogus edges
-        //  included.  So, we remark all the edges.
-
-        if (inserted > 0) {
-          NodeCGW_T  *scaff = GetGraphNode(ScaffoldGraph->ScaffoldGraph, scaff_id);
-          int         nc    = 0;
-
-          //  Someone includes edges to other scaffolds in this scaffold, so we
-          //  should re-mark all the edges.
-          //
-          MarkInternalEdgeStatus(ScaffoldGraph, scaff, PAIRWISECHI2THRESHOLD_CGW,
-                                 SLOPPY_EDGE_VARIANCE_THRESHHOLD,
-                                 TRUE, TRUE, 0, TRUE);
-
-          CleanupAScaffold(ScaffoldGraph,
-                           scaff,
-                           FALSE, NULLINDEX, FALSE);
-
-          Force_Increasing_Variances_One_Scaffold(scaff_id);
-
-#if 1
-          //  A bad idea to use ALL_TRUSTED_EDGES.  We destroy our nice big scaffolds.
-          //
-          components1 = CheckScaffoldConnectivityAndSplit(ScaffoldGraph, scaff_id, ALL_EDGES, FALSE);  //  last arg is verbose
-
-          if (components1 > 1) {
-            splitscaffolds++;
-
-            fprintf(stderr, "Throw_Stones()-- Scaffold %d components: ALL_EDGES=%d (%d before stones); ALL_TRUSTED_EDGES=%d components.\n",
-                    components1,
-                    components0,
-                    IsScaffoldInternallyConnected(ScaffoldGraph,
-                                                  GetGraphNode(ScaffoldGraph->ScaffoldGraph, scaff_id),
-                                                  ALL_TRUSTED_EDGES));
+                scaff = GetGraphNode (ScaffoldGraph -> ScaffoldGraph, scaff_id);
+                CleanupAScaffold (ScaffoldGraph, scaff, FALSE, NULLINDEX, FALSE);
+                Force_Increasing_Variances_One_Scaffold (scaff_id);
+                total_stones += inserted;
+               }
           }
-#endif
-
-
-          total_stones += inserted;
-        }
-      }  //  stones to throw
 
      if  (total_stones - stones_last_chkpt >= STONES_PER_CHECKPOINT)
          {
@@ -12984,20 +12945,17 @@ PALLOC (Num_Scaffolds * sizeof (char));
           CheckScaffoldGraphCache (ScaffoldGraph);
 
           stones_last_chkpt = total_stones;
+          checkpoint_ct ++;
          }
-     }  //  Main loop
+
+      // TEMPORARY FOR THIS RUN ONLY
+//      if  (checkpoint_ct >= 2)
+//          break;
+     }
 
    fprintf (stderr, "             Actually inserted: %7d\n", total_stones);
-   fprintf (stderr, "             Scaffolds split because they were disconnected: %d\n", splitscaffolds);
 
    fclose (log_file);
-
-    //  But since Throw_Stones can now split scaffolds, we should be
-    //  rebuilding scaffold edges.
-   //
-   if (splitscaffolds > 0)
-     BuildNewScaffoldEdges(ScaffoldGraph, 0);
-
 
 #if  MAKE_CAM_FILE
    Update_Colours (fill_stones);
@@ -13017,6 +12975,113 @@ PALLOC (Num_Scaffolds * sizeof (char));
    Analyze_Stone_Fill (log_file, fill_stones);
    fclose (log_file);
 
+#else  // without ALLOW_STONE_CHECKPOINTS
+
+#if  VERBOSE
+   fprintf (stderr, "### Before New_Confirm_Stones ###\n");
+   fprintf (log_file, "\n\n>>>> fill_stones BEFORE New_Confirm_Stones <<<<\n");
+   Print_Fill_Info (log_file, fill_stones);
+   fflush (log_file);
+#endif
+   New_Confirm_Stones (log_file, fill_stones, TRUE);
+#if  VERBOSE
+   fprintf (stderr, "### After New_Confirm_Stones ###\n");
+   fprintf (log_file, "\n\n>>>> fill_stones AFTER New_Confirm_Stones <<<<\n");
+   Print_Fill_Info (log_file, fill_stones);
+   fflush (log_file);
+#endif
+
+   Disqualify_Scaff_Chunks (fill_stones);
+
+   Set_Split_Flags (fill_stones, FALSE_IFF_SINGLETON);
+
+#if  VERBOSE
+   fprintf (log_file, "\n\n>>>> fill_stones BEFORE Jiggle_Positions <<<<\n");
+   Print_Fill_Info (log_file, fill_stones);
+   fflush (log_file);
+#endif
+   Jiggle_Positions (fill_stones);
+#if  VERBOSE
+   fprintf (stderr, "### After Jiggle_Positions ###\n");
+   fprintf (log_file, "\n\n>>>> fill_stones AFTER Jiggle_Positions <<<<\n");
+   Print_Fill_Info (log_file, fill_stones);
+   fflush (log_file);
+#endif
+
+   Adjust_By_Ref_Variance (fill_stones);
+#if  VERBOSE
+   fprintf (stderr, "### After Adjust_By_Ref_Variance ###\n");
+   fprintf (log_file, "\n\n>>>> fill_stones AFTER Adjust_By_Ref_Variance <<<<\n");
+   Print_Fill_Info (log_file, fill_stones);
+   fflush (log_file);
+#endif
+
+   Sort_Insertions (fill_stones, By_Keep_And_Low_Position);
+
+#if  VERBOSE
+   fprintf (stderr, "### Before Doublecheck_Positions ###\n");
+   fprintf (log_file, "\n\n>>>> fill_stones BEFORE Doublecheck_Positions <<<<\n");
+   Print_Fill_Info (log_file, fill_stones);
+   fflush (log_file);
+#endif
+   Doublecheck_Positions (fill_stones, TRUE);
+
+   if (level == 1)
+     Check_Other_Links (fill_stones);
+   
+   if  (UNIQUES_CAN_BE_STONES)
+       Eliminate_Encumbered_Uniques (fill_stones);
+
+   Kill_Duplicate_Stones (fill_stones);
+
+   fprintf (log_file, "\n\n>>>> Stones <<<<\n");
+   Print_Fill_Info (log_file, fill_stones);
+
+   fclose (log_file);
+
+#if  MAKE_CAM_FILE
+   Update_Colours (fill_stones);
+   Output_Cam_Files (fill_stones);
+
+   fclose (Cam_File);
+#if  SHOW_CALC_COORDS
+   fclose (Calc_Cam_File);
+#endif
+#endif
+
+   strcpy (filename, prefix);
+   strcat (filename, ".stone.i");
+   strcat (filename, iter_string);
+   strcat (filename, ".analysis");
+   log_file = file_open (filename, "w");
+   Analyze_Stone_Fill (log_file, fill_stones);
+   fclose (log_file);
+
+#if  CHECK_CELSIM_COORDS
+   strcpy (filename, prefix);
+   strcat (filename, ".stone.i");
+   strcat (filename, iter_string);
+   strcat (filename, ".place");
+   log_file = file_open (filename, "w");
+   Analyze_Placement (log_file, fill_stones);
+   fclose (log_file);
+#endif
+
+   fprintf (stderr, ">>> Inserting Stones\n");
+#if  0
+Clear_Keep_Flags (fill_stones, 1);    // Try only one stone
+#endif
+    StartTimerT(&GlobalData->UpdateTimer);
+    inserted = Update_Scaffold_Graph
+      (ScaffoldGraph, fill_stones, FALSE, TRUE, FALSE, TRUE /* not used */,
+       -1, STONES);
+    StopTimerT(&GlobalData->UpdateTimer);
+
+   fprintf (stderr, "             Actually inserted: %7d\n", inserted);
+
+   Force_Increasing_Variances ();
+
+#endif  // ALLOW_STONE_CHECKPOINTS
 
 
    Free_Fill_Array (fill_stones);
@@ -13186,13 +13251,14 @@ int  Toss_Contained_Stones
             iter_string, ctime (& now));
    start_time = clock ();
 
-#if VERBOSE
-   strcpy (filename, prefix);
-   strcat (filename, ".cstones.i");
-   strcat (filename, iter_string);
-   strcat (filename, ".log");
-   log_file = file_open (filename, "w");
-#endif
+   if  (GlobalData -> write_stone_log)
+       {
+        strcpy (filename, prefix);
+        strcat (filename, ".cstones.i");
+        strcat (filename, iter_string);
+        strcat (filename, ".log");
+        log_file = file_open (filename, "w");
+       }
 
 #if  MAKE_CAM_FILE
    strcpy (filename, prefix);
@@ -13249,8 +13315,11 @@ PALLOC (Num_Scaffolds * sizeof (char));
    Choose_Stones (fill_stones, 1, MIN_STONE_COVER_STAT, TRUE);
 
 #if  VERBOSE
-   fprintf (log_file, "\n>>> Fill after Choose_Stones <<<\n");
-   Print_Fill_Info (log_file, fill_stones);
+   if  (GlobalData -> write_stone_log)
+       {
+        fprintf (log_file, "\n>>> Fill after Choose_Stones <<<\n");
+        Print_Fill_Info (log_file, fill_stones);
+       }
 #endif
 
    StopTimerT(&GlobalData->ChooseChunksTimer);
@@ -13258,8 +13327,11 @@ PALLOC (Num_Scaffolds * sizeof (char));
    Add_Gap_Ends (fill_stones);
 
 #if  VERBOSE
-   fprintf (log_file, "\n>>> Fill after Add_Gap_Ends <<<\n");
-   Print_Fill_Info (log_file, fill_stones);
+   if  (GlobalData -> write_stone_log)
+       {
+        fprintf (log_file, "\n>>> Fill after Add_Gap_Ends <<<\n");
+        Print_Fill_Info (log_file, fill_stones);
+       }
 #endif
 
    Confirm_Contained (log_file, fill_stones, TRUE);
@@ -13288,21 +13360,22 @@ PALLOC (Num_Scaffolds * sizeof (char));
    Set_Split_Flags (fill_stones, ALL_FALSE);
    fprintf (stderr, "After Set_Split_Flags\n");
 
-#if  VERBOSE
-   fprintf (log_file, "\n>>> Fill before  Update_Scaffold_Graph <<<\n");
-   Print_Fill_Info (log_file, fill_stones);
+   if  (GlobalData -> write_stone_log)
+       {
+        fprintf (log_file, "\n>>> Fill before  Update_Scaffold_Graph <<<\n");
+        Print_Fill_Info (log_file, fill_stones);
 
-   fclose (log_file);
+        fclose (log_file);
 
-   strcpy (filename, prefix);
-   strcat (filename, ".cstones.i");
-   strcat (filename, iter_string);
-   strcat (filename, ".analysis");
-   log_file = file_open (filename, "w");
-   Analyze_Rock_Fill (log_file, fill_stones);
+        strcpy (filename, prefix);
+        strcat (filename, ".cstones.i");
+        strcat (filename, iter_string);
+        strcat (filename, ".analysis");
+        log_file = file_open (filename, "w");
+        Analyze_Rock_Fill (log_file, fill_stones);
 
-   fclose (log_file);
-#endif
+        fclose (log_file);
+       }
 
 
    StartTimerT(&GlobalData->UpdateTimer);

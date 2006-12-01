@@ -30,11 +30,11 @@
 *************************************************/
 
 /* RCS info
- * $Id: BuildUnitigs.cc,v 1.12 2006-11-02 19:44:30 eliv Exp $
- * $Revision: 1.12 $
+ * $Id: BuildUnitigs.cc,v 1.10 2006-05-02 15:02:12 eliv Exp $
+ * $Revision: 1.10 $
 */
 
-static const char BUILD_UNITIGS_MAIN_CM_ID[] = "$Id: BuildUnitigs.cc,v 1.12 2006-11-02 19:44:30 eliv Exp $";
+static const char BUILD_UNITIGS_MAIN_CM_ID[] = "$Id: BuildUnitigs.cc,v 1.10 2006-05-02 15:02:12 eliv Exp $";
 
 //  System include files
 
@@ -117,19 +117,18 @@ int  main (int argc, char * argv [])
 
    int i;
    for(i=0; i<3; i++){
-//	AS_BOG::ChunkGraph *cg = new AS_BOG::ChunkGraph();
-	AS_BOG::PromiscuousChunkGraph *cg = new AS_BOG::PromiscuousChunkGraph();
+	AS_BOG::ChunkGraph cg;
 	//cg.checkInDegree(bogRunner.metrics[i]);
-	cg->build(bogRunner.metrics[i]);
-	std::cout << "Num Fragments: " << cg->getNumFragments() << std::endl;
-	std::cout << "Num Singletons: " << cg->countSingletons() << std::endl;
+	cg.build(bogRunner.metrics[i]);
+	std::cout << "Num Fragments: " << cg.getNumFragments() << std::endl;
+	std::cout << "Num Singletons: " << cg.countSingletons() << std::endl;
 	std::cout << "Num Containees: " << bogRunner.metrics[i]->_best_containments.size() << std::endl;
 	std::cout << std::endl;
 
 	//std::cerr << er_cg << std::endl;
 	AS_BOG::UnitigGraph utg(bogRunner.metrics[i]);
 	std::cerr << "Building Unitigs.\n" << std::endl;
-	utg.build(cg, cg->getNumFragments(), genome_size=0);
+	utg.build(&cg, cg.getNumFragments(), genome_size=0);
 
 	std::cerr << "Reporting.\n" << std::endl;
 	//std::cout<< utg << endl;
@@ -148,7 +147,6 @@ int  main (int argc, char * argv [])
 	std::cerr << "///////////////////////////////////////////////////////////\n" << std::endl;
 
     delete bogRunner.metrics[i];
-    delete cg;
    }
 
 
@@ -187,8 +185,6 @@ void outputHistograms(AS_BOG::UnitigGraph *utg) {
     for(;uiter != utg->unitigs->end(); uiter++) {
 
         AS_BOG::Unitig *u = *uiter;
-        if (u == NULL)
-            continue;
         zork.nsamples = 1;
         int numFrags = u->getNumFrags();
         zork.sum_frags = zork.min_frags = zork.max_frags = numFrags;

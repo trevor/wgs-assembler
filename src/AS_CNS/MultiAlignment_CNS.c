@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.117 2006-11-17 22:24:19 brianwalenz Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.77 2006-08-22 03:16:10 ahalpern Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -52,7 +52,7 @@ static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.117 2006-11-17 22:24:19 bri
 #define ALT_QV_THRESH                      30
 #define IDENT_NAMESPACE                     1
 #define DONT_SHOW_OLAP                      0
-#define MIN_SUM_QVS_FOR_VARIATION          50
+#define MIN_QV_FOR_VARIATION               22
 #define QV_FOR_MULTI_GAP                   14
 #define SHOW_OLAP                           1
 #undef  ALIGN_TO_CONSENSUS
@@ -75,14 +75,8 @@ static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.117 2006-11-17 22:24:19 bri
 #define INITIAL_NR                        100
 #define MAX_ALLOWED_MA_DEPTH               40
 #define MAX_EXTEND_LENGTH                2048
-#define MAX_WINDOW_FOR_ABACUS_REFINE      100
-#define SHOW_ABACUS                         0
-#define SHOW_READS                          0
+#define SHOW_ABACUS                        0
 #define STABWIDTH                           6
-#define DEBUG_ABACUS                        0
-#define DEBUG_CONSENSUS_CALL                0
-#define DEBUG_VAR_RECORDS                   0
-
 
 // Parameters used by Abacus processing code
 #define MSTRING_SIZE                        3
@@ -103,16 +97,20 @@ static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.117 2006-11-17 22:24:19 bri
 #include "UtilsREZ.h"
 #include "AS_UTL_HashCommon.h"
 #include "AS_UTL_PHash.h"
+#include "AS_UTL_systemdebug.h"
 #include "AS_MSG_pmesg.h"
+#include "PrimitiveVA.h"
 #include "PrimitiveVA_MSG.h"
 #include "Globals_CNS.h"
 #include "PublicAPI_CNS.h"
 #include "MultiAlignment_CNS.h"
+//#include "AS_ALN_aligners.h"
 #include "dpc_CNS.h"
 #include "Array_CNS.h"
 #include "UtilsREZ.h"
 #include "MicroHetREZ_test3.h"
 #include "AS_UTL_alloc.h"
+//#include "CA_ALN_local.h"
 
 extern int MaxBegGap;       // [ init value is 200; this could be set to the amount you extend the clear
                             // range of seq b, plus 10 for good measure]
@@ -126,10 +124,9 @@ int NumColumnsInContigs;
 int NumRunsOfGapsInContigReads;
 int NumGapsInContigs;
 int NumAAMismatches; // mismatches b/w consensi of two different alleles
+int NumFAMismatches; // mismatches b/w fragments and consensus of the same allele
 int NumVARRecords;
 int NumVARStringsWithFlankingGaps;
-int NumUnitigRetrySuccess;
-int contig_id;
 
 //*********************************************************************************
 //  Tables to facilitate SNP Basecalling
@@ -1681,7 +1678,7 @@ char QVInRange(int q) {
 }
 
 static int
-Iid2ReadId(int32 iid, int32 *iids, int nr)
+IidToIndex(int32 iid, int32 *iids, int nr)
 {
     int i;
     for (i=0; i<nr; i++)
@@ -1692,25 +1689,12 @@ Iid2ReadId(int32 iid, int32 *iids, int nr)
     return (-1);
 }
 
-static int
-IsNewRead(int32 iid, int32 *iid_list, int nr)
-{
-    int i;
-    for (i=0; i<nr; i++)
-    {
-        if (iid_list[i] == iid)
-            return 0;
-    }
-    return 1;
-}
-
-
 //*********************************************************************************
 // Function: BaseCalling
 // Purpose: Calculate the consensus base for the given column
 //*********************************************************************************
 int
-BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
+BaseCall(int32 cid, int quality, double *var, AlPair *ap,
     int target_allele, char *cons_base, int verbose, int get_scores,
     CNS_Options *opp)
 {
@@ -1742,7 +1726,7 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
     int sum_qv_cbase=0, sum_qv_all=0;
     int k;
 
-    vreg->nb = 0;
+    ap->nb = 0;
 
     //  Make sure that we have valid options here, we then reset the
     //  pointer to the freshly copied options, so that we can always
@@ -1780,8 +1764,6 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
         int16  max_ind=0;
         double max_cw=0.0;   // max of "consensus weights" of all bases
         double normalize=0.;
-        int    nr=0, max_nr=100;
-        int32 *column_iid_list = (int32 *)safe_malloc(max_nr*sizeof(int32));
 
         if (!guides_alloc) {
             guides = CreateVA_Bead(16);
@@ -1808,7 +1790,7 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
         while ( (bid = NextColumnBead(&ci)) != -1)
         {
             bead =  GetBead(beadStore,bid);
-            cbase = *Getchar(sequenceStore,bead->soffset);    // current base
+            cbase = *Getchar(sequenceStore,bead->soffset);
             qv = (int) ( *Getchar(qualityStore,bead->soffset)-'0');
             if ( cbase == 'N' ) {
                 // skip 'N' base calls
@@ -1820,52 +1802,32 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
             bmask = AMASK[BaseToInt(cbase)];
             type  = GetFragment(fragmentStore,bead->frag_index)->type;
             iid   = GetFragment(fragmentStore,bead->frag_index)->iid;
-            k     = Iid2ReadId(iid, vreg->iids, vreg->nr);
+            k     = IidToIndex(iid, ap->iids, ap->nr);
 
             if ((type == AS_READ)   ||
                 (type == AS_B_READ) ||
                 (type == AS_EXTR)   ||
                 (type == AS_TRNR))
             {
-                // Filter out "duplicated" reads with the same iid
-                if (!IsNewRead(iid, column_iid_list, nr))
-                {
-                    fprintf(stderr, "Read iid= %d occurs more than once ", iid);
-                    fprintf(stderr, "in MSA for contig #%d at pos= %d\n",
-                        contig_id, cid);
-                    continue;
-                }
-
-                column_iid_list[nr] = iid;
-                nr++;
-                if (nr == max_nr)
-                {
-                    max_nr += 100;
-                    column_iid_list = (int32 *)safe_realloc(column_iid_list,
-                            max_nr*sizeof(int32));
-                }
-
-                // Will be used when detecting alleles
                 if (target_allele < 0 && get_scores)
                 {
-                    vreg->curr_bases[vreg->nb] = cbase;
-                    vreg->iids[vreg->nb]  = iid;
-                    vreg->nb++;
-                    if (vreg->nb == vreg->max_nr)
+                    ap->bases[ap->nb] = cbase;
+                    ap->iids[ap->nb]  = iid;
+                    ap->nb++;
+                    if (ap->nb == ap->max_nr)
                     {
-                       vreg->max_nr += INITIAL_NR;
-                       vreg->curr_bases = (char *)safe_realloc(vreg->curr_bases,
-                                   vreg->max_nr*sizeof(char));
-                       vreg->iids = (int32 *)safe_realloc(vreg->iids,
-                                   vreg->max_nr*sizeof(int32));
+                       ap->max_nr += INITIAL_NR;
+                       ap->bases = (char *)safe_realloc(ap->bases,
+                                   ap->max_nr*sizeof(char));
+                       ap->iids = (int32 *)safe_realloc(ap->iids,
+                                   ap->max_nr*sizeof(int32));
                     }
                 }
 
-                // Will be used when detecting variation
                 if (((target_allele < 0)  ||   // use any allele
                      !opp->split_alleles  ||   // use any allele
-                     (vreg->nr >  0  &&
-                      vreg->reads[k].allele_id == target_allele))) // use the best allele
+                     (ap->nr >  0  &&
+                      ap->alleles[k] == target_allele))) // use the best allele
                 {
                     best_read_base_count[BaseToInt(cbase)]++;
                     best_read_qv_count[BaseToInt(cbase)] += qv;
@@ -1883,6 +1845,7 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
                 guide_base_count[BaseToInt(cbase)]++;
                 AppendBead(guides, bead);
             }
+
 
             if ( type != AS_UNITIG ) {
                 frag_cov++;
@@ -2013,7 +1976,8 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
         }
 
         // Set the consensus base quality value
-        cbase = RALPHABET[max_ind];      // consensus base
+        // cbase = toupper(RALPHABET[max_ind]);
+        cbase = RALPHABET[max_ind];
         if (DBL_EQ_DBL(max_cw, (double)1.0)) {
             cqv = CNS_MAX_QV+'0';
             Setchar(qualityStore, call->soffset, &cqv);
@@ -2053,13 +2017,12 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
 
 
        *cons_base = cbase;
-        if (target_allele <  0 || target_allele == vreg->alleles[0].id)
+        if (target_allele <  0 || target_allele == ap->best_allele)
         {
             Setchar(sequenceStore, call->soffset, &cbase);
             Setchar(qualityStore, call->soffset, &cqv);
         }
 
-        // Detecting variation
         for (bi=0; bi<CNS_NALPHABET-1; bi++)
             b_read_count += best_read_base_count[bi];
 
@@ -2072,11 +2035,10 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
                       + guide_base_count[bi];
             }
             /* To be considered, base should either have high enough quality
-             * or be confirmed by another base, also of reasonably high quality 
-             * (Granger's suggestion - GD)
+             * or be confirmed by another base (Granger's suggestion - GD)
              */
-            if (best_read_qv_count[bi]   >  1 &&
-                best_read_qv_count[bi]   >= MIN_SUM_QVS_FOR_VARIATION)
+            if ((best_read_base_count[bi] > 1) ||
+                (best_read_qv_count[bi] > MIN_QV_FOR_VARIATION))
             {
                 sum_qv_all += best_read_qv_count[bi];
                 if (IntToBase(bi) == cbase)
@@ -2084,20 +2046,9 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
             }
         }
         if ((b_read_count == 1 ) || (sum_qv_all == 0))
-        {
            *var = 0.;
-            if (cbase == '-')
-              *var = -2;
-        }
         else
-        {
            *var = 1. - (double)sum_qv_cbase / (double)sum_qv_all;
-            if (cbase == '-')
-            {
-                *var = - (*var);
-            }
-        }
-        FREE(column_iid_list);
         return score;
     }
     else if (quality == 0 )
@@ -2189,58 +2140,47 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
 
 
 static void
-SetDefault(VarRegion  *vreg)
+SetDefault(AlPair *ap)
 {
-    vreg->nr = 0;
+    ap->nr = 0;
 }
 
 static void
-SmoothenVariation(double *var, int len, int window)
+SmoothenVariation(double *var, int dim, int window)
 {
-    int i;
-    double *y = (double *)safe_malloc(len * sizeof(double));
-    for (i=0; i<len; i++)
+    int i, j, beg, end;
+    double *y = (double *)safe_malloc(dim * sizeof(double));
+    for (i=0; i<dim; i++)
     {
-        int j, left_win=0, right_win=0;
-        double sum_var = (var[i]>ZERO_MINUS)?var[i]:((var[i]<-1.)?0.:-var[i]);
-
-        j = i-1;
-        while (j>=0 && left_win<window/2)
-        {
-            if (var[j] > ZERO_MINUS)   // consensus is not gap
-            {
-                left_win++;
-                sum_var += var[j];
-            }
-            else if (var[j]>-1+ZERO_MINUS) // consensus is gap, var != 0
-                sum_var -= var[j];
-
-            j--;
+        double sum_var = 0.;
+        beg = BC_MAX(0, i - window/2);
+        end = BC_MIN(beg + window, dim);
+        for (j=beg; j<end; j++) {
+            sum_var += var[j];
         }
-        j = i+1;
-        while (j<len && right_win<window/2)
-        {
-            if (var[j] > ZERO_MINUS)  // consensus is not gap
-            {
-                right_win++;
-                sum_var += var[j];
-            }
-            else if (var[j]>-1+ZERO_MINUS) // consensus is gap, var != 0
-                sum_var -= var[j];
-            j++;
-        }
-        y[i] = (left_win+right_win > 0) ?
-                sum_var/(double)(left_win+right_win) : var[i];
+        y[i] = (window > 0) ? sum_var/(double)window : var[i];
     }
-    for (i=0; i<len; i++)
+    for (i=0; i<dim; i++)
     {
         var[i] = y[i];
     }
     FREE(y);
 }
 
+static int 
+IsNewRead(int32 iid, AlPair *ap)
+{
+    int i;
+    for (i=0; i<ap->nr; i++)
+    {
+        if (ap->iids[i] == iid)
+            return 0;
+    }
+    return 1;
+}
+
 static void
-GetReadIidsAndNumReads(int cid, VarRegion  *vreg)
+GetReadIids(int cid, AlPair *ap)
 {
     int      cind;
     int16    bi;
@@ -2251,12 +2191,10 @@ GetReadIidsAndNumReads(int cid, VarRegion  *vreg)
     int32    iid;
     FragType type;
     ColumnBeadIterator ci;
-    int nr=0, max_nr=100;
-    int32 *column_iid_list = (int32 *)safe_malloc(max_nr*sizeof(int32));
+    int num_reads = 0, num_giudes = 0;
 
     if(!CreateColumnBeadIterator(cid, &ci)){
-        CleanExit("GetReadIidsAndNumReads CreateColumnBeadIterator failed",
-            __LINE__,1);
+        CleanExit("GetReadIids CreateColumnBeadIterator failed",__LINE__,1);
     }
     while ( (bid = NextColumnBead(&ci)) != -1 )
     {
@@ -2268,224 +2206,281 @@ GetReadIidsAndNumReads(int cid, VarRegion  *vreg)
             continue;
         type = GetFragment(fragmentStore,bead->frag_index)->type;
         iid  = GetFragment(fragmentStore,bead->frag_index)->iid;
-
         if ((type == AS_READ) ||
             (type == AS_B_READ) ||
             (type == AS_EXTR) ||
             (type == AS_TRNR))
         {
-            // Filter out "duplicated" reads with the same iid
-            if (!IsNewRead(iid, column_iid_list, nr))
-                continue;
+            num_reads++;
+            if (IsNewRead(iid, ap)) {
 
-            column_iid_list[nr] = iid;
-            nr++;
-            if (nr == max_nr)
-            {
-                max_nr += 100;
-                column_iid_list = (int32 *)safe_realloc(column_iid_list,
-                        max_nr*sizeof(int32));
-            }
-
-            if (IsNewRead(iid, vreg->iids, vreg->nr)) {
-                if (vreg->nr == vreg->max_nr) {
+                if (ap->nr == ap->max_nr) {
                     int l;
-                    vreg->max_nr += MIN_ALLOCATED_DEPTH;
-                    vreg->iids = (int32 *)safe_realloc(vreg->iids, 
-                        vreg->max_nr*sizeof(int32));
-                    for (l=vreg->nr; l<vreg->max_nr; l++) {
-                        vreg->iids[l] = -1;
+                    ap->max_nr += MIN_ALLOCATED_DEPTH;
+                    ap->iids = (int32 *)safe_realloc(ap->iids, 
+                        ap->max_nr*sizeof(int32));
+                    for (l=ap->nr; l<ap->max_nr; l++) {
+                        ap->iids[l] = -1;
                     }
                 }
-                vreg->iids[vreg->nr] = iid;
-                vreg->nr++;  
+                ap->iids[ap->nr] = iid;
+                ap->nr++;  
+            }
+        }
+        else
+            num_giudes++;
+    }
+#if 0
+    fprintf(stderr, "In GetReadIids: num_reads= %d num_giudes= %d\n", num_reads, num_giudes);
+#endif
+}
+
+static void
+AllocateDistMatrix(AlPair *ap)
+{
+    int j, k;
+
+    ap->dist_matrix = (int **)safe_calloc(ap->nr, sizeof(int *));
+    for (j=0; j<ap->nr; j++)
+    {
+        ap->dist_matrix[j] = (int *)safe_calloc(ap->nr, sizeof(int));
+        for (k=0; k<ap->nr; k++)
+            ap->dist_matrix[j][k] = -1;
+    }
+}
+
+static void
+OutputDistMatrix(AlPair *ap)
+{
+    int j, k;
+
+    fprintf(stderr, "Distance matrix=\n");
+    for (j=0; j<ap->nr; j++)
+    {
+        for (k=0; k<ap->nr; k++)
+           fprintf(stderr, " %d", ap->dist_matrix[j][k]);             
+        fprintf(stderr, "\n");
+    }
+}
+
+static void
+PopulateDistMatrix(int32 cid, AlPair *ap)
+{
+    Column *column=GetColumn(columnStore,cid);
+    Bead *call = GetBead(beadStore, column->call);
+    Bead *bead;
+    int32 bid;
+    int32 iid;
+    FragType type;
+    ColumnBeadIterator ci;
+    int   cind, depth = MIN_ALLOCATED_DEPTH;
+    int16 bi;
+    char *bases, base;
+    int32 *iids;
+    int i, j, qv, *qvs;
+
+    if(!CreateColumnBeadIterator(cid, &ci)){
+        CleanExit("PopulateDistMatrix CreateColumnBeadIterator failed",__LINE__,1);
+    }
+
+//  fprintf(stderr, "ap->nr = %d\n", ap->nr);
+
+    bases = (char *)safe_calloc(ap->nr, sizeof(char));
+    iids  = (int32 *)safe_calloc(ap->nr, sizeof(int32));
+    qvs   = (int *)  safe_calloc(ap->nr, sizeof(int));
+    for (i=0; i<ap->nr; i++)
+    {
+        bases[i] = 'X';
+        iids[i]  = -1;
+        qvs[i] = 0;
+    }
+
+    // Collect bases and usids in the coluimn
+    while ( (bid = NextColumnBead(&ci)) != -1 )
+    {
+        bead = GetBead(beadStore,bid);
+        type = GetFragment(fragmentStore,bead->frag_index)->type;
+        if ((type == AS_READ) ||
+            (type == AS_B_READ) ||
+            (type == AS_EXTR) ||
+            (type == AS_TRNR))
+        {
+            base = *Getchar(sequenceStore,bead->soffset);
+            iid  = GetFragment(fragmentStore,bead->frag_index)->iid;
+            qv = (int) ( *Getchar(qualityStore,bead->soffset)-'0');
+            i = IidToIndex(iid, ap->iids, ap->nr);   
+
+            if (i < 0 || i>=ap->nr) {
+                continue;
+            }
+ 
+            bases[i] = base;
+            iids[i]  = iid; 
+            qvs[i]   = qv;
+            if (base != '-') 
+            {
+                ap->sum_qvs[i] += qv;
+            }
+            /* If a single gap, assign it a minimal QV of the two adjacent bases.
+             * If multiple gap, assign it a fixed QV = QV_FOR_MULTI_GAP
+             * (at Granger Sutton's suggestion)
+             */
+            else // gap
+            {
+                Bead *prev_bead = NULL, *next_bead = NULL;
+                prev_bead = GetBead(beadStore, bead->prev);
+                next_bead = GetBead(beadStore, bead->next);
+                if ((prev_bead != NULL) && (next_bead != NULL))
+                {
+                    char  prev_base = *Getchar(sequenceStore, prev_bead->soffset);       
+                    char  next_base = *Getchar(sequenceStore, next_bead->soffset);       
+                    if ((prev_base == '-') || (next_base == '-')) 
+                    {
+                        ap->sum_qvs[i] += QV_FOR_MULTI_GAP;  // Granger's suggestion
+                    }
+                    else
+                    {
+                        int prev_qv = 
+                            (int)(*Getchar(qualityStore, prev_bead->soffset)-'0');           
+                        int next_qv =
+                            (int)(*Getchar(qualityStore, next_bead->soffset)-'0');
+                        ap->sum_qvs[i] += MIN(prev_qv, next_qv);
+                    }
+                }
             }
         }
     }
-    FREE(column_iid_list);
-}
+   
+    // Update the matrix
 
-static void
-AllocateDistMatrix(VarRegion  *vreg, int init)
-{
-    int j, k;
+    int *iidtoindexcache = (int *)malloc(sizeof(int) * ap->nr);
+    for (i=0; i<ap->nr; i++)
+      if (iids[i] >= 0)
+        iidtoindexcache[i] = IidToIndex(iids[i], ap->iids, ap->nr);
 
-    vreg->dist_matrix = (int **)safe_calloc(vreg->nr, sizeof(int *));
-    for (j=0; j<vreg->nr; j++)
+    for (i=0; i<ap->nr; i++)
     {
-        vreg->dist_matrix[j] = (int *)safe_calloc(vreg->nr, sizeof(int));
-        for (k=0; k<vreg->nr; k++)
-            vreg->dist_matrix[j][k] = init;
+        for (j=i; j<ap->nr; j++)
+        {
+            int k, m;
+
+            if (i == j)
+                continue;
+
+            if ((bases[i] == 'X') || (bases[j] == 'X'))
+                continue;
+
+            if ((iids[i] < 0)  || (iids[j] < 0))
+                continue;
+
+            k = iidtoindexcache[i];
+            m = iidtoindexcache[j];
+
+            //k = IidToIndex(iids[i], ap->iids, ap->nr);
+            //m = IidToIndex(iids[j], ap->iids, ap->nr);
+
+            if (ap->dist_matrix[k][m] < 0) ap->dist_matrix[k][m] = 0;
+            if (ap->dist_matrix[m][k] < 0) ap->dist_matrix[m][k] = 0;
+ 
+            if (bases[i] != bases[j]) {
+              ap->dist_matrix[m][k] += qvs[k] + qvs[m];
+              ap->dist_matrix[k][m] += qvs[k] + qvs[m];
+            }
+        }
     }
+    free(iidtoindexcache);
+    FREE(bases);
+    FREE(iids);
+    FREE(qvs);
 }
-
-static void
-OutputDistMatrix(FILE *fout, VarRegion  *vreg)
-{
-    int j, k;
-
-    fprintf(fout, "Distance matrix=\n");
-    for (j=0; j<vreg->nr; j++)
-    {
-        for (k=0; k<vreg->nr; k++)
-           fprintf(fout, " %d", vreg->dist_matrix[j][k]);             
-        fprintf(fout, "\n");
-    }
-}
-
 
 /*******************************************************************************
  * Function: ClusterReads
- * Purpose:  detect allele and split reads between the alleles
+ * Purpose:  split reads between two alleles, determine the best allele
  *******************************************************************************
  */
 static void
-ClusterReads(Read *reads, int nr, Allele *alleles, int32 *na, int32 *nca, 
-    int **dist_matrix)
+ClusterReads(AlPair *ap)
 {
-    int aid, anr, row, col;
+    int i, j;
+    int largest = -100;
+    int seed0=-1, seed1=-1;
+    int sum_qv0 = 0, sum_qv1 = 0;
+    int nr0 = 0, nr1 = 0;
 
-   *na = 0;
-
-    // Iniytialize alleles
-   
-    // Process zero elements first                                         
-    for (row=0; row<nr; row++)
+    if (ap->nr <= 1)
     {
-        for (col=row+1; col<nr; col++)
-        {
-            if (dist_matrix[row][col]!=0)
-                continue;
+       ap->best_allele = 0;
+       ap->alleles[0] = 0;
+       return;    
+    }
 
-            if (reads[row].allele_id < 0 && 
-                reads[col].allele_id < 0)
+    // Find the largest element of a distance matrix and the "seed" reads
+    for (i=0; i<ap->nr; i++)
+    {
+        for (j=i; j<ap->nr; j++)
+        {
+//          if (j== i)
+//              continue;
+
+            if (largest < ap->dist_matrix[i][j])
             {
-                // New allele
-                reads[row].allele_id = *na;
-                reads[col].allele_id = *na;
-                alleles[*na].weight = 
-                    ROUND(reads[row].ave_qv) + ROUND(reads[col].ave_qv);
-                alleles[*na].uglen  = reads[row].uglen;
-                alleles[*na].read_ids[0] = row;
-                alleles[*na].read_ids[1] = col;
-                alleles[*na].num_reads = 2;
-                alleles[*na].id = *na;
-                (*na)++;
-            }
-            else if (reads[row].allele_id < 0 && 
-                     reads[col].allele_id >=0)
-            {
-                // Already existing allele
-                aid = reads[col].allele_id;
-                reads[row].allele_id = aid;
-                alleles[aid].weight += ROUND(reads[row].ave_qv); 
-                anr = alleles[aid].num_reads;
-                alleles[aid].read_ids[anr] = row;
-                alleles[aid].num_reads++;
-            }
-            else if (reads[row].allele_id >=0 &&
-                     reads[col].allele_id < 0)
-            {
-                // Already existing allele
-                aid = reads[row].allele_id;
-                reads[col].allele_id = aid;
-                alleles[aid].weight += ROUND(reads[col].ave_qv);
-                anr = alleles[aid].num_reads;
-                alleles[aid].read_ids[anr] = col;
-                alleles[aid].num_reads++;
+                largest = ap->dist_matrix[i][j];
+                seed0 = i;
+                seed1 = j;
             }
         }       
     }
-   *nca = *na;
-
-    //Now process the remaining reads; assign each to its "own" allele
-    for (row=0; row<nr; row++)
+    ap->alleles[seed0] = 0;
+    ap->alleles[seed1] = 1;
+   
+    // Split reads between two alleles based on their distance from the seed reads
+    for (i=0; i<ap->nr; i++)
     {
-        if (reads[row].allele_id < 0)
+        if ((i==seed0) || (i==seed1))
+           continue;
+   
+        if (ap->dist_matrix[i][seed0] < ap->dist_matrix[i][seed1])
+            ap->alleles[i] = 0;
+        else
+            ap->alleles[i] = 1;
+    }
+
+    // Selecvt the best allele based on the sum of read QVs
+    for (i=0; i<ap->nr; i++)
+    {
+        if (ap->alleles[i] == 0)  
         {
-           // New allele
-           reads[row].allele_id = *na;
-           alleles[*na].weight = ROUND(reads[row].ave_qv);
-           alleles[*na].uglen  = reads[row].uglen;
-           alleles[*na].read_ids[0] = row;
-           alleles[*na].num_reads = 1;
-           alleles[*na].id = *na;
-           (*na)++;
+            sum_qv0 += ap->sum_qvs[i];  
+            nr0++;
+        }
+        else       
+        {          
+            sum_qv1 += ap->sum_qvs[i]; 
+            nr1++;
         }
     }
-}
-// Reverse sort by weight
-static void
-SortAllelesByWeight(Allele *alleles, int32 num_alleles, Read *reads)
-{
-    int i, j, best_id;
-    Allele temp;
 
-    for (i=0; i<num_alleles; i++)
+#if 0
+    fprintf(stderr, "sum_qv0= %d sum_qv1= %d\n", sum_qv0, sum_qv1);
+#endif
+    if (sum_qv0 > sum_qv1 + ZERO_PLUS) 
     {
-        int best_weight = alleles[i].weight;
-        best_id = -1;
-        for (j=i+1; j<num_alleles; j++)
-        {
-            if (best_weight < alleles[j].weight)
-            {
-                best_weight = alleles[j].weight;
-                best_id = j;
-            }
-        }
-        if (best_id >= 0)
-        {
-            temp       = alleles[i];
-            alleles[i] = alleles[best_id];
-            alleles[best_id] = temp;
-        }
+        ap->best_allele = 0;
+        ap->ratio = (double)sum_qv1/(double)sum_qv0;
+        ap->nr_best_allele = nr0;
     }
-    // Update allele_id of reads
-    for (i=0; i<num_alleles; i++)
+    else 
     {
-        for (j=0; j<alleles[i].num_reads; j++)
-        {
-           int read_id = alleles[i].read_ids[j];
-           reads[read_id].allele_id = i;
-        }
-    } 
-}
+        ap->best_allele = 1; 
+        ap->ratio = (double)sum_qv0/(double)sum_qv1;   
+        ap->nr_best_allele = nr1;
+    }
+#if 0
+    fprintf(stderr, "sum_qv0 = %d sum_qv1 = %d best_allele = %d ratio = %f nrb = %d\n", 
+        sum_qv0,  sum_qv1, ap->best_allele, ap->ratio, ap->nr_best_allele);
+#endif
 
-// Reverse sort confirmed alleles by ungapped length
-static void
-SortConfirmedAllelesByLength(Allele *alleles, int32 num_alleles, Read *reads)
-{
-    int i, j, best_id;
-    Allele temp;
-
-    for (i=0; i<num_alleles; i++)
-    {
-        int best_uglen = alleles[i].uglen; 
-        best_id = -1;
-        for (j=i+1; j<num_alleles; j++)
-        {
-            if (best_uglen  < alleles[j].uglen )
-            {
-                best_uglen  = alleles[j].uglen ;
-                best_id = j;
-            }
-        }
-        if (best_id >= 0)
-        {
-            temp       = alleles[i];
-            alleles[i] = alleles[best_id];
-            alleles[best_id] = temp;
-        }
-    }
-    // Update allele_id of reads
-    for (i=0; i<num_alleles; i++)
-    {
-        for (j=0; j<alleles[i].num_reads; j++)
-        {
-           int read_id = alleles[i].read_ids[j];
-           reads[read_id].allele_id = i;
-        }
-    }
 }
 
 static int
@@ -2501,7 +2496,7 @@ is_good_base(char b)
 }
 
 static void
-UpdateScoreNumRunsOfGaps(VarRegion vreg, int prev_nr, char *prev_bases,
+UpdateScoreNumRunsOfGaps(AlPair ap, int prev_nr, char *prev_bases,
     int32 *prev_iids, int get_scores)
 {
     int i, j;
@@ -2511,11 +2506,11 @@ UpdateScoreNumRunsOfGaps(VarRegion vreg, int prev_nr, char *prev_bases,
        if (prev_bases[i] == '-')
            continue;
 
-       for (j=0; j<vreg.nb; j++) {
-           if (vreg.curr_bases[j] != '-')
+       for (j=0; j<ap.nb; j++) {
+           if (ap.bases[j] != '-')
                continue;
 
-           if (prev_iids[i] == vreg.iids[j])
+           if (prev_iids[i] == ap.iids[j])
            {
                if (get_scores == 1)
                    NumRunsOfGapsInUnitigReads++;
@@ -2539,475 +2534,29 @@ UpdateScoreNumGaps(char cbase, int get_scores)
 }
 
 static void
-UpdateScores(VarRegion vreg, char *cbase, int nca)
+UpdateScores(AlPair ap, char cbase, char abase)
 {
     int i, j;
 
-    for (i=0; i<nca; i++)
+    if (cbase != abase)
+        NumAAMismatches++;
+
+    // Updating count of fragment bases mismatching
+    // the consensus base of the corresponding allele
+    for (i=0; i<ap.nr; i++)
     {
-        for (j=i+1; j<nca; j++)
-        {
-            if (cbase[i] != cbase[j])
-               NumAAMismatches++;
-        }
+       if ((ap.alleles[i] == ap.best_allele) &&
+           is_good_base(ap.bases[i])         &&
+           (ap.bases[i]   != cbase))
+            NumFAMismatches++;
+
+       if ((ap.alleles[i] != ap.best_allele) &&
+           is_good_base(ap.bases[i])         &&
+           (ap.bases[i]   != abase))
+            NumFAMismatches++;
     }
 }
 
-
-static void 
-GetReadsForVARRecord(Read *reads, int32 *iids, int32 nvr,
-    int beg, int end, int32 *cids)
-{
-    int k;
-
-    for (k=beg; k<=end; k++)
-    {
-        Column *column=GetColumn(columnStore,cids[k]);
-        Bead  *bead;
-        int32  bid;
-        int32  iid;
-        FragType type;
-        ColumnBeadIterator ci;
-        char  base, qv;
-        int i, j;
-        int    nr=0, max_nr=100;
-        int32 *column_iid_list = (int32 *)safe_malloc(max_nr*sizeof(int32));
-
-        if(!CreateColumnBeadIterator(cids[k], &ci)){
-            CleanExit("GetReadsForVARRecord CreateColumnBeadIterator failed",
-                __LINE__,1);
-        }
-
-        // Collect bases and usids in the coluimn
-        while ( (bid = NextColumnBead(&ci)) != -1 )
-        {
-            bead = GetBead(beadStore,bid);
-            type = GetFragment(fragmentStore,bead->frag_index)->type;
-            iid  = GetFragment(fragmentStore,bead->frag_index)->iid;
-
-            if ((type == AS_READ)   ||
-                (type == AS_B_READ) ||
-                (type == AS_EXTR)   ||
-                (type == AS_TRNR))
-            {
-                // Filter out "duplicated" reads with the same iid
-                if (!IsNewRead(iid, column_iid_list, nr))
-                    continue;
-
-                column_iid_list[nr] = iid;
-                nr++;
-                if (nr == max_nr)
-                {
-                    max_nr += 100;
-                    column_iid_list = (int32 *)safe_realloc(column_iid_list,
-                            max_nr*sizeof(int32));
-                }
-
-                base = *Getchar(sequenceStore,bead->soffset);
-                if (base != '-')
-                {
-                    qv = (int)(*Getchar(qualityStore,bead->soffset)-'0');
-                }
-                else // set qvs of boundary gaps to qvs of adjacent bases
-                {
-                    Bead *prev_bead = GetBead(beadStore, bead->prev);
-                    Bead *next_bead = GetBead(beadStore, bead->next);
-                    qv = 0;
-                    if (prev_bead != NULL)
-                    {
-                        char prev_base=*Getchar(sequenceStore, prev_bead->soffset);
-                        int  prev_qv  =(int)(*Getchar(qualityStore,
-                            prev_bead->soffset)-'0');
-                        if (prev_base != '-') { qv = prev_qv; } 
-                        // otherwise, it stays QV_FOR_MULTI_GAP
-                    }
-                    if (next_bead != NULL)
-                    {
-                        char next_base=*Getchar(sequenceStore, next_bead->soffset);
-                        int  next_qv  =(int)(*Getchar(qualityStore,
-                            next_bead->soffset)-'0');
-                        if (next_base != '-' && 
-                           (qv == 0 || qv > next_qv)) 
-                            qv = next_qv; 
-                    }
-                }
-                iid  =  GetFragment(fragmentStore,bead->frag_index)->iid;
-                i    =  Iid2ReadId(iid, iids, nvr);
-    
-                if (i < 0 || i>=nvr) {
-                    continue;
-                }
-                reads[i].bases[k-beg] = base;
-                reads[i].qvs[k-beg] = qv;
-            }
-        }
-        FREE(column_iid_list);
-    }
-
-    // Reset qvs of internal gaps to MIN(qv_first_gap, qv_last_gap); 
-    // Compute ave_qvs
-    for (k=0; k<nvr; k++)
-    {
-        int i, j, m = end-beg+1;
-        reads[k].uglen = 0;
-        reads[k].ave_qv = 0.;
-        for (i=0; i<m; i++)
-        {
-            if (reads[k].bases[i] != '-')
-            {
-                reads[k].ave_qv += (double)reads[k].qvs[i];
-                reads[k].uglen++;
-            }
-            else   // gap
-            {
-                int first_gap = i;
-                int first_qv  = reads[k].qvs[first_gap];
-                int last_gap  = i;
-                int last_qv;
-                int min_qv;
-                if (first_qv == 0 && i>0) first_qv = reads[k].qvs[i-1];
-                while (last_gap<m && reads[k].bases[last_gap] == '-')
-                    last_gap++;
-                if (last_gap == m || reads[k].bases[last_gap] != '-')
-                    last_gap--;
-                last_qv = reads[k].qvs[last_gap];
-                if (last_qv == 0 && last_gap<m-1) 
-                    last_qv = reads[k].qvs[last_gap+1];
-                if (first_qv != 0 && last_qv  != 0) 
-                    min_qv = (first_qv < last_qv) ? first_qv : last_qv;
-                else if (first_qv == 0 && last_qv != 0)
-                    min_qv = last_qv;
-                else if (first_qv != 0 && last_qv == 0)
-                    min_qv = first_qv;
-                else // both == 0               
-                    min_qv = QV_FOR_MULTI_GAP;
-                for (j=first_gap; j<=last_gap; j++)
-                {
-                    reads[k].qvs[j] = min_qv;
-                    reads[k].ave_qv += (double)min_qv;
-                } 
-                i = last_gap;
-            } 
-        }
-        reads[k].ave_qv /= (double)m;
-    }
-
-#if 0
-    fprintf(stderr, "In GetReads: ave_qvs= ");
-    for (k=0; k<nvr; k++) 
-        fprintf(stderr, "%3.1f ", reads[k].ave_qv);
-    fprintf(stderr, "\n");
-#endif
-}
-
-static int
-GetDistanceBetweenReads(char *read1, char *read2, int len)
-{
-    int i, j, k, uglen1=0, uglen2=0, uglen;
-    int dist, gapped_dist = 0, ungapped_dist = 0;
-    char *ugread1 = (char*)safe_malloc(len*sizeof(char));
-    char *ugread2 = (char*)safe_malloc(len*sizeof(char));
-
-    // Compute gapped distance
-    for (k=0; k<len; k++) {
-        if (read1[k] != read2[k])
-            gapped_dist++;
-
-        if (read1[k] != '-')
-        {
-            ugread1[uglen1] = read1[k];
-            uglen1++;
-        }
-        if (read2[k] != '-')
-        {
-            ugread2[uglen2] = read2[k];
-            uglen2++;
-        }
-    }
-    
-    uglen = (uglen1<uglen2) ? uglen2:uglen1;
-    for (k=0; k<uglen; k++)
-    {
-        // Compute ungapped distance
-        if (k<uglen1 && k<uglen2 && ugread1[k] != ugread2[k]) 
-            ungapped_dist++;
-        else if (k <uglen1 && k>=uglen2)  
-            ungapped_dist++;
-        else if (k>=uglen1 && k <uglen2)                  
-            ungapped_dist++;
-    }
-    dist = (gapped_dist < ungapped_dist) ? gapped_dist : ungapped_dist;
-    FREE(ugread1);
-    FREE(ugread2);
-    return dist;
-}
-
-static void
-PopulateDistMatrix(Read *reads, int len, VarRegion  *vreg)
-{
-    int i, j;
-
-    // Update the matrix
-    for (i=0; i<vreg->nr; i++) {
-        for (j=i; j<vreg->nr; j++) {
-            vreg->dist_matrix[i][j] =
-                GetDistanceBetweenReads(reads[i].bases, reads[j].bases, len);
-            vreg->dist_matrix[j][i] = vreg->dist_matrix[i][j];
-        }
-    }
-}
-
-static int
-GetTheMostDistantRead(int curr_read_id, int32 nr, int32 **dist_matrix)
-{
-    int i, dist_read_id = -1;
-    int max_dist = -1;
-    for (i=0; i<nr; i++)
-    {
-        if (i == curr_read_id)
-            continue;
-
-        if (max_dist < dist_matrix[curr_read_id][i])
-        {
-            max_dist = dist_matrix[curr_read_id][i];
-            dist_read_id = i;
-        }
-    }
-    return dist_read_id; 
-}
-
-static void
-OutputReads(FILE *fout, Read *reads, int32 nr, int32 width)
-{
-    int i, j;
-    fprintf(fout, "\nReads =\n");
-
-    for (i=0; i<nr; i++) {
-        fprintf(fout, "%d   ", reads[i].allele_id);
-        for (j=0; j<width; j++)
-            fprintf(fout, "%c", reads[i].bases[j]);
-        fprintf(fout, "\n");
-    }
-    fprintf(fout, "\n\n");
-}
-
-static void
-OutputAlleles(FILE *fout, VarRegion *vreg)
-{
-    int i, j;
-    fprintf(fout,   "Outputting alleles:\n");
-    fprintf(fout,   "nr= %d na= %d nca= %d\n", vreg->nr, vreg->na, vreg->nca);
-    fprintf(fout,   "Num_reads= ");
-    for (i=0; i<vreg->na; i++)
-    {
-        fprintf(fout,   "%d ", vreg->alleles[i].num_reads);
-    }
-    fprintf(fout,   "\n");
-    fprintf(fout,   "Weights= ");
-    for (i=0; i<vreg->na; i++)
-    {
-        fprintf(fout,   "%d ", vreg->alleles[i].weight);
-    }
-    fprintf(fout,   "\n");
-    fprintf(fout,   "Reads= \n");
-    for (i=0; i<vreg->na; i++)
-    {
-        fprintf(fout,   "   Allele order= %d, id= %d:\n", i, vreg->alleles[i].id);
-        for (j=0; j<vreg->alleles[i].num_reads; j++)
-        {
-            int k, read_id = vreg->alleles[i].read_ids[j];
-            int len = vreg->end-vreg->beg+1;
-            fprintf(fout,   "    %d   ", read_id);
-            for (k=0; k<len; k++)
-                fprintf(fout,   "%c", vreg->reads[read_id].bases[k]);
-            fprintf(fout,   "\n");
-        }
-    }
-}
-
-static void
-PopulateVarRecord(int32 *cids, int32 *nvars, int32 *min_len_vlist,
-    IntMultiVar **v_list, VarRegion vreg, CNS_Options *opp, int get_scores)
-{
-    double fict_var;
-    int   m;
-    int   num_reported_alleles= (vreg.nca < 2) ? 2 : vreg.nca;
-    char  cbase;
-    char *base = (char*)safe_calloc(num_reported_alleles,sizeof(char));
-    char  buf[10000];
-
-    if (!(*v_list)) {
-       *v_list = (IntMultiVar *)safe_malloc(*min_len_vlist*
-            sizeof(IntMultiVar));
-    }
-    if (*nvars == *min_len_vlist) {
-        *min_len_vlist += 10;
-       *v_list = (IntMultiVar *)safe_realloc(*v_list, *min_len_vlist*
-            sizeof(IntMultiVar));
-    }
-    (*v_list)[*nvars].position.bgn = vreg.beg;
-    (*v_list)[*nvars].position.end = vreg.end+1;
-    (*v_list)[*nvars].num_reads = (int32)vreg.nr;
-    (*v_list)[*nvars].num_conf_alleles = vreg.nca;
-    (*v_list)[*nvars].anchor_size = opp->smooth_win;
-    (*v_list)[*nvars].var_length = vreg.end+1-vreg.beg;
-
-    (*v_list)[*nvars].weights = (char*)safe_calloc(num_reported_alleles,
-        (5+2)* sizeof(char));
-    (*v_list)[*nvars].nr_conf_alleles = (char*)safe_calloc(num_reported_alleles,
-        (2+2)* sizeof(char));
-    (*v_list)[*nvars].var_seq = (char*)safe_malloc(num_reported_alleles*
-        (vreg.end-vreg.beg+2)* sizeof(char));
-
-    NumVARRecords++;
-    {
-        int al;
-        int32 shift   = vreg.end-vreg.beg+2;
-        int distant_read_id = -42, distant_allele_id = -42;
-        if (vreg.nca < 2)
-        {
-            distant_read_id = GetTheMostDistantRead(vreg.alleles[0].read_ids[0],
-                vreg.nr, vreg.dist_matrix);
-            distant_allele_id = vreg.reads[distant_read_id].allele_id;
-        }
-#if DEBUG_VAR_RECORDS
-        fprintf(stderr, "VAR beg= %d end= %d\n", vreg.beg, vreg.end);
-        OutputReads(stderr, vreg.reads, vreg.nr, vreg.end-vreg.beg+1);
-        OutputDistMatrix(stderr, &vreg);
-        OutputAlleles(stderr, &vreg);
-#endif
-   
-        for (m=0; m<vreg.end-vreg.beg+1; m++)           
-        {
-            for (al=num_reported_alleles-1; al >=0; al--)
-            {
-                if (al == 0 || al < vreg.nca)
-                {
-                    int read_id = vreg.alleles[al].read_ids[0];
-                    base[al] = vreg.reads[read_id].bases[m];
-                    if (al == 0)
-                    {
-                        int32 cid = cids[vreg.beg+m];
-                        Column *column=GetColumn(columnStore,cid);
-                        Bead *call = GetBead(beadStore, column->call);
-#if DEBUG_CONSENSUS_CALL
-                        // Check the consistency of a consensus call
-                        BaseCall(cids[vreg.beg+m], 1, &fict_var, &vreg,
-                             vreg.alleles[al].id, &cbase, 0, 0, opp);
-                        if (cbase != base[al])
-                        {
-                            fprintf(cnslog, "Error setting the consensus base #%d  %c/%c\n",
-                                m, cbase, base[al]);
-                            OutputReads(cnslog, vreg.reads, vreg.nr, vreg.end-vreg.beg+1);
-                            OutputDistMatrix(cnslog, &vreg);
-                            OutputAlleles(cnslog, &vreg);
-                            fprintf(stderr, "Error setting the consensus base\n");
-                            exit(-1);
-                        }
-#endif
-
-                        // Set the consensus quality
-                        BaseCall(cids[vreg.beg+m], 1, &fict_var, &vreg,
-                             -1, &cbase, 0, 0, opp);
-
-                        // Set the consensus base
-                        Setchar(sequenceStore, call->soffset, &base[al]);
-
-                    }
-                }
-                else // vreg.nca < 2 and al == 1
-                {
-                    base[al] = vreg.reads[distant_read_id].bases[m];
-                }
-                (*v_list)[*nvars].var_seq[m+al*shift] = base[al];
-            }
-            if (get_scores > 0)
-               UpdateScores(vreg, base, num_reported_alleles);
-        }
-
-        sprintf((*v_list)[*nvars].weights, "");
-        sprintf((*v_list)[*nvars].nr_conf_alleles, "");
-        for (al=0; al < num_reported_alleles; al++)
-        {
-            int    weight = vreg.alleles[al].weight;
-            int    num_reads = vreg.alleles[al].num_reads;
-            char *format_weight = (al < num_reported_alleles-1) ?
-                "%d/" : "%d\0";
-            char *format_num_reads = (al < num_reported_alleles-1) ?
-                "%d/" : "%d\0";
-            
-            (*v_list)[*nvars].var_seq[-1+(al+1)*shift] =
-                (al < num_reported_alleles-1) ? '/' : '\0';
-
-            sprintf(buf, format_weight, ROUND(weight));
-            (*v_list)[*nvars].weights = strcat((*v_list)[*nvars].weights, buf);
-        
-            sprintf(buf, format_num_reads, num_reads);
-            (*v_list)[*nvars].nr_conf_alleles = strcat((*v_list)[*nvars].nr_conf_alleles, buf);
-        }
-#if 0
-        fprintf(stderr, "In PolulateVarRecord: weights= %s , nr_conf_alleles= %s\n",
-            (*v_list)[*nvars].weights, (*v_list)[*nvars].nr_conf_alleles);
-#endif
-
-#if 0
-        fprintf(stderr, "len= %d var_seq = %s\n", vreg.end-vreg.beg+1, (*v_list)[*nvars].var_seq);
-        
-#endif        
-        for (al=0; al < num_reported_alleles; al++)
-        { 
-            if ((*v_list)[*nvars].var_seq[al*shift]             == '-' &&
-                (*v_list)[*nvars].var_seq[al*shift + shift - 2] == '-')
-            {
-                NumVARStringsWithFlankingGaps++;
-            }
-        }
-    }
-    FREE(base);
-#if DEBUG_ABACUS
-    fprintf(stderr, "VARiation= %s\n", (*v_list)[*nvars].var_seq);
-#endif
-                (*nvars)++;
-}
-
-
-// Allocate memrory for reads
-static void
-AllocateMemoryForReads(Read **reads, int32 nr, int32 len,
-    int default_qv)
-{
-    int i, j;    
-
-   *reads = (Read *)safe_malloc(nr*sizeof(Read));
-    for (i=0; i<nr; i++) 
-    {
-      (*reads)[i].allele_id = -1;
-      (*reads)[i].ave_qv = 0.;
-      (*reads)[i].bases = (char *)safe_malloc(len*sizeof(char));
-      (*reads)[i].qvs   = (int  *)safe_malloc(len*sizeof(int ));
-        for(j=0; j<len; j++)
-        {
-          (*reads)[i].bases[j] = '-';
-          (*reads)[i].qvs[j] = default_qv;
-        }
-    }
-}
-
-// Allocate memrory for alleles
-static void
-AllocateMemoryForAlleles(Allele **alleles, int32 nr, int32 *na)
-{
-    int j;
-
-   *na = 0;
-   *alleles = (Allele *)safe_calloc(nr, sizeof(Allele));
-    for (j=0; j<nr; j++)
-    {
-      (*alleles)[j].id = -1;
-      (*alleles)[j].weight = 0;
-      (*alleles)[j].read_ids = (int *)safe_calloc(nr, sizeof(int));
-    }
-}
 
 //*********************************************************************************
 // Basic MultiAlignmentNode (MANode) manipulation
@@ -3021,14 +2570,13 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
     // if quality == -1, don't recall the consensus base
     int     i, j, l, index=0, len_manode = MIN_SIZE_OF_MANODE;
     int32   cid, *cids, *prev_iids;
-    int     window, vbeg, vend, max_prev_nr=INITIAL_NR,
+    int     window, beg, end, vbeg, vend, max_prev_nr=INITIAL_NR,
             prev_nr=0;
     char    cbase, abase, *prev_bases;
     char   *var_seq=NULL;
     double *varf=NULL, *svarf=NULL;
     Column *column;
-    VarRegion  vreg;
-    char  **reads; 
+    AlPair  ap;
     MANode *ma = GetMANode(manodeStore,mid);
     int32   min_len_vlist = 10;
 
@@ -3048,23 +2596,23 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
    *nvars = 0;
 
 #if 0
-    fprintf(fout,   "Calling RefreshMANode, quality = %d\n", quality);
+    fprintf(stderr, "Calling RefreshMANode, quality = %d\n", quality);
 #endif
     if (ma == NULL ) 
         CleanExit("RefreshMANode ma==NULL",__LINE__,1);
     if ( ma->first == -1 ) 
         return 1;
 
-    SetDefault(&vreg);
-    vreg.max_nr = MIN_ALLOCATED_DEPTH;
-    vreg.iids  = (int32 *)safe_calloc(vreg.max_nr, sizeof(int32));
-    vreg.curr_bases =  (char *)safe_calloc(vreg.max_nr, sizeof(char));
+    SetDefault(&ap);
+    ap.max_nr = MIN_ALLOCATED_DEPTH;
+    ap.iids  = (int32 *)safe_calloc(ap.max_nr, sizeof(int32));
+    ap.bases =  (char *)safe_calloc(ap.max_nr, sizeof(char));
 
     varf     = (double *)safe_calloc(len_manode, sizeof(double));
     cids     =  (int32 *)safe_calloc(len_manode, sizeof(int32));
     Resetint32(ma->columns);
     cid = ma->first;
-    vreg.nr = -1;
+    ap.nr = -1;
 
     if (get_scores > 0) {
         prev_bases = (char  *)safe_malloc(max_prev_nr*sizeof(char ));
@@ -3085,9 +2633,9 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
                 varf  = (double *)safe_realloc(varf,  len_manode*sizeof(double));
                 cids = (int32 *)safe_realloc(cids, len_manode*sizeof(int32));
             }
-            // Call consensus using all alleles
-            // The goal is to detect a variation at a given position
-            BaseCall(cid, quality, &(varf[index]), &vreg, -1, &cbase, 0, get_scores, 
+            // Call consensus using both the alleles
+            // The goal is to calculate variation at a given position
+            BaseCall(cid, quality, &(varf[index]), &ap, -1, &cbase, 0, get_scores, 
                 opp);
             cids[index] = cid;
         }
@@ -3106,35 +2654,35 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
         if (get_scores> 0)
         {
 #if 0
-            fprintf(stderr, "vreg.nb=%d vreg.curr_bases=", vreg.nb);
-            for (i=0; i<vreg.nb; i++) 
-                fprintf(stderr, "%c", vreg.curr_bases[i]);
+            fprintf(stderr, "ap.nb=%d ap.bases=", ap.nb);
+            for (i=0; i<ap.nb; i++) 
+                fprintf(stderr, "%c", ap.bases[i]);
             fprintf(stderr, " prev_nr=%d prev_bases=", prev_nr);
             for (i=0; i<prev_nr; i++)
                 fprintf(stderr, "%c", prev_bases[i]);
-            fprintf(stderr, " NumRunsOfGaps=%d \nvreg.iids= ", NumRunsOfGaps);
-            for (i=0; i<vreg.nb; i++)
-                fprintf(stderr, "%d ", vreg.iids[i]);
+            fprintf(stderr, " NumRunsOfGaps=%d \nap.iids= ", NumRunsOfGaps);
+            for (i=0; i<ap.nb; i++)
+                fprintf(stderr, "%d ", ap.iids[i]);
             fprintf(stderr, "\n");
             fprintf(stderr, "prev_iids= ");
             for (i=0; i<prev_nr; i++)
                 fprintf(stderr, "%d ", prev_iids[i]);
             fprintf(stderr, "\n");                
 #endif
-            UpdateScoreNumRunsOfGaps(vreg, prev_nr, prev_bases, prev_iids, 
+            UpdateScoreNumRunsOfGaps(ap, prev_nr, prev_bases, prev_iids, 
                 get_scores);
             UpdateScoreNumGaps(cbase, get_scores);
-            if (vreg.nb > max_prev_nr) {
-                max_prev_nr =  vreg.nb;
+            if (ap.nb > max_prev_nr) {
+                max_prev_nr =  ap.nb;
                 prev_bases = (char *)safe_realloc(prev_bases,
                     max_prev_nr*sizeof(char));
                 prev_iids  = (int32 *)safe_realloc(prev_iids,
                     max_prev_nr*sizeof(int32));
             }
-            prev_nr = vreg.nb;
-            for (i=0; i<vreg.nb; i++) {
-                prev_bases[i] = vreg.curr_bases[i];
-                prev_iids[i]  = vreg.iids[i];
+            prev_nr = ap.nb;
+            for (i=0; i<ap.nb; i++) {
+                prev_bases[i] = ap.bases[i];
+                prev_iids[i]  = ap.iids[i];
             }
         }
 
@@ -3152,8 +2700,8 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
     if ((opp->split_alleles == 0) ||
         (quality <= 0))
     {
-        FREE(vreg.curr_bases);
-        FREE(vreg.iids);
+        FREE(ap.bases);
+        FREE(ap.iids);
         FREE(varf);
         FREE(cids);
         return 1;
@@ -3165,15 +2713,10 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
     svarf= (double *)safe_calloc(len_manode, sizeof(double));
     for (i=0; i<len_manode; i++) {
         svarf[i] = varf[i];
-        if (varf[i] < ZERO_MINUS)
-            varf[i] = (varf[i] < -1.) ? 0. : -varf[i];
-#if 0
-        if (varf[i] > 0)
-        fprintf(stderr, "i= %d varf= %f\n", i, varf[i]);
-#endif
     }
     SmoothenVariation(svarf, len_manode, window);
 
+    // Recall beses using only one of two alleles
     for (i=0; i<len_manode; i++) 
     { 
         if (svarf[i] == 0) {
@@ -3183,116 +2726,132 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
         {
             // Process a region of variation
             double fict_var;
-            vreg.beg = vbeg = vend = i;
+            beg = vbeg = vend = i;
 
-            while (DBL_EQ_DBL(varf[vreg.beg], (double)0.0))
-                vreg.beg++;
+            while (DBL_EQ_DBL(varf[beg], (double)0.0))
+                beg++;
             
             while ((vend < len_manode) && (svarf[vend] > ZERO_PLUS))
                 vend++;
 
-            vreg.end = vend;
+            end = vend;
 
-            while (varf[vreg.end] < ZERO_PLUS)
-                vreg.end--;
+            while (varf[end] < ZERO_PLUS)
+                end--;
 
+#if 0
+            fprintf(stderr, "window=%d vbeg=%d beg=%d end=%d vend=%d\n", 
+                window, vbeg, beg, end, vend);
+#endif
+ 
             // Store iids of all the reads in current region
-            vreg.nr = 0;
-            for(l=0; l<vreg.max_nr; l++) 
-                vreg.iids[l] = -1;
+            ap.nr = 0;
+//          ap.iids = (int32 *)safe_realloc(ap.iids, ap.max_nr * sizeof(int32));
+            for(l=0; l<ap.max_nr; l++) 
+                ap.iids[l] = -1;
 
             // Get all the read iids 
-            // Calculate the total number of reads, vreg.nr (corresponding to any allele)
-            for (j=vreg.beg; j<=vreg.end; j++) 
-                GetReadIidsAndNumReads(cids[j], &vreg);
-   
-            // Allocate memrory for reads
-            AllocateMemoryForReads(&vreg.reads, vreg.nr, vreg.end - vreg.beg + 1, 
-                0);
-
+            // Calculate the total number of reads, ap.nr (corresponding to any allele)
+            for (j=beg; j<=end; j++) 
+                GetReadIids(cids[j], &ap);
 #if 0
-            fprintf(stderr, "Num_reads= %d vreg.beg= %d vreg.end= %d\n", vreg.nr, vreg.beg, vreg.end);
-            fprintf(stderr, "Reads=\n");
-            for (j=0; j<vreg.nr; j++)
-            {
-                for (l=0; l< vreg.end-vreg.beg+1; l++)
-                {
-                    fprintf(stderr, "%c", vreg.reads[j].bases[l]);
-                }
-                fprintf(stderr, "\n");
-            }
-#endif
-            GetReadsForVARRecord(vreg.reads, vreg.iids, vreg.nr, vreg.beg, 
-                vreg.end, cids);
+            fprintf(stderr, "beg= %d end= %d\n", beg, end);
+            fprintf(stderr, "total number of reads after GetReadIids= %d\n", ap.nr);
+#endif       
+   
+            ap.alleles = (char *)safe_calloc(ap.nr, sizeof(char));
+//          ap.bases   = (char *)safe_realloc(ap.bases, ap.nr * sizeof(char));
+            ap.sum_qvs = (int  *)safe_calloc(ap.nr, sizeof(int));
+            for (j=0; j<ap.nr; j++)
+                ap.alleles[j] = -1;    
+
+
+            AllocateDistMatrix(&ap);
+
             // Calculate a sum of qvs for each read within a variation region
             // Populate the distance matrix
+            for (j=beg; j<=end; j++)
+                PopulateDistMatrix(cids[j], &ap);    
 
-#if SHOW_READS
-            fprintf(stderr, "Num_reads= %d vreg.beg= %d vreg.end= %d\n", vreg.nr, 
-                vreg.beg, vreg.end);
-            fprintf(stderr, "Reads=\n");
-            for (j=0; j<vreg.nr; j++)
-            {
-                for (l=0; l< vreg.end-vreg.beg+1; l++)
-                {
-                    fprintf(stderr, "%c", vreg.reads[j].bases[l]);
-                }
-                fprintf(stderr, "\n");
-            }
-            fprintf(stderr, "Ave_qvs= \n");
-            for (j=0; j<vreg.nr; j++)
-                fprintf(stderr, "%f ", vreg.reads[j].ave_qv);
-            fprintf(stderr, "\n");
-#endif
-            AllocateDistMatrix(&vreg, -1);
-            PopulateDistMatrix(vreg.reads, vreg.end-vreg.beg+1, &vreg);    
+//          OutputDistMatrix(&ap);
 
-#if 0
-            OutputDistMatrix(stderr, &vreg);
-#endif
-
-            // Allocate memory for alleles
-            AllocateMemoryForAlleles(&vreg.alleles, vreg.nr, &vreg.na);
-
-            // Populate vreg.alleles array
+            // Populate ap.alleles array
             // Determine the best allele and the number of reads in this allele
-            ClusterReads(vreg.reads, vreg.nr, vreg.alleles, &(vreg.na), 
-                &(vreg.nca), vreg.dist_matrix);
+            ClusterReads(&ap);   
+
 #if 0
-            fprintf(stderr, "Total number of alleles after ClusterReads %d\n", vreg.na);
-            fprintf(stderr, "Allele weights= \n");
-            for (j=0; j<vreg.na; j++)
-                fprintf(stderr, "%d ", vreg.alleles[j].weight);
-            fprintf(stderr, "\n");
+            fprintf(stderr, "total number of reads after ClusterReads %d\n", ap.nr);
 #endif
-            SortAllelesByWeight(vreg.alleles, vreg.na, vreg.reads);
-#if 0            
-            OutputAlleles(stderr, &vreg);
-#endif
+
             /* Store variations in a v_list */
-            if (quality > 0 && make_v_list)
+            if ((quality > 0) && make_v_list 
+                                             // && (ap.nr > 0)
+                                                              )
             {
-                PopulateVarRecord(cids, nvars, &min_len_vlist, v_list, vreg,
-                    opp, get_scores); 
+                if (!(*v_list))
+                {
+                   *v_list = (IntMultiVar *)safe_malloc(min_len_vlist*
+                        sizeof(IntMultiVar));
+                }
+                if ((*nvars == min_len_vlist) && quality > 0 && make_v_list)
+                {
+                    min_len_vlist += 10;
+                   *v_list = (IntMultiVar *)safe_realloc(*v_list, min_len_vlist*
+                        sizeof(IntMultiVar));
+                }
+                (*v_list)[*nvars].position.bgn = beg;
+                (*v_list)[*nvars].position.end = end+1;
+                (*v_list)[*nvars].num_reads = (int32)ap.nr;
+                (*v_list)[*nvars].nr_best_allele = (int32)ap.nr_best_allele;
+                (*v_list)[*nvars].num_alleles = 2;
+                (*v_list)[*nvars].ratio = ap.ratio;
+                (*v_list)[*nvars].window_size = opp->smooth_win;
+                (*v_list)[*nvars].var_length = end+1-beg;
+                (*v_list)[*nvars].var_seq
+                      = (char*)safe_calloc(2*(end-beg)+4, sizeof(char));
+                NumVARRecords++;
+                {
+                    int m;
+                    for (m=0; m<end-beg+1; m++)
+                    {
+                       // Get the consensus base for an alternative allele
+                       BaseCall(cids[beg+m], quality, &fict_var, &ap,
+                           ap.best_allele == 0 ? 1 : 0, &abase, 0, 0, opp);
+                       // Get the consensus base for the best allele
+                       BaseCall(cids[beg+m], quality, &fict_var, &ap,
+                           ap.best_allele,              &cbase, 0, 0, opp);
+                       (*v_list)[*nvars].var_seq[end-beg+2+m] = abase;
+                       (*v_list)[*nvars].var_seq[m          ] = cbase;
+                       if (get_scores > 0)
+                           UpdateScores(ap, cbase, abase); 
+                    }
+                    (*v_list)[*nvars].var_seq[end-beg+1] = '/';
+                    (*v_list)[*nvars].var_seq[2*(end-beg)+3] = '\0';
+                    if (((*v_list)[*nvars].var_seq[0      ] == '-' &&
+                         (*v_list)[*nvars].var_seq[end-beg] == '-')
+                         ||
+                        ((*v_list)[*nvars].var_seq[end-beg+2] == '-' &&
+                         (*v_list)[*nvars].var_seq[2*(end-beg)+2] == '-'))
+                    {
+                        NumVARStringsWithFlankingGaps++;
+                    }
+                }
+                (*nvars)++;
             }
             
             i = vend;
+            FREE(ap.alleles);
+            FREE(ap.sum_qvs);
 
-            for (j=0; j<vreg.nr; j++)
-            {
-                FREE(vreg.dist_matrix[j]);
-                FREE(vreg.reads[j].bases);
-                FREE(vreg.reads[j].qvs);
-                FREE(vreg.alleles[j].read_ids);
-            }
-            FREE(vreg.dist_matrix); 
-            FREE(vreg.reads);
-            FREE(vreg.alleles);
-            vreg.nr = 0;
+            for (j=0; j<ap.nr; j++)
+                FREE(ap.dist_matrix[j]);
+            FREE(ap.dist_matrix); 
+
+            ap.nr = 0;
         }
     }
-    FREE(vreg.curr_bases);
-    FREE(vreg.iids);
+    FREE(ap.bases);
+    FREE(ap.iids);
     FREE(varf);
     FREE(svarf);
     FREE(cids);
@@ -3594,18 +3153,6 @@ void ReportTrick(FILE *fp, CNS_AlignTrick trick) {
       ReportTrick(stderr,trick);
    }
    return;
-}
-
-static void utl_showstring(FILE *out,const char *cs, int width)
-{
-  int len=strlen(cs);
-  int s=0;
-  const char *p;
-  while( s<len ) {
-    p=cs+s;
-    fprintf(out,"%.*s\n",width,p);
-    s+=width;
-  }
 }
 
 //*********************************************************************************
@@ -4106,7 +3653,7 @@ int32 ApplyAlignment(int32 afid, int32 aoffset,int32 bfid, int32 ahang, int32 *t
    bboffset = bfrag->beads;
    last_a_aligned = -1;
    last_b_aligned = -1;
-   apos = MAX(ahang,0);
+   apos = max(ahang,0);
    bpos = 0;
 
    if ( ahang == alen ) { // special case where fragments abutt
@@ -4920,11 +4467,11 @@ void SetAbacus(Abacus *a, int32 i, int32 j, char c)
 {
    int32 offset = i*(a->columns+2)+j+1;
    if(i<0 || i>a->rows-1){
-     fprintf(stderr, "i=%d j=%d a->rows=%d\n", i, j, a->rows);
+     fprintf(stderr, "i=%d a->rows=%d\n", i, a->rows);
      CleanExit("SetAbacus attempt to write beyond row range",__LINE__,1);
    }
    if(j<0 || j>a->columns-1){
-     fprintf(stderr, "i=%d j=%d a->columns=%d\n", i, j, a->columns);
+     fprintf(stderr, "i=%d a->columns=%d\n", i, a->columns);
      CleanExit("SetAbacus attempt to write beyond column range",__LINE__,1);
    }
    a->beads[offset] = c; 
@@ -4956,11 +4503,9 @@ Abacus *CreateAbacus(int32 mid, int32 from, int32 end)
    ColumnBeadIterator  bi;
    Bead               *bead;
    MANode             *ma;
-#define  MAX_MID_COLUMN_NUM 50
-   static int                 mid_column_points[MAX_MID_COLUMN_NUM] = { 75, 150};
-   Column             *mid_column[MAX_MID_COLUMN_NUM] = { NULL, NULL };
-   int                 next_mid_column=0;
-   int                 max_mid_columns = 0;
+   int                 mid_column_num = 6;
+   Column             *mid_column[6] = { 0 };
+   int                 mid_column_points[6] = { 75, 150, -1, -1, -1, -1 };
 
    //  Macaque, using overlap based trimming, needed mid_column points
    //  at rather small intervals to pass.  Even without OBT, macaque
@@ -4968,21 +4513,10 @@ Abacus *CreateAbacus(int32 mid, int32 from, int32 end)
    //
    //  This change was tested on macaque, and did not change the
    //  results (except for allowing one partition to finish....).  You
-   //  can revert to the original behavior by undef'ing the following.
+   //  can revert to the original behavior by disabling this loop.
    //
-#define EXTRA_MID_COLUMNS 1
-#ifdef EXTRA_MID_COLUMNS
-   if(mid_column_points[0]==75){
-     for (i=0; i<MAX_MID_COLUMN_NUM; i++){
-       mid_column_points[i] = i * (AS_FRAG_MIN_LEN-1) + 30;
-       mid_column[i]=NULL;
-     }
-   }
-   max_mid_columns=MAX_MID_COLUMN_NUM;
-
-#else
-   max_mid_columns=2;
-#endif
+   for (i=0; i<6; i++)
+     mid_column_points[i] = i * 30 + 30;
 
    ma = GetMANode(manodeStore, mid);
    if (ma == NULL ) CleanExit("CreateAbacus ma==NULL",__LINE__,1);
@@ -4998,32 +4532,21 @@ Abacus *CreateAbacus(int32 mid, int32 from, int32 end)
    fprintf(stderr, "column_ids= %lu", from);
 #endif
    // first, just determine requires number of rows and columns for Abacus
-   while( column->next != end  && column->next != -1) { // this test looks subtly wrong: most of the loop could be done
-                                                        // as long as column!=NULL?  -- ALH
+   while( column->next != end  && column->next != -1) {
      columns++;
-
 #if 0
-     fprintf(stderr, ",%lu", column->next);
+   fprintf(stderr, ",%lu", column->next);
 #endif
+     for (i=0; i<6; i++)
+       if (columns == mid_column_points[i])
+         mid_column[i] = GetColumn(columnStore,column->lid);
 
-     if( next_mid_column<MAX_MID_COLUMN_NUM && 
-	 columns == mid_column_points[next_mid_column]){
-       mid_column[next_mid_column] = GetColumn(columnStore,column->lid);
-       next_mid_column++;
-     }
      column = GetColumn(columnStore,column->next);
      // GD: this is where base calling code should be called  
    }
-
 #if 0
    fprintf(stderr, "\n");
 #endif
-
-   if(columns>MAX_MID_COLUMN_NUM*(AS_FRAG_MIN_LEN-1)){
-     fprintf(stderr,"WARNING: CreateAbacus called with such a large window that small fragments might slip through the cracks...\n");
-   }
-
-   max_mid_columns=next_mid_column;
 
    orig_columns = columns;
    last = column;
@@ -5059,7 +4582,7 @@ Abacus *CreateAbacus(int32 mid, int32 from, int32 end)
    // "SetAbacus" beyond row range error.  putting in two mid-columns
    // will hopefully catch all fragments in the abacus range.
    //
-   for (i=0; i<max_mid_columns; i++) {
+   for (i=0; i<6; i++) {
      if (mid_column[i] != NULL) {
        if(!CreateColumnBeadIterator(mid_column[i]->lid,&bi))
          CleanExit("CreateAbacus CreateColumnBeadIterator failed",__LINE__,1);
@@ -5269,15 +4792,12 @@ int MergeAbacus(Abacus *abacus, int merge_dir)
     // with right neighbor and merge if compatible
     //
     //  GD: this code will merge practically any
-    int  i, j, k;
-    int  mergeok, next_column_good, curr_column_good;
-    char prev, curr, next;
-    int  last_non_null = abacus->columns-1;
-    int  first_non_null = 0;
-    int  columns_merged = 0;
-
-    // determine the rightmost and leftmost columns
-    // not totally composed of gaps
+    int i, j, mergeok, next_column_good;
+    char curr, next;
+    int last_non_null = abacus->columns-1;
+    int columns_merged = 0;
+    
+    // determine the rightmost column not totally composed of gaps
     for (j=abacus->columns-1;j>0;j--)
     {
         int null_column = 1;
@@ -5289,151 +4809,48 @@ int MergeAbacus(Abacus *abacus, int merge_dir)
            break;
         last_non_null = j;
     }
-    for (j=0; j<abacus->columns;j++)
-    {
-        int null_column = 1;
-        for (i=0; i<abacus->rows; i++) {
-            curr = *GetAbacus(abacus,i,j);
-            if (curr != '-') null_column = 0;
-        }
-        if (!null_column)
-           break;
-        first_non_null = j;
-    }
-#if DEBUG_ABACUS
-    fprintf(stderr, "abacus->columns=%d first_non_null = %d last_non_null= %d\n",
-        abacus->columns, first_non_null, last_non_null);
+#if 0
+    fprintf(stderr, "abacus->columns=%d last non-null = %d\n", 
+        abacus->columns, last_non_null);
 #endif
-    if (merge_dir < 0)
-    {
-        for (j=0;j<last_non_null;j++)
-        {
-            int num_gaps=0, num_ns=0;
-            mergeok = 1;
-            next_column_good = -1;
-            for (i=0;i<abacus->rows;i++)
-            {
-                curr = *GetAbacus(abacus,i,j);
-                next = *GetAbacus(abacus,i,j+1);
-                // at least in one column there should be a gap
-                // or, alternatively, both should be 'n'
-                if (curr != '-' && next != '-') {
-                    if (curr != 'n' || next != 'n') {
-                        mergeok = 0;
-                        break;
-                    }
-                    else
-                        num_ns++;
-                }
-                else
-                    num_gaps++;
-
-                // next column should contain at least one good base - a, c, g or t
-                if (next != '-' && next != 'n') {
-                    next_column_good = i;
+    for (j=0;j<last_non_null;j++) {
+        //for (j=0;j<abacus->columns-1;j++) {
+        mergeok = 1;
+        next_column_good = -1;
+        for (i=0;i<abacus->rows;i++) {
+            curr = *GetAbacus(abacus,i,j);
+            next = *GetAbacus(abacus,i,j+1);
+            // at least in one column there should be a gap
+            // or, alternatively, both should be 'n'
+            if (curr != '-' && next != '-') {
+                if (curr != 'n' || next != 'n') {
+                    mergeok = 0;
+                    break;
                 }
             }
-          //fprintf(stderr, "column= %d mergeok= %d next_column_good= %d\n", j, mergeok, next_column_good);
-            if (mergeok && next_column_good >= 0 && num_gaps > num_ns) 
-            {
-                columns_merged++;
-                for (i=0;i<abacus->rows;i++) {
-                    curr = *GetAbacus(abacus,i,j  );
-                    next = *GetAbacus(abacus,i,j+1);
-                    if (curr == 'n' && next == 'n')
-                    {
-                        continue;
-                    }
-                    if (next != '-' && next != 'n' )
-                    {
-                        SetAbacus(abacus, i, j  , next);
-                        SetAbacus(abacus, i, j+1, curr);
-                    }
-                }
-                // The entire j+1-th column now contains only gaps or n's
-                // Remove it by shifting all the subsequent columns
-                // one position to the left
-                for (i=0;i<abacus->rows;i++)
-                {
-                    curr = *GetAbacus(abacus,i,j  );
-                    next = *GetAbacus(abacus,i,j+1);
-                    if (curr == 'n' && next == 'n')
-                        continue;
-                    for (k=j+1; k<last_non_null; k++)
-                    {
-                        next= *GetAbacus(abacus,i,k+1);
-                        SetAbacus(abacus, i, k, next);
-                    }
-                    SetAbacus(abacus, i, last_non_null, '-');
-                }
-                // Return to the previous coljumn to see if it can be merged again
-                j--;
+
+            // next column should contain at least one good base - a, c, g or t
+            if (next != '-' && next != 'n') {
+                next_column_good = i;
             }
         }
-    }
-    else /* merge_dir > 0 */
-    {
-        for (j=last_non_null-1; j>first_non_null; j--)
+      //fprintf(stderr, "mergeok= %d next_column_good= %d\n", mergeok, next_column_good);
+        if (mergeok && next_column_good >= 0)  // next column contains a, c, g or t) {
         {
-            int num_gaps=0, num_ns=0;
-            mergeok = 1;
-            curr_column_good = -1;
-            for (i=0;i<abacus->rows;i++)
-            {
-                curr = *GetAbacus(abacus,i,j);
+            columns_merged++;
+            for (i=0;i<abacus->rows;i++) {
+                curr = *GetAbacus(abacus,i,j  );
                 next = *GetAbacus(abacus,i,j+1);
-                // in at least one column there should be a gap
-                // or, alternatively, both should be 'n'
-                if (curr != '-' && next != '-') {
-                    if (curr != 'n' || next != 'n') {
-                        mergeok = 0;
-                        break;
-                    }
-                    else
-                        num_ns++; 
-                }
-                else
-                    num_gaps++;
-                // current column should contain at least one good base - a, c, g or t
-                if (curr != '-' && curr != 'n')
-                {
-                    curr_column_good = i;
-                }
-            }
-          //fprintf(stderr, "column= %d mergeok= %d next_column_good= %d\n", j, mergeok, next_column_good);
-            if (mergeok && curr_column_good >= 0 && num_gaps > num_ns) 
-            {
-                columns_merged++;
-                for (i=0;i<abacus->rows;i++) {
-                    curr = *GetAbacus(abacus,i,j  );
-                    next = *GetAbacus(abacus,i,j+1);
-                    if (curr == 'n' && next == 'n')
-                    {
-                        continue;
-                    }
-                    if (curr != '-' && curr != 'n' ) {
+                if (curr == 'n' && next == 'n')
+                    continue;
+                if (merge_dir >= 0 && curr != '-' && curr != 'n' ) {
                         SetAbacus(abacus, i, j  , next);
                         SetAbacus(abacus, i, j+1, curr);
-                    }
                 }
-                // The entire j-th column contains gaps
-                // Remove it by shifting all the previous columns
-                // one position to the right
-                for (i=0;i<abacus->rows;i++)
-                {
-                    curr = *GetAbacus(abacus,i,j  );
-                    next = *GetAbacus(abacus,i,j+1);
-                    if (curr == 'n' && next == 'n')
-                        continue;
-                    for (k=j; k>first_non_null; k--)
-                    {
-                        prev = *GetAbacus(abacus,i,k-1);
-                        SetAbacus(abacus, i, k, prev);
-                    }
-                    SetAbacus(abacus, i, first_non_null, '-');
+                if (merge_dir < 0 && next != '-' && next != 'n' ) {
+                        SetAbacus(abacus, i, j  , next);
+                        SetAbacus(abacus, i, j+1, curr);
                 }
-                // Return to the next column to see if it can be merged again
-                j++;
             }
         }
     }
@@ -5444,79 +4861,58 @@ int MergeAbacus(Abacus *abacus, int merge_dir)
 }
 
 
-int32 
-LeftShift(Abacus *abacus, VarRegion vreg, int *lcols) 
+int32 LeftShift(Abacus *abacus, int *lcols) 
 {  
     // lcols is the number of non-null columns in result
-    int32 i, j, k, l, ccol, pcol;
-    char c, call;
+    int32 i,j,ccol,pcol;
+    char c,call;
     ResetCalls(abacus);
-#if 0
-    fprintf(stderr, "Abacus region:\n");
-    fprintf(stderr, "nr= %d na= %d nca= %d\n", vreg.nr, vreg.na, vreg.nca);
-    fprintf(stderr, "Order of left-shifting alleles:\n");
-    for (i=0; i<vreg.na; i++)
-    {
-        fprintf(stderr, "Allele %d uglen=%d weight= %d\n", i,
-            vreg.alleles[i].uglen, vreg.alleles[i].weight);
-        fprintf(stderr, "   Reads:\n");
-        for (j=0; j<vreg.alleles[i].num_reads; j++)
-        {
-            int k, read_id = vreg.alleles[i].read_ids[j];
-            int len = vreg.end-vreg.beg+1;
-            fprintf(stderr, "    %d   ", read_id);
-            for (k=0; k<len; k++)
-                fprintf(stderr, "%c", vreg.reads[read_id].bases[k]);
-            fprintf(stderr, "\n");
-        }
-    }
-#endif
-    for (j=abacus->window_width; j<2*abacus->window_width; j++) 
-    {
-        for (k=0; k<vreg.na; k++)
-        {
-            for (l=0; l<vreg.alleles[k].num_reads; l++) 
+    for (j=abacus->window_width;j<2*abacus->window_width;j++) {
+        for (i=0;i<abacus->rows;i++) {
+            c = *GetAbacus(abacus,i,j);
+            ccol = j;
+            if ( c != '-' ) 
             {
-                i = vreg.alleles[k].read_ids[l];
-                c = *GetAbacus(abacus, i, j);
-                ccol = j;
-                if ( c != '-' ) 
-                {
-                    //look to the left for a suitable placement
-                    // will be safe on left since abacus has 'n' border
-                    while (*GetAbacus(abacus, i, ccol-1) == '-') {
-                        ccol--;
-                    }
-                    // from ccol back up to j, look for column with matching call
-                    for (pcol = ccol; pcol<j; pcol++) 
-                    {
-                        call = abacus->calls[pcol]; 
-                        if ( call != 'n' && call != c && c != 'n') {
-                            // GD: consensus in a column == '-' ? 
-                            continue;
-                        }     
-                        if ( call == 'n') {
-                            // GD: 
-                            // Found the leftmost column with non-gap consensus.
-                            // Now, reset its consensus "dynamically" to the 
-                            // current base
-                            // Potential problem: the result will generally 
-                            // depend on the order in which rows 
-                            // are processed
-                            abacus->calls[pcol] = c;
+                //look to the left for a suitable placement
+                // will be safe on left since abacus has 'n' border
+                while (*GetAbacus(abacus,i,ccol-1) == '-') {
+                    ccol--;
+                }
 #if 0
-                            fprintf(stderr, "j= %d i= %d calls[%d]= %c\n", j, i, pcol, c);
+                fprintf(stderr, "j= %d i= %d ccol= %d\n", j, i, ccol);
 #endif
-                        } 
-                        if (abacus->calls[pcol] == c || c == 'n') {
-                            // swap bases in columns pcol and j of row i
-                            SetAbacus(abacus, i, j, '-');
-                            SetAbacus(abacus, i, pcol, c);
-                            break;
-                        }
+                // from ccol back up to j, look for column with matching call
+                for (pcol = ccol;pcol<j;pcol++) {
+                    call = abacus->calls[pcol]; 
+                    if ( call != 'n' && call != c && c != 'n') {
+                        // GD: consensus in a column == '-' ? 
+                        continue;
+                    } 
+                    if ( call == 'n') {
+                        // GD: 
+                        // Found the leftmost column with non-gap consensus.
+                        // Now, reset its consensus "dynamically" to the 
+                        // current base
+                        // Potential problem: the result will generally 
+                        // depend on the order in which rows 
+                        // are processed
+                        abacus->calls[pcol] = c;
+#if 0
+                        fprintf(stderr, "j= %d i= %d calls[%d]= %c\n", j, i, pcol, c);
+#endif
+                    } 
+                    if (abacus->calls[pcol] == c || c == 'n') {
+                        // swap bases in columns pcol and j of row i
+                        SetAbacus(abacus,i,j,'-');
+                        SetAbacus(abacus,i,pcol,c);
+                        break;
                     }
-                    if (*GetAbacus(abacus, i, j) != '-') 
-                        abacus->calls[j] = c;
+                }
+                if (*GetAbacus(abacus,i,j) != '-') {
+                    abacus->calls[j] = c;
+#if 0
+                    fprintf(stderr, "j= %d i= %d calls[%d]= %c\n", j, i, j, c);
+#endif
                 }
             }
         }
@@ -5526,10 +4922,8 @@ LeftShift(Abacus *abacus, VarRegion vreg, int *lcols)
     for (j=0;j<abacus->columns;j++)
         fprintf(stderr, "%c", abacus->calls[j]);
     fprintf(stderr, "\n");
-#endif
-#if DEBUG_ABACUS
-        fprintf(stderr, "Abacus after LeftShift before Merge:\n");
-        ShowAbacus(abacus); 
+    fprintf(stderr, "Abacus after LeftShift before Merge:\n");
+    ShowAbacus(abacus); 
 #endif
     MergeAbacus(abacus, -1);
 #if 0
@@ -5540,82 +4934,53 @@ LeftShift(Abacus *abacus, VarRegion vreg, int *lcols)
     return ScoreAbacus(abacus,lcols);
 }
 
-int32 RightShift(Abacus *abacus, VarRegion vreg, int *rcols) 
+int32 RightShift(Abacus *abacus, int *rcols) 
 { // rcols is the number of non-null columns in result
-    int32 i, j, k, l, ccol, pcol;
-    char c, call;
-    ResetCalls(abacus);
-#if 0
-    fprintf(stderr, "Abacus region:\n");
-    fprintf(stderr, "nr= %d na= %d nca= %d\n", vreg.nr, vreg.na, vreg.nca);
-    fprintf(stderr, "Order of left-shifting alleles:\n");
-    for (i=0; i<vreg.na; i++)
-    {
-        fprintf(stderr, "Allele %d uglen=%d weight= %d\n", i,
-            vreg.alleles[i].uglen, vreg.alleles[i].weight);
-        fprintf(stderr, "   Reads:\n");
-        for (j=0; j<vreg.alleles[i].num_reads; j++)
-        {
-            int k, read_id = vreg.alleles[i].read_ids[j];
-            int len = vreg.end-vreg.beg+1;
-            fprintf(stderr, "    %d   ", read_id);
-            for (k=0; k<len; k++)
-                fprintf(stderr, "%c", vreg.reads[read_id].bases[k]);
-            fprintf(stderr, "\n");
+   int32 i,j,ccol,pcol;
+   char c,call;
+   ResetCalls(abacus);
+   for (j=2*abacus->window_width-1;j>abacus->window_width-1;j--) {
+     for (i=0;i<abacus->rows;i++) {
+        c = *GetAbacus(abacus,i,j);
+        ccol = j;
+        if ( c != '-' ) {
+           //look to the right for a suitable placement
+           // will be safe on right since abacus has 'n' border
+           while ( *GetAbacus(abacus,i,ccol+1) == '-' ) {
+              ccol++;
+           }
+           // now, from ccol back down to j, look for column with matching call
+           for ( pcol = ccol;pcol>j;pcol--) {
+              call = abacus->calls[pcol]; 
+              if ( call != 'n' && call != c && c != 'n' ) {
+                 continue;
+              } 
+              if ( call == 'n') {
+                 abacus->calls[pcol] = c;
+              } 
+              if (abacus->calls[pcol] == c || c == 'n' ) {
+                 SetAbacus(abacus,i,j,'-');
+                 SetAbacus(abacus,i,pcol,c);
+                 break;
+              }
+           }
+           if ( *GetAbacus(abacus,i,j) != '-' ) {
+             abacus->calls[j] = c;
+           }
         }
-    }
-#endif
-
-    for (j=2*abacus->window_width-1;j>abacus->window_width-1;j--) 
-    {
-        for (k=0; k<vreg.na; k++)
-        {
-            for (l=0; l<vreg.alleles[k].num_reads; l++)
-            {
-                i = vreg.alleles[k].read_ids[l];
-                c = *GetAbacus(abacus,i,j);
-                ccol = j;
-                if ( c != '-' ) 
-                {
-                    //look to the right for a suitable placement
-                    // will be safe on right since abacus has 'n' border
-                    while ( *GetAbacus(abacus,i,ccol+1) == '-' ) 
-                        ccol++;
-                    // now, from ccol back down to j, look for column with matching call
-                    for ( pcol = ccol;pcol>j;pcol--) 
-                    {
-                        call = abacus->calls[pcol]; 
-                        if ( call != 'n' && call != c && c != 'n' ) 
-                            continue;
-                        if ( call == 'n') 
-                            abacus->calls[pcol] = c;
-                        if (abacus->calls[pcol] == c || c == 'n' ) {
-                            SetAbacus(abacus,i,j,'-');
-                            SetAbacus(abacus,i,pcol,c);
-                            break;
-                        }
-                    }
-                    if ( *GetAbacus(abacus,i,j) != '-' ) 
-                        abacus->calls[j] = c;
-                }
-            }
-        }
-    }
-#if DEBUG_ABACUS
-        fprintf(stderr, "Abacus after RightShift before Merge:\n");
-        ShowAbacus(abacus);
-#endif
+     }
+  }
   MergeAbacus(abacus, 1);
   abacus->shift = RIGHT_SHIFT;
   return ScoreAbacus(abacus,rcols);
 }
 
-int32 MixedShift(Abacus *abacus, int *mcols, VarRegion  vreg, int lpos, int rpos,
+int32 MixedShift(Abacus *abacus, int *mcols, AlPair ap, int lpos, int rpos,
    char *template, int long_allele, int short_allele)
 {
    // lcols is the number of non-null columns in result
-   int32 i, j, k, l, ccol, pcol;
-   char c, call;
+   int32 i,j,ccol,pcol;
+   char c,call;
    ResetCalls(abacus);
    int32 window_beg, window_end;
    int shift =0;
@@ -5640,57 +5005,54 @@ int32 MixedShift(Abacus *abacus, int *mcols, VarRegion  vreg, int lpos, int rpos
    for (j=window_beg; j<window_end; j++)
       abacus->calls[j] = template[j];
 
-    /* Perform left shift */
-    for (j=window_beg;j<=MIN(window_end, lpos);j++)
-    {
-        for (k=0; k<vreg.na; k++)
-        {
-            for (l=0; l<vreg.alleles[k].num_reads; l++)
-            {
-                i = vreg.alleles[k].read_ids[l];
-                // Only reads from short allele shouls be shifted
-                if (vreg.alleles[i].id != short_allele)
-                    continue;
+   /* Perform left shift */
+   for (j=window_beg;j<=min(window_end, lpos);j++)
+   {
+      for (i=0;i<abacus->rows;i++)
+      {
+         // Only reads from short allele shouls be shifted
+         if (ap.alleles[i] != short_allele)
+            continue;
 
-                c = *GetAbacus(abacus,i,j);
-                ccol = j;
-                if ( c != '-' )
-                {
-                    //look to the left for a suitable placement
-                    // will be safe on left since abacus has 'n' border
-                    while (( *GetAbacus(abacus,i,ccol-1) == '-' ) &&
-                        (ccol > window_beg)) {
-                        ccol--;
-                    }
-                    // now, from ccol back up to j, look for column with matching call
-                    for ( pcol = ccol;pcol<j;pcol++) {
-                        call = abacus->calls[pcol];
-                        if ( call != 'n' && call != c && c != 'n') 
-                            // GD: consensus in a column == '-' ?
-                            continue;
-                        
-                        if ( call == 'n') {
-                        // GD: found the leftmost column with non-gap consensus =>
-                        //     reset it consensus "dynamically" to the current base
-                        //     Potential problem: this code is biased  in the sense that
-                        //     the result will generally depend on the order in which
-                        //     reads i(or rows) are processed
-                           abacus->calls[pcol] = c;
-                        }
-                        if (abacus->calls[pcol] == c || c == 'n') {
-                           // swap bases in columns pcol and j of row i
-                           SetAbacus(abacus,i,j,'-');
-                           SetAbacus(abacus,i,pcol,c);
-                           break;
-                        }
-                     }
-                     if ( *GetAbacus(abacus,i,j) != '-' ) {
-                       abacus->calls[j] = c;
-                     }
-                 }
-             }
+         c = *GetAbacus(abacus,i,j);
+         ccol = j;
+         if ( c != '-' )
+         {
+            //look to the left for a suitable placement
+            // will be safe on left since abacus has 'n' border
+            while (( *GetAbacus(abacus,i,ccol-1) == '-' ) &&
+                   (ccol > window_beg)) {
+               ccol--;
+            }
+            // now, from ccol back up to j, look for column with matching call
+            for ( pcol = ccol;pcol<j;pcol++) {
+               call = abacus->calls[pcol];
+               if ( call != 'n' && call != c && c != 'n') {
+                  // GD: consensus in a column == '-' ?
+                  continue;
+               }
+               if ( call == 'n') {
+                  // GD: found the leftmost column with non-gap consensus =>
+                  //     reset it consensus "dynamically" to the current base
+                  //     Potential problem: this code is biased  in the sense that
+                  //     the result will generally depend on the order in which
+                  //     reads i(or rows) are processed
+                  abacus->calls[pcol] = c;
+               }
+               if (abacus->calls[pcol] == c || c == 'n') {
+                  // swap bases in columns pcol and j of row i
+                  SetAbacus(abacus,i,j,'-');
+                  SetAbacus(abacus,i,pcol,c);
+                  break;
+               }
+            }
+            if ( *GetAbacus(abacus,i,j) != '-' ) {
+              abacus->calls[j] = c;
+            }
          }
-    }
+      }
+   }
+
 #if 0
    fprintf(stderr, "In MixedShift: window_beg=%d lpos=%d rpos=%d  window_end=%d\n",
        window_beg, lpos, rpos, window_end);
@@ -5699,68 +5061,63 @@ int32 MixedShift(Abacus *abacus, int *mcols, VarRegion  vreg, int lpos, int rpos
       fprintf(stderr, "%c", abacus->calls[i]);
    fprintf(stderr, "\n");
 #endif
-
    /* Perform right shift */
-    for (j=window_end-1;j>(rpos>0?rpos:window_end);j--)
-    {
-        for (k=0; k<vreg.na; k++)
-        {
-            for (l=0; l<vreg.alleles[k].num_reads; l++)
-            {
-                i = vreg.alleles[k].read_ids[l];
-                // Only reads from short allele shouls be shifted
+   for (j=window_end-1;j>(rpos>0?rpos:window_end);j--)
+   {
+      for (i=0;i<abacus->rows;i++)
+      {
+         // Only reads from short allele shouls be shifted
 #if 0
-         fprintf(stderr, "i=%d vreg.alleles[i]=%d short_allele=%d\n", 
-             i, vreg.alleles[i], short_allele);
+         fprintf(stderr, "i=%d ap.alleles[i]=%d short_allele=%d\n", i, ap.alleles[i], short_allele);
 #endif
-                if (vreg.alleles[i].id != short_allele)
-                    continue;
+         if (ap.alleles[i] != short_allele)
+            continue;
 
-                c = *GetAbacus(abacus,i,j);
-                ccol = j;
-                if ( c != '-' )
-                {
-                   //look to the right for a suitable placement
-                   // will be safe on right since abacus has 'n' border
-                    while (( *GetAbacus(abacus,i,ccol+1) == '-') &&
-                        (ccol+1<window_end) ) 
-                        ccol++;
-#if 0
-                    fprintf(stderr, "ccol=%d\n", ccol);
-#endif
-                    // now, from ccol back down to j, look for column with matching call
-                    for ( pcol = ccol;pcol>j;pcol--) {
-                        call = abacus->calls[pcol];
-#if 0
-                        fprintf(stderr, "i=%d j=%d c=%c pcol=%d call=%d \n", 
-                            i, j, c, pcol, call);
-#endif
-                        if ( call != 'n' && call != c && c != 'n' ) {
-                            continue;
-                        }
-                        if ( call == 'n') {
-                            abacus->calls[pcol] = c;
-                        }
-#if 0
-                        fprintf(stderr, "abacus->calls=%c c=%c\n", abacus->calls, c);
-#endif
-                        if (abacus->calls[pcol] == c || c == 'n' ) {
-#if 0
-                            fprintf(stderr, "Swapping elements (%d, %d)=%c  and (%d, %d)='-'\n", 
-                                i, j, c, i, pcol);
-#endif
-                            SetAbacus(abacus,i,j,'-');
-                            SetAbacus(abacus,i,pcol,c);
-                            break;
-                        }
-                    }
-                    if ( *GetAbacus(abacus,i,j) != '-' ) 
-                      abacus->calls[j] = c;
-                }
+         c = *GetAbacus(abacus,i,j);
+         ccol = j;
+         if ( c != '-' )
+         {
+            //look to the right for a suitable placement
+            // will be safe on right since abacus has 'n' border
+            while (( *GetAbacus(abacus,i,ccol+1) == '-') &&
+                   (ccol+1<window_end) ) {
+               ccol++;
             }
-        }
-    }
-// MergeAbacus(abacus, 1);
+#if 0
+            fprintf(stderr, "ccol=%d\n", ccol);
+#endif
+            // now, from ccol back down to j, look for column with matching call
+            for ( pcol = ccol;pcol>j;pcol--) {
+               call = abacus->calls[pcol];
+#if 0
+               fprintf(stderr, "i=%d j=%d c=%c pcol=%d call=%d \n", i, j, c, pcol, call);
+#endif
+               if ( call != 'n' && call != c && c != 'n' ) {
+                  continue;
+               }
+               if ( call == 'n') {
+                  abacus->calls[pcol] = c;
+               }
+#if 0
+               fprintf(stderr, "abacus->calls=%c c=%c\n", abacus->calls, c);
+#endif
+               if (abacus->calls[pcol] == c || c == 'n' ) {
+#if 0
+               fprintf(stderr, "Swapping elements (%d, %d)=%c  and (%d, %d)='-'\n", i, j, c, i, pcol);
+#endif
+                  SetAbacus(abacus,i,j,'-');
+                  SetAbacus(abacus,i,pcol,c);
+                  break;
+               }
+            }
+            if ( *GetAbacus(abacus,i,j) != '-' ) {
+              abacus->calls[j] = c;
+            }
+
+         }
+      }
+   }
+   MergeAbacus(abacus, 1);
    abacus->shift = MIXED_SHIFT;
    return ScoreAbacus(abacus,mcols);
 }
@@ -5788,11 +5145,11 @@ int ApplyAbacus(Abacus *a, CNS_Options *opp)
   int columns=0;
   int32 bid,eid,i;
   char a_entry;
-  double fict_var;   // variation is a column
+  double var;   // variation is a column
   Bead *bead,*exch_bead;
-  VarRegion  vreg;
+  AlPair ap;
 
-  SetDefault(&vreg);
+  SetDefault(&ap);
   if ( a->shift == LEFT_SHIFT) 
   {
      column = GetColumn(columnStore,a->start_column);
@@ -5867,7 +5224,7 @@ int ApplyAbacus(Abacus *a, CNS_Options *opp)
                 exch_bead->boffset);
          */
        }
-       BaseCall(column->lid, 1, &fict_var, &vreg, -1, &base, 0, 0, opp);
+       BaseCall(column->lid, 1, &var, &ap, -1, &base, 0, 0, opp);
        column = GetColumn(columnStore,column->next);
        columns++;
      } 
@@ -5936,7 +5293,7 @@ int ApplyAbacus(Abacus *a, CNS_Options *opp)
                 exch_bead->boffset);
          */
        }
-       BaseCall(column->lid, 1, &fict_var, &vreg, -1, &base, 0, 0, opp);
+       BaseCall(column->lid, 1, &var, &ap, -1, &base, 0, 0, opp);
        column = GetColumn(columnStore,column->prev);
        columns++;
      } 
@@ -6092,6 +5449,34 @@ int IdentifyWindow(Column **start_column, int *stab_bgn, CNS_RefineLevel level)
    return rc;
 }
 
+static void
+PopulateDistMatrixForAbacus(char **bases, int len, int *max_element, AlPair *ap,
+    Abacus *abacus)
+{
+    int i, j;
+
+   *max_element = 0;
+
+    // Update the matrix
+    for (i=0; i<ap->nr; i++) {
+        for (j=i; j<ap->nr; j++) {
+            int k;
+
+            for (k=0; k<len; k++) {
+                if (bases[i][k] != bases[j][k] &&
+                    bases[i][k] != 'n'         &&
+                    bases[j][k] != 'n') 
+                {
+                    ap->dist_matrix[i][j] += 1;
+                    ap->dist_matrix[j][i] += 1;
+                }
+            }
+            if (*max_element < ap->dist_matrix[i][j])
+                *max_element = ap->dist_matrix[i][j];
+        }
+    }
+}
+
 void ShowCalls(Abacus *abacus)
 {
     int j;
@@ -6102,10 +5487,17 @@ void ShowCalls(Abacus *abacus)
 }
 
 static void 
-GetReadsForAbacus(Read *reads, Abacus *abacus)
+GetReadsForAbacus(char ***reads, Abacus *abacus)
 {
     int i, j, shift=0;
     char base;
+
+   *reads = (char **)safe_malloc(abacus->rows * sizeof(char *)); 
+    for (i=0; i<abacus->rows; i++) {
+       (*reads)[i] = (char *)safe_malloc(abacus->columns *sizeof(char));
+        for (j=0; j<abacus->window_width; j++)
+           (*reads)[i][j] = '-';
+    }
 
 #if 0
     fprintf(stderr, "rows=%lu shift=%c window_width=%lu \nReads= \n",
@@ -6116,18 +5508,111 @@ GetReadsForAbacus(Read *reads, Abacus *abacus)
     else if (abacus->shift == RIGHT_SHIFT)
         shift = 2*abacus->columns; 
     for (i=0; i<abacus->rows; i++) {
-        reads[i].id = i;
-        reads[i].allele_id = -1;
-        reads[i].ave_qv = 20.;        // qvs are hardly available for abacus
-        reads[i].uglen = 0;
         for (j=0; j<abacus->columns; j++) {
             base = *GetAbacus(abacus,i,j);
             if (is_good_base(base))
-                reads[i].bases[j] = base;                        
-            if (base != '-')
-                reads[i].uglen++;
+                (*reads)[i][j] = base;                        
         }
     }
+}
+
+static void
+AllocateDistMatrixForAbacus(AlPair *ap)
+{
+    int j, k;
+
+    ap->dist_matrix = (int **)safe_calloc(ap->nr, sizeof(int *));
+    for (j=0; j<ap->nr; j++)
+    {
+        ap->dist_matrix[j] = (int *)safe_calloc(ap->nr, sizeof(int));
+    }
+}
+
+/*******************************************************************************
+ * Function: ClusterReadsForAbacus
+ * Purpose:  split reads between two alleles, determine the best allele
+ *******************************************************************************
+ */
+static void
+ClusterReadsForAbacus(AlPair *ap, char **reads, Abacus *abacus)
+{
+    int i, j;
+    int largest = -100;
+    int seed0=-1, seed1=-1;
+    int nr0 = 0, nr1 = 0;
+    int sum_ng0=0, sum_ng1=0;
+
+    if (ap->nr <= 1) {
+       ap->best_allele = 0;
+       ap->alleles[0] = 0;
+       return;
+    }
+
+    // Find the largest element of a distance matrix and the "seed" reads
+    for (i=0; i<ap->nr; i++) {
+        for (j=i; j<ap->nr; j++) {
+//          if (j== i)
+//              continue;
+
+            if (largest < ap->dist_matrix[i][j]) {
+                largest = ap->dist_matrix[i][j];
+                seed0 = i;
+                seed1 = j;
+            }
+        }
+    }
+    ap->alleles[seed0] = 0;
+    ap->alleles[seed1] = 1;
+
+    // Split reads between two alleles based on their distance from the seed reads
+    for (i=0; i<ap->nr; i++) {
+        if ((i==seed0) || (i==seed1))
+           continue;
+
+        if (ap->dist_matrix[i][seed0] < ap->dist_matrix[i][seed1])
+            ap->alleles[i] = 0;
+        else
+            ap->alleles[i] = 1;
+    }
+
+    // Select the best allele based on the number of non-gaps
+    for (i=0; i<ap->nr; i++) {
+        if (ap->alleles[i] == 0) {
+            int j;
+            for (j=0; j<abacus->columns; j++) {
+                if (reads[i][j] != '-')
+                    sum_ng0++;
+            }
+            nr0++;
+        }
+        else {
+            int j;
+            for (j=0; j<abacus->columns; j++) {
+                if (reads[i][j] != '-')
+                    sum_ng1++;
+            }
+            nr1++;
+        }
+    }
+
+#if 0
+    fprintf(stderr, "sum_qv0= %d sum_qv1= %d\n", sum_qv0, sum_qv1);
+#endif
+    if (sum_ng0 > sum_ng1) {
+        ap->best_allele = 0;
+        ap->ratio = (double)sum_ng1/(double)sum_ng0;
+        ap->nr_best_allele = nr0;
+    }
+    else {
+        ap->best_allele = 1;
+        ap->ratio = (double)sum_ng0/(double)sum_ng1;
+        ap->nr_best_allele = nr1;
+    }
+#if 0
+    fprintf(stderr, "sum_qv0 = %d sum_qv1 = %d best_allele = %d ratio = %f nrb = %d\n",
+        sum_qv0,  sum_qv1, ap->best_allele, ap->ratio, ap->nr_best_allele);
+#endif
+
 }
 
 static int 
@@ -6143,7 +5628,7 @@ base2int(char b)
 }
 
 static void
-GetConsensusForAbacus(VarRegion  *vreg, Read *reads, Abacus *abacus, 
+GetConsensusForAbacus(AlPair *ap, char **reads, Abacus *abacus, 
     char ***consensus)
 {
     int i, j;
@@ -6166,14 +5651,14 @@ GetConsensusForAbacus(VarRegion  *vreg, Read *reads, Abacus *abacus,
         char cbase0, cbase1;
         for (j=0; j<abacus->rows; j++) {
 #if 0
-            fprintf(stderr, " reads[%d][%d]= %c\n", j, i, reads[j].bases[i]);
+            fprintf(stderr, " reads[%d][%d]= %c\n", j, i, reads[j][i]);
 #endif
-            if (is_good_base(reads[j].bases[i]))
+            if (is_good_base(reads[j][i]))
             {
-                if   (vreg->alleles[j].id == 0) 
-                    bcount0[base2int(reads[j].bases[i])]++;         
+                if   (ap->alleles[j] == 0) 
+                    bcount0[base2int(reads[j][i])]++;         
                 else                       
-                    bcount1[base2int(reads[j].bases[i])]++;
+                    bcount1[base2int(reads[j][i])]++;
             }
         }
         for (j=0; j<CNS_NALPHABET; j++) {
@@ -6525,50 +6010,26 @@ void  GetTemplateForAbacus(char **template, char **consensus, int len,
 int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
     CNS_Options *opp ) 
 {
-    int orig_columns=0, left_columns=0, right_columns=0, best_columns=0;
-    // Mismatch, gap and total scores:
+    int   orig_columns=0, left_columns=0, right_columns=0, 
+          best_columns=0;
+    // Mismatch scores:
     int32 orig_mm_score=0, left_mm_score=0, right_mm_score=0, best_mm_score=0;
+    int32 score_reduction=0;
     int32 orig_gap_score=0, left_gap_score=0, right_gap_score=0,
           best_gap_score = 0;
     int32 orig_total_score, left_total_score, right_total_score, 
           best_total_score;
-    int32 max_element = 0, score_reduction;
+    int   max_element = 0;
     BaseCount abacus_count;
     Abacus *left_abacus, *orig_abacus, *right_abacus, *best_abacus;
-    VarRegion  vreg;
+    AlPair  ap;
 
+    SetDefault(&ap);
     orig_abacus = CreateAbacus(ma->lid,start_column->lid,stab_bgn);
-    SetDefault(&vreg);
-    vreg.nr = orig_abacus->rows;
     //ShowAbacus(orig_abacus);
+    MergeAbacus(orig_abacus, 1);
     orig_mm_score = ScoreAbacus(orig_abacus,&orig_columns);
-
-    // Process reads of the original abacus
-    AllocateDistMatrix(&vreg, 0);
-    AllocateMemoryForReads(&vreg.reads, orig_abacus->rows, orig_abacus->columns,
-        QV_FOR_MULTI_GAP);
-    vreg.beg = 0;
-    vreg.end = orig_abacus->columns-1;
-    GetReadsForAbacus(vreg.reads, orig_abacus);
 #if 0
-    OutputReads(stderr, vreg.reads, vreg.nr, orig_abacus->columns);
-#endif
-    PopulateDistMatrix(vreg.reads, orig_abacus->columns, &vreg);
-#if DEBUG_ABACUS
-    OutputDistMatrix(stderr, &vreg);
-#endif
-    AllocateMemoryForAlleles(&vreg.alleles, vreg.nr, &vreg.na);
-    ClusterReads(vreg.reads, vreg.nr, vreg.alleles, &vreg.na,
-        &vreg.nca, vreg.dist_matrix);
-    SortConfirmedAllelesByLength(vreg.alleles, vreg.nca, vreg.reads);
-#if 0
-        fprintf(stderr, "vreg.alleles= ");
-        for (i=0; i<vreg.nr; i++)
-            fprintf(stderr, "%d", vreg.alleles[i]);
-
-#endif
-
-#if DEBUG_ABACUS
     fprintf(stderr, "\n\nOrigCalls=\n");
     ShowCalls(orig_abacus);
     fprintf(stderr, "Abacus=\n");
@@ -6577,22 +6038,22 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
 #endif
     //ShowAbacus(orig_abacus);
     left_abacus = CloneAbacus(orig_abacus);
-    left_mm_score = LeftShift(left_abacus, vreg, &left_columns);
-#if DEBUG_ABACUS
-        fprintf(stderr, "\n\nLeftShiftCalls=\n");
-        ShowCalls(left_abacus);
-        fprintf(stderr, "Abacus=\n");
-        ShowAbacus(left_abacus);
-        fprintf(stderr, "\n");
+    left_mm_score = LeftShift(left_abacus,&left_columns);
+#if 0
+    fprintf(stderr, "\n\nLeftShiftCalls=\n");
+    ShowCalls(left_abacus);
+    fprintf(stderr, "Abacus=\n");
+    ShowAbacus(left_abacus);
+    fprintf(stderr, "\n");
 #endif
     right_abacus = CloneAbacus(orig_abacus);
-    right_mm_score = RightShift(right_abacus, vreg, &right_columns);
-#if DEBUG_ABACUS
-        fprintf(stderr, "\n\nRightShiftCalls=\n");
-        ShowCalls(right_abacus);
-        fprintf(stderr, "Abacus=\n");
-        ShowAbacus(right_abacus);
-        fprintf(stderr, "\n");
+    right_mm_score = RightShift(right_abacus,&right_columns);
+#if 0
+    fprintf(stderr, "\n\nRightShiftCalls=\n");
+    ShowCalls(right_abacus);
+    fprintf(stderr, "Abacus=\n");
+    ShowAbacus(right_abacus);
+    fprintf(stderr, "\n");
 #endif
     //fprintf(stderr,"Abacus Report:\norig_mm_score: %d left_mm_score: %d right_mm_score: %d\n",
     //             orig_mm_score,left_mm_score,right_mm_score);
@@ -6611,22 +6072,15 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
     right_total_score = right_mm_score + right_columns + right_gap_score;
     best_total_score  = orig_total_score;
 
-#if DEBUG_ABACUS
-    fprintf(stderr, "In RefineWindow: beg= %lu end= %d\n", 
-        start_column->lid, stab_bgn);
-    fprintf(stderr, "    abacus->columns= %d, abacus->rows= %d\n", 
-        orig_abacus->columns, orig_abacus->rows);
-    fprintf(stderr, "    w_width left= %d orig= %d right= %d\n", 
-        left_abacus->window_width, orig_abacus->window_width,
-        right_abacus->window_width);
-    fprintf(stderr, "    mm_score left= %d orig= %d right= %d\n", 
-        left_mm_score, orig_mm_score, right_mm_score);
-    fprintf(stderr, "     columns left= %d orig= %d right= %d\n", 
-        left_columns, orig_columns, right_columns);
-    fprintf(stderr, "   gap_score left= %d orig= %d right= %d\n", 
-        left_gap_score, orig_gap_score, right_gap_score);
-    fprintf(stderr, " total_score left= %d orig= %d right= %d\n", 
-        left_total_score, orig_total_score, right_total_score);
+#if 0
+    fprintf(stderr, "In RefineWindow: beg= %lu end= %d\n", start_column->lid, stab_bgn);
+    fprintf(stderr, "    abacus->columns= %d, abacus->rows= %d\n", orig_abacus->columns, orig_abacus->rows);
+    fprintf(stderr, "    w_width left= %d orig= %d right= %d\n", left_abacus->window_width, orig_abacus->window_width,
+                                                                     right_abacus->window_width);
+    fprintf(stderr, "    mm_score left= %d orig= %d right= %d\n", left_mm_score, orig_mm_score, right_mm_score);
+    fprintf(stderr, "     columns left= %d orig= %d right= %d\n", left_columns, orig_columns, right_columns);
+    fprintf(stderr, "   gap_score left= %d orig= %d right= %d\n", left_gap_score, orig_gap_score, right_gap_score);
+    fprintf(stderr, " total_score left= %d orig= %d right= %d\n", left_total_score, orig_total_score, right_total_score);
 #endif
 
     // Use the total score to refine the abacus
@@ -6642,9 +6096,6 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
             fprintf(stderr, " Applying left abacus\n");
 #endif
             best_abacus      = left_abacus;
-            best_mm_score    = left_mm_score;
-            best_columns     = left_columns;
-            best_gap_score   = left_gap_score;
             best_total_score = left_total_score;
         }
         else
@@ -6657,20 +6108,18 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
             fprintf(stderr, " Applying right abacus\n");
 #endif
             best_abacus      = right_abacus;
-            best_mm_score    = right_mm_score;
-            best_columns     = right_columns;
-            best_gap_score   = right_gap_score;
             best_total_score = right_total_score;
         }
     }
-
 #if 0
     fprintf(stderr, "Best Abacus Before MixedShift=\n");
     ShowAbacus(best_abacus);
 #endif
+
     { 
-        int i, j;
-        char  **consensus=NULL, **ugconsensus=NULL, *template=NULL;
+        int i;
+        AlPair  ap;
+        char  **reads=NULL, **consensus=NULL, **ugconsensus=NULL, *template=NULL;
         int   **imap=NULL, uglen[2]={0,0}, adjleft[2]={-1,-1}, adjright[2]={-1,-1};
         int     gapcount[2], short_allele=-1, long_allele=-1;
         int     lscore=0, rscore=0, lpos=-1, rpos=-1;
@@ -6678,7 +6127,79 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
         int32   mixed_mm_score=0, mixed_gap_score=0;
         Abacus *mixed_abacus=NULL;
 
-        GetConsensusForAbacus(&vreg, vreg.reads, best_abacus, &consensus);
+        SetDefault(&ap);
+        ap.nr = best_abacus->rows;
+        ap.alleles = (char *)safe_calloc(ap.nr, sizeof(char));
+        ap.sum_qvs = (int  *)safe_calloc(ap.nr, sizeof(int));
+        {
+            int j;
+            for (j=0; j<ap.nr; j++)
+                ap.alleles[j] = -1;
+        }
+
+        AllocateDistMatrixForAbacus(&ap);
+        GetReadsForAbacus(&reads, best_abacus);
+#if 0
+    fprintf(stderr, "\nReads =\n");
+    {
+        int j;
+        for (i=0; i<ap.nr; i++)
+        {
+            for (j=0; j<3*best_abacus->window_width; j++)
+                fprintf(stderr, "%c", reads[i][j]);
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n\n");
+    }
+#endif
+        PopulateDistMatrixForAbacus(reads, 3*best_abacus->window_width,
+            &max_element, &ap, best_abacus);
+#if 0
+    fprintf(stderr, "Max element =%d ap.nr=%d num_rows=%d\n", max_element,
+              ap.nr, best_abacus->rows);
+#endif
+#if 0
+      OutputDistMatrix(&ap);
+#endif
+
+    /* If only one allele is detected, as indicated by small distance between
+     * the reads, apply the best abacus so far and quit
+     */
+#if 0
+        fprintf(stderr, "max_element = %d\n", max_element);
+#endif
+        if (max_element < 3)
+        {
+#if 0
+        fprintf(stderr, "No MixedShift will be performed: max_element = %d < 3\n", max_element);
+#endif
+            ApplyAbacus(best_abacus, opp);
+
+            DeleteAbacus(orig_abacus);
+            DeleteAbacus(left_abacus);
+            DeleteAbacus(right_abacus);
+            if (ap.nr > 0) {
+                int j;
+                for (j=0; j<ap.nr; j++)
+                    FREE(reads[j]);
+                FREE(reads);
+                FREE(ap.sum_qvs);
+                FREE(ap.alleles);
+                for (j=0; j<ap.nr; j++)
+                    FREE(ap.dist_matrix[j]);
+                FREE(ap.dist_matrix);
+            }
+            return score_reduction;
+        }
+
+        ClusterReadsForAbacus(&ap, reads, best_abacus);
+#if 0
+        fprintf(stderr, "ap.alleles= ");
+        for (i=0; i<ap.nr; i++)
+            fprintf(stderr, "%d", ap.alleles[i]);
+
+#endif
+        GetConsensusForAbacus(&ap, reads, best_abacus, &consensus);
 #if 0
         fprintf(stderr, "\nconsensus[0]=\n");
         for (i=0; i<3*best_abacus->window_width; i++)
@@ -6705,19 +6226,17 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
             DeleteAbacus(orig_abacus);
             DeleteAbacus(left_abacus);
             DeleteAbacus(right_abacus);
-            if (vreg.nr > 0)
+            if (ap.nr > 0)
             {
                 int j;
-                for (j=0; j<vreg.nr; j++)
-                {
-                    FREE(vreg.alleles[j].read_ids);
-                    FREE(vreg.dist_matrix[j]);
-                    FREE(vreg.reads[j].bases);
-                    FREE(vreg.reads[j].qvs);
-                }
-                FREE(vreg.reads);
-                FREE(vreg.alleles);
-                FREE(vreg.dist_matrix);
+                for (j=0; j<ap.nr; j++)
+                    FREE(reads[j]);
+                FREE(reads);
+                FREE(ap.sum_qvs);
+                FREE(ap.alleles);
+                for (j=0; j<ap.nr; j++)
+                    FREE(ap.dist_matrix[j]);
+                FREE(ap.dist_matrix);
             }
             FREE(consensus[0]);
             FREE(consensus[1]);
@@ -6738,19 +6257,17 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
             DeleteAbacus(orig_abacus);
             DeleteAbacus(left_abacus);
             DeleteAbacus(right_abacus);
-            if (vreg.nr > 0)
+            if (ap.nr > 0)
             {
                 int j;
-                for (j=0; j<vreg.nr; j++)
-                {
-                    FREE(vreg.alleles[j].read_ids);
-                    FREE(vreg.dist_matrix[j]);
-                    FREE(vreg.reads[j].bases);
-                    FREE(vreg.reads[j].qvs);
-                }
-                FREE(vreg.reads);
-                FREE(vreg.alleles);
-                FREE(vreg.dist_matrix);
+                for (j=0; j<ap.nr; j++)
+                    FREE(reads[j]);
+                FREE(reads);
+                FREE(ap.sum_qvs);
+                FREE(ap.alleles);
+                for (j=0; j<ap.nr; j++)
+                    FREE(ap.dist_matrix[j]);
+                FREE(ap.dist_matrix);
             }
             FREE(consensus[0]);
             FREE(consensus[1]);
@@ -6793,7 +6310,7 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
             ugconsensus, uglen, lpos, rpos, imap, adjleft, adjright,
             short_allele, long_allele);
 
-        mixed_abacus = CloneAbacus(orig_abacus);
+        mixed_abacus = CloneAbacus(best_abacus);
 #if 0
    {
    fprintf(stderr, "Template = \n");
@@ -6805,7 +6322,7 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
    fprintf(stderr, "   Final lpos=%d rpos=%d window_width=%d long_allele=%d short_allele=%d\n",
           lpos, rpos, best_abacus->window_width, long_allele, short_allele);
 #endif
-        mixed_mm_score = MixedShift(mixed_abacus, &mixed_columns, vreg, lpos, rpos,
+        mixed_mm_score = MixedShift(mixed_abacus, &mixed_columns, ap, lpos, rpos,
             template, long_allele, short_allele);
 
 #if 0
@@ -6837,7 +6354,7 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
         ShowAbacus(best_abacus);
 #endif
 
-//      OutputDistMatrix(stderr, &vreg);
+//      OutputDistMatrix(&ap);
 
 #if 0
         {
@@ -6854,15 +6371,15 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
 #endif
 
     /* Otherwise, try to do a more sophisticated shift:
-     * - only shifting reads of the shortest allele
-     * - only within a subregion of abacus window where the alleles match
+     * - only shifting reads of the short allele
+     * - only within a subregion of abacus window where the two alleles match
      */
 #if 0
         fprintf(stderr, "Applying the Best abacus\n");
 #endif
         ApplyAbacus(best_abacus, opp);
 
-//      fprintf(stderr, "vreg.nr = %d\n", vreg.nr);
+//      fprintf(stderr, "ap.nr = %d\n", ap.nr);
 
         DeleteAbacus(orig_abacus);
         DeleteAbacus(left_abacus);
@@ -6880,19 +6397,17 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
           FREE(imap);
           FREE(template);
         }
-        if (vreg.nr > 0)
+        if (ap.nr > 0)
         {
             int j;
-            for (j=0; j<vreg.nr; j++)
-            {
-                FREE(vreg.alleles[j].read_ids);
-                FREE(vreg.dist_matrix[j]);
-                FREE(vreg.reads[j].bases);
-                FREE(vreg.reads[j].qvs);
-            }
-            FREE(vreg.reads);
-            FREE(vreg.alleles);
-            FREE(vreg.dist_matrix);
+            for (j=0; j<ap.nr; j++)
+                FREE(reads[j]);
+            FREE(reads);
+            FREE(ap.sum_qvs);
+            FREE(ap.alleles);
+            for (j=0; j<ap.nr; j++)
+                FREE(ap.dist_matrix[j]);
+            FREE(ap.dist_matrix);
         }
     }
     return score_reduction;
@@ -6908,7 +6423,7 @@ int RefineWindow(MANode *ma, Column *start_column, int stab_bgn,
 //   applied to window of the MultiAlignment
 //*********************************************************************************
 
-int AbacusRefine(MANode *ma, int32 from, int32 to, CNS_RefineLevel level,
+int AbacusRefine(MANode *ma,int32 from, int32 to, CNS_RefineLevel level,
     CNS_Options *opp) 
 {
   // from and to are in ma's column coordinates
@@ -6929,21 +6444,17 @@ int AbacusRefine(MANode *ma, int32 from, int32 to, CNS_RefineLevel level,
   }
 
   ResetIndex(abacus_indices,GetNumFragments(fragmentStore));
-  sid = *Getint32(ma->columns,from);   // id of the starting column
-  eid = *Getint32(ma->columns,to);     // id of the ending column
+  sid = *Getint32(ma->columns,from);
+  eid = *Getint32(ma->columns,to);
   start_column = GetColumn(columnStore,sid);
 
   while (start_column->lid != eid) 
   {
-    int window_width = IdentifyWindow(&start_column,&stab_bgn, level);
+    int window_width=0;
     // start_column stands as the candidate for first column in window 
     // look for window start and stop
-
-      if (window_width > 0)
+      if ( (window_width = IdentifyWindow(&start_column,&stab_bgn, level)) > 0 ) 
       {
-#if DEBUG_ABACUS
-          fprintf(stderr, "In AbacusRefine window_width= %d\n", window_width);
-#endif
        //
        // refine in window
           if ( start_column->prev == -1 ) {
@@ -6960,18 +6471,13 @@ int AbacusRefine(MANode *ma, int32 from, int32 to, CNS_RefineLevel level,
                            newbead, firstbead->boffset);
            ColumnAppend(firstbead->column_index,newbead);
           }
-
-          //  if the window is too big, there's likely a polymorphism
-          //  that won't respond well to abacus, so skip it
-          //
-          //  BPW saw crashes with large window_width's (1333, 3252,
-          //  1858, 675, 855, 1563, 601, 1102).  The longest
-          //  window_width that worked was 573.  Previous versions
-          //  used 100 here.  Not sure what it should be.
-          //
-          if ( window_width < MAX_WINDOW_FOR_ABACUS_REFINE )
-            score_reduction += RefineWindow(ma,start_column,stab_bgn, opp); 
-
+          if ( window_width < 100 ) { // if the window is too big, there's likely a 
+                                      // polymorphism that won't respond well to abacus, so skip it
+#if 0
+            fprintf(stderr, "window_width = %d\n", window_width);
+#endif
+            score_reduction += RefineWindow(ma,start_column,stab_bgn, opp);
+          } 
           start_column = GetColumn(columnStore, stab_bgn);
       }
       start_column = GetColumn(columnStore, stab_bgn);
@@ -7648,7 +7154,7 @@ int MultiAlignUnitig(IntUnitigMesg *unitig,
 
         if (cnslog != NULL && printwhat != CNS_QUIET && printwhat != CNS_STATS_ONLY) 
         {
-          //fprintf(stderr,"Should print alignment!\n");
+          fprintf(stderr,"Should print alignment!\n");
           PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
         }
     }
@@ -7991,7 +7497,6 @@ int MultiAlignContig(IntConConMesg *contig,
        fprintf(stderr, "Null contig #%d detected\n", contig->iaccession);
        return EXIT_FAILURE;
    }
-
    num_unitigs = contig->num_unitigs;
    num_frags = contig->num_pieces;
    upositions = contig->unitigs;
@@ -8030,8 +7535,7 @@ int MultiAlignContig(IntConConMesg *contig,
        hash_rc = InsertInPHashTable_AS(&thash,IDENT_NAMESPACE, (uint64) contig->pieces[i].ident, &value, FALSE,FALSE);
      }
      //if ( cnslog != NULL ) {
-     // fprintf(cnslog,"Contigging ICM %d:\n",contig->iaccession);
-     contig_id = contig->iaccession;
+     //  fprintf(cnslog,"Contigging ICM %d:\n",contig->iaccession);
      //}
      for (i=0;i<num_unitigs;i++) {
        complement = (upositions[i].position.bgn<upositions[i].position.end)?0:1;
@@ -8099,17 +7603,6 @@ int MultiAlignContig(IntConConMesg *contig,
                 fprintf(stderr, "overlaps with current unitig %d\n",
                         bfrag->iid);
               }
-
-              if ( align_to < 0 && ! try_contained ) {
-                try_contained = 1;
-                if (VERBOSE_MULTIALIGN_OUTPUT) {
-                  fprintf(stderr, "MultiAligncontig: trying contained afrags ");
-                  fprintf(stderr, "for bfrag %d\n", bfrag->iid);
-                }
-                align_to = i-1;
-		continue;
-              }
-
               break;
             }
             afrag = GetFragment(fragmentStore, align_to);
@@ -8119,7 +7612,7 @@ int MultiAlignContig(IntConConMesg *contig,
             {
               if (VERBOSE_MULTIALIGN_OUTPUT) {
                 fprintf(stderr, "MultiAlignContig: positions of afrag ");
-                fprintf(stderr, "%d and bfrag %d do not overlvreg. ",
+                fprintf(stderr, "%d and bfrag %d do not overlap. ",
                         afrag->iid, bfrag->iid);
                 fprintf(stderr, "Proceed to the next upstream afrag\n");
               }
@@ -8150,7 +7643,7 @@ int MultiAlignContig(IntConConMesg *contig,
                                                     trace, &otype, COMPARE_FUNC,SHOW_OLAP,0);
                  }
 
-                 // here, calculate the appropriate allowable endgvreg.
+                 // here, calculate the appropriate allowable endgap.
                  //  ------------ afrag
                  //     ----------- bfrag
                  //         ------------------ nextfrag
@@ -8316,7 +7809,6 @@ int MultiAlignContig(IntConConMesg *contig,
      {
         IntMultiVar  *vl=NULL;
         int32 nv=0;
-        int score_reduction;
         MergeRefine(ma->lid, NULL, NULL, opp, 0);
         AbacusRefine(ma,0,-1,CNS_POLYX, opp);
         if ( cnslog != NULL && printwhat == CNS_VERBOSE) {
@@ -8324,7 +7816,7 @@ int MultiAlignContig(IntConConMesg *contig,
           PrintAlignment(cnslog,ma->lid,0,-1,printwhat);
         }
         RefreshMANode(ma->lid, 0, opp, &nv, &vl, 0, 0);
-        score_reduction = AbacusRefine(ma,0,-1,CNS_INDEL, opp);
+        AbacusRefine(ma,0,-1,CNS_INDEL, opp);
         MergeRefine(ma->lid, &(contig->v_list), &(contig->num_vars), opp, 2);
      }
 
@@ -8575,10 +8067,10 @@ int ExamineMANode(FILE *outFile,int32 sid, int32 mid, UnitigData *tigData,int nu
   int tindex=0;
   UnitigData *tig;
   MANode *ma = GetMANode(manodeStore,mid);
-  VarRegion  vreg;
+  AlPair ap;
   char base;
 
-  SetDefault(&vreg);
+  SetDefault(&ap);
   if (ma == NULL ) CleanExit("RefreshMANode ma==NULL",__LINE__,1);
   if ( ma->first == -1 ) return 1;
   cid = ma->first;
@@ -8595,7 +8087,7 @@ int ExamineMANode(FILE *outFile,int32 sid, int32 mid, UnitigData *tigData,int nu
     qv = *Getchar(qualityStore,cbead->soffset);
     fprintf(outFile,"%d\t%d\t%d\t%d\t%c\t%c\t" ,sid,ma->iid,index,ugindex,base,qv);
     ShowBaseCountPlain(outFile,&column->base_count);
-    BaseCall(cid, 1, &var, &vreg, vreg.alleles[0].id, &base, 0, 0, opp); 
+    BaseCall(cid, 1, &var, &ap, ap.best_allele, &base, 0, 0, opp); 
          // recall with quality on (and QV parameters set by user)
     fprintf(outFile,"%c\t%c\t", *Getchar(sequenceStore,cbead->soffset), 
         *Getchar(qualityStore,cbead->soffset));
@@ -8623,7 +8115,7 @@ int ExamineMANode(FILE *outFile,int32 sid, int32 mid, UnitigData *tigData,int nu
   return 1;
 }
 
-// static int utl_counts[4]={0,0,0,0};
+static int utl_counts[4]={0,0,0,0};
 
 
 int ExamineConfirmedMMColumns(FILE *outFile,int32 sid, int32 mid, UnitigData *tigData,int num_unitigs) {

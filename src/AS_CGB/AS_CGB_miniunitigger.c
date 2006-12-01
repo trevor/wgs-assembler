@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 /*********************************************************************
- * $Id: AS_CGB_miniunitigger.c,v 1.7 2006-11-14 19:58:21 eliv Exp $
+ * $Id: AS_CGB_miniunitigger.c,v 1.4 2005-03-22 19:48:29 jason_miller Exp $
  * Module:  AS_CGB_miniunitigger
  * Description: 
  * Assumptions:
@@ -34,15 +34,15 @@
 #include "AS_CGB_miniunitigger.h"
 
 #if 0
-#define MAX(a,b) (a > b ? a : b)
-#define MIN(a,b) (a < b ? a : b)
+#define max(a,b) (a > b ? a : b)
+#define min(a,b) (a < b ? a : b)
 #define FALSE 0
 #undef DEBUGGING1
 #undef DEBUGGING2
 #endif
 
 /*************************************************************************/
-static char CM_ID[] = "$Id: AS_CGB_miniunitigger.c,v 1.7 2006-11-14 19:58:21 eliv Exp $";
+static char CM_ID[] = "$Id: AS_CGB_miniunitigger.c,v 1.4 2005-03-22 19:48:29 jason_miller Exp $";
 /*************************************************************************/
 
 extern int REAPER_VALIDATION;
@@ -122,7 +122,8 @@ MiniUnitiggerObject *createMiniUnitigger
 )
 { 
   MiniUnitiggerStruct * self 
-    = (MiniUnitiggerStruct *) safe_malloc(sizeof(MiniUnitiggerStruct));
+    = (MiniUnitiggerStruct *) malloc(sizeof(MiniUnitiggerStruct));
+  assert(NULL != self);
   memset( self, 0, sizeof(MiniUnitiggerStruct));
 
   {  

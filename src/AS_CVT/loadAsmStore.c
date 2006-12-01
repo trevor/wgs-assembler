@@ -24,6 +24,7 @@
 
 #include "AS_global.h"
 #include "ASMData.h"
+#include "AS_UTL_systemdebug.h"
 
 int main(int argc, char ** argv)
 {

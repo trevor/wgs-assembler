@@ -32,10 +32,10 @@
 
 #include "Instrument_CGW.h"
 
-VA_DEF(Segment);
-VA_DEF(Local_Overlap);
-VA_DEF(Scaffold_Gap);
-VA_DEF(Scaffold_Tig);
+VA_DEF(Segment)
+VA_DEF(Local_Overlap)
+VA_DEF(Scaffold_Gap)
+VA_DEF(Scaffold_Tig)
 
 typedef struct
 {
@@ -47,7 +47,7 @@ typedef struct
   NodeOrient orient;
 } ContigElement;
 
-VA_DEF(ContigElement);
+VA_DEF(ContigElement)
 
 typedef struct
 {
@@ -82,6 +82,7 @@ typedef struct
 typedef struct
 {
   ScaffoldAlignmentInterface * sai;
+  int doInterleaving;
   int contigNow;
   int checkForTinyScaffolds;
   int checkAbutting;

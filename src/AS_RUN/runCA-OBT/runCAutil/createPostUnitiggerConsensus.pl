@@ -2,25 +2,23 @@ use strict;
 
 sub createPostUnitiggerConsensusJobs(@) {
     my @cgbFiles  = @_;
+    my $pstats    = getGlobal("processStats");
 
     if (! -e "$wrk/5-consensus/$asm.partFile") {
 
         #  Then, build a partition information file, and do the partitioning.
         #
-        open(G, "> $wrk/5-consensus/$asm.partFile") or die;
         foreach my $f (@cgbFiles) {
             if ($f =~ m/^.*(\d\d\d).cgb$/) {
-                my $part = $1;
-                open(F, "grep ^mid: $f |") or die;
-                while (<F>) {
-                    print G "$part $1\n" if (m/^mid:(\d+)$/);                        
+                if (runCommand("grep mid: $f | sed 's/mid:/$1 /' >> $wrk/5-consensus/$asm.partFile")) {
+                    rename "$wrk/5-consensus/$asm.partFile", "$wrk/5-consensus/$asm.partFile.FAILED";
+                    die "Failed to grep mid: from CGB output in $f.\n";
                 }
-                close(F);
             } else {
                 die "CGB file didn't match ###.cgb!\n";
             }
         }
-        close(G);
+        close(F);
 
         my $cmd;
         $cmd  = "$bin/partitionFragStore ";
@@ -28,7 +26,7 @@ sub createPostUnitiggerConsensusJobs(@) {
         $cmd .= "$wrk/$asm.frgStore ";
         $cmd .= "$wrk/$asm.frgStore_cns1part ";
         $cmd .= "> $wrk/5-consensus/partitionfragstore.err 2>&1";
-        if (runCommand("$wrk/5-consensus", $cmd)) {
+        if (runCommand($cmd)) {
             rename "$wrk/5-consensus/$asm.partFile", "$wrk/5-consensus/$asm.partFile.FAILED";
             die "Failed to partition the fragStore.\n";
         }
@@ -80,7 +78,6 @@ sub createPostUnitiggerConsensusJobs(@) {
     print F "\n";
     print F "echo \\\n";
     print F "$gin/consensus \\\n";
-    print F "  -G \\\n";
     print F "  -P -m -U \\\n";
     print F "  -S \$jobp \\\n";
     print F "  -o $wrk/5-consensus/${asm}_\$jobp.cgi \\\n";
@@ -89,8 +86,8 @@ sub createPostUnitiggerConsensusJobs(@) {
     #print F "  $wrk/4-unitigger/${asm}_\$jobp.cgb \\\n";
     print F " \\> $wrk/5-consensus/${asm}_\$jobp.err 2\\>\\&1\n";
     print F "\n";
+    print F "$pstats \\\n" if (defined($pstats));
     print F "$gin/consensus \\\n";
-    print F "  -G \\\n";
     print F "  -P -m -U \\\n";
     print F "  -S \$jobp \\\n";
     print F "  -o $wrk/5-consensus/${asm}_\$jobp.cgi \\\n";
@@ -105,28 +102,17 @@ sub createPostUnitiggerConsensusJobs(@) {
     chmod 0755, "$wrk/5-consensus/consensus.sh";
 
     if (getGlobal("useGrid") && getGlobal("cnsOnGrid")) {
-        my $sge          = getGlobal("sge");
-        my $sgeConsensus = getGlobal("sgeConsensus");
-
-        my $SGE;
-        $SGE  = "qsub $sge $sgeConsensus -r y -N cns1_$asm ";
-        $SGE .= "-t 1-$jobs ";
-        $SGE .= "-j y -o /dev/null ";
-        $SGE .= "$wrk/5-consensus/consensus.sh\n";
-
-        if (runningOnGrid()) {
-            touch("$wrk/5-consensus/jobsCreated.success");
-            system($SGE) and die "Failed to submit consensus jobs.\n";
-            submitScript("cns1_$asm");
-            exit(0);
-        } else {
-            pleaseExecute($SGE);
-            touch("$wrk/5-consensus/jobsCreated.success");
-            exit(0);
-        }
+        my $cmd;
+        $cmd  = "qsub -p 0 -r y -N cns1_${asm} ";
+        $cmd .= "-t 1-$jobs ";
+        $cmd .= "-j y -o /dev/null ";
+        $cmd .= "$wrk/5-consensus/consensus.sh\n";
+        pleaseExecute($cmd);
+        touch("$wrk/5-consensus/jobsCreated.success");
+        exit(0);
     } else {
         for (my $i=1; $i<=$jobs; $i++) {
-            &scheduler::schedulerSubmit("sh $wrk/5-consensus/consensus.sh $i > /dev/null 2>&1");
+            &scheduler::schedulerSubmit("sh $wrk/5-consensus/consensus.sh $i");
         }
 
         &scheduler::schedulerSetNumberOfProcesses(getGlobal("cnsConcurrency"));
@@ -180,15 +166,12 @@ sub postUnitiggerConsensus (@) {
     #  Consolidate all the output
     #
 
-    open(G, "> $wrk/5-consensus/$asm.cgi") or die;
     foreach my $fid (@cgbIndices) {
-        open(F, "< $wrk/5-consensus/${asm}_$fid.cgi") or die;
-        while (<F>) {
-            print G $_;
+        if (runCommand("cat $wrk/5-consensus/${asm}_$fid.cgi >> $wrk/5-consensus/$asm.cgi")) {
+            rename "$wrk/5-consensus/$asm.cgi", "$wrk/5-consensus/$asm.cgi.FAILED";
+            die "cat failed?\n";
         }
-        close(F);
     }
-    close(G);
 
     touch ("$wrk/5-consensus/consensus.success");
 

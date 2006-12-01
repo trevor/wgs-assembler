@@ -19,6 +19,7 @@ sub createOverlapJobs {
     my $ovlRefBlockSize   = getGlobal("ovlRefBlockSize");
     my $ovlMemory         = getGlobal("ovlMemory");
     my $scratch           = getGlobal("scratch");
+    my $pstats            = getGlobal("processStats");
 
     if (!defined($isTrim)) {
         die "createOverlapJobs()-- I need to know if I'm trimming or assembling!\n";
@@ -90,10 +91,10 @@ sub createOverlapJobs {
     print F "  exit\n";
     print F "fi\n";
     print F "\n";
+    print F "$pstats \\\n" if (defined($pstats));
     print F "$gin/overlap -P $ovlOpt -M $ovlMemory -t $ovlThreads \\\n";
     print F "  \$opt \\\n";
-    print F "  -k $wrk/0-preoverlap/$asm.nmers.fasta \\\n"          if ($isTrim ne "trim");
-    print F "  -k $wrk/0-overlaptrim-overlap/$asm.nmers.fasta \\\n" if ($isTrim eq "trim");
+    print F "  -k $wrk/0-preoverlap/$asm.nmers.fasta \\\n";
     print F "  -o $scratch/$asm.\$bat-\$job.\$jid.ovl \\\n";
     print F "  $wrk/$asm.frgStore \\\n";
     print F "&& \\\n";
@@ -103,17 +104,13 @@ sub createOverlapJobs {
         print F "&& \\\n";
         print F "cp -p $scratch/$asm.\$bat-\$job.\$jid.ovb \\\n";
         print F "      $wrk/$outDir/\$bat/\$job.ovb \\\n";
+        #print F "&& \\\n";
+        #print F "cp -p $scratch/$asm.\$bat-\$job.\$jid.ovl \\\n";
+        #print F "      $wrk/$outDir/\$bat/\$job.ovl \\\n";
         print F "&& \\\n";
         print F "rm -f $scratch/$asm.\$bat-\$job.\$jid.ovb \\\n";
         print F "&& \\\n";
         print F "rm -f $scratch/$asm.\$bat-\$job.\$jid.ovl \\\n";
-    } elsif (getGlobal("useGrid") && getGlobal("ovlOnGrid")) {
-        print F "bzip2 -9v $scratch/$asm.\$bat-\$job.\$jid.ovl \\\n";
-        print F "&& \\\n";
-        print F "cp -p $scratch/$asm.\$bat-\$job.\$jid.ovl.bz2 \\\n";
-        print F "      $wrk/$outDir/\$bat/\$job.ovl.bz2 \\\n";
-        print F "&& \\\n";
-        print F "rm -f $scratch/$asm.\$bat-\$job.\$jid.ovl.bz2 \\\n";
     } else {
         print F "cp -p $scratch/$asm.\$bat-\$job.\$jid.ovl \\\n";
         print F "      $wrk/$outDir/\$bat/\$job.ovl \\\n";
@@ -213,31 +210,23 @@ sub createOverlapJobs {
     #  things here
     #
     if (getGlobal("useGrid") && getGlobal("ovlOnGrid")) {
-        my $sge        = getGlobal("sge");
-        my $sgeOverlap = getGlobal("sgeOverlap");
-
         my $SGE;
-        $SGE .= "qsub $sge $sgeOverlap -r y -N ovl_$asm \\\n";
+        $SGE .= "\n";
+        $SGE .= "qsub -p 0 -r y -N ovl_${asm} \\\n";
+        $SGE .= "  -pe thread 2 \\\n";
         $SGE .= "  -t 1-$jobs \\\n";
         $SGE .= "  -j y -o $wrk/$outDir/overlap.\\\$TASK_ID.out \\\n";
         $SGE .= "  -e $wrk/$outDir/overlap.\\\$TASK_ID.err \\\n";
         $SGE .= "  $wrk/$outDir/overlap.sh\n";
 
-        if (runningOnGrid()) {
-            touch("$wrk/$outDir/jobsCreated.success");
-            system($SGE) and die "Failed to submit overlap jobs.\n";
-            submitScript("ovl_$asm");
-            exit(0);
-        } else {
-            pleaseExecute($SGE);
-            touch("$wrk/$outDir/jobsCreated.success");
-            exit(0);
-        }
+        pleaseExecute($SGE);
+        touch("$wrk/$outDir/jobsCreated.success");
+        exit(0);
     } else {
         my $failures = 0;
         for (my $i=1; $i<=$jobs; $i++) {
             my $out = substr("0000" . $i, -4);
-            if (runCommand("$wrk/$outDir", "$wrk/$outDir/overlap.sh $i > $wrk/$outDir/$out.out 2>&1")) {
+            if (runCommand("$wrk/$outDir/overlap.sh $i > $wrk/$outDir/$out.out 2>&1")) {
                 $failures++;
             }
         }

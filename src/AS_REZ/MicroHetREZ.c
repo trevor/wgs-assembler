@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: MicroHetREZ.c,v 1.6 2006-11-14 19:58:23 eliv Exp $";
+static char CM_ID[] = "$Id: MicroHetREZ.c,v 1.4 2005-03-22 19:49:25 jason_miller Exp $";
 
 #include "MicroHetREZ.h"
 #include "MicroHetScoreREZ.h"
@@ -416,7 +416,7 @@ UnitigStatus_t test_simple(Alignment_t *ali, double thresh, Marker_t* m, int sta
 		  cont = no_col_contributing_two_fixed(ali,i,j,start,end);
 
 #ifdef RETURNPVALS
-		  *pval=MIN(*pval,binomial_tail_prob(end-start,cont,p));
+		  *pval=min(*pval,binomial_tail_prob(end-start,cont,p));
 #endif
 		  if( cont >= *critical )
 		    {
@@ -638,7 +638,7 @@ UnitigStatus_t is_IUM_simple(IntUnitigMesg* ium, FragStoreHandle handle,
 
 #ifdef RETURNPVALS
 	  simple = test_simple(*ali,thresh,m,start,end,&critical,&segpval);
-	  *pval=MIN(*pval,segpval);
+	  *pval=min(*pval,segpval);
 #else
 	  simple = test_simple(*ali,thresh,m,start,end,&critical);
 #endif
@@ -665,7 +665,7 @@ UnitigStatus_t is_IUM_simple(IntUnitigMesg* ium, FragStoreHandle handle,
 #endif
 #ifdef RETURNPVALS
 	  simple = test_simple(*ali,thresh,m,i,i+600,&critical,&winpval);
-	  *pval=MIN(*pval,winpval);
+	  *pval=min(*pval,winpval);
 #else
 	  simple = test_simple(*ali,thresh,m,i,i+600,&critical);
 #endif
@@ -679,7 +679,7 @@ UnitigStatus_t is_IUM_simple(IntUnitigMesg* ium, FragStoreHandle handle,
 	if( ret != UNITIG_IS_REPETITIVE ) {
 #ifdef RETURNPVALS
 	  ret = test_simple(*ali,thresh,m,i,(*ali)->cols,&critical,&winpval);
-	  *pval=MIN(*pval,winpval);
+	  *pval=min(*pval,winpval);
 #else
 	  ret = test_simple(*ali,thresh,m,i,(*ali)->cols,&critical);
 #endif
@@ -776,7 +776,7 @@ UnitigStatus_t is_IUM_MPsimple(IntUnitigMesg* ium, FragStoreHandle handle,
 #endif
 #ifdef RETURNPVALS
 	    simple = test_MPsimple(*ali,thresh,m,start,end,&segpval);
-	    *pval=MIN(*pval,segpval);
+	    *pval=min(*pval,segpval);
 #else
 	    simple = test_MPsimple(*ali,thresh,m,start,end);
 #endif
@@ -801,7 +801,7 @@ UnitigStatus_t is_IUM_MPsimple(IntUnitigMesg* ium, FragStoreHandle handle,
 
 #ifdef RETURNPVALS
 	    simple = test_MPsimple(*ali,thresh,m,i,i+600,&winpval);
-	    *pval=MIN(*pval,winpval);
+	    *pval=min(*pval,winpval);
 #else
 	    simple = test_MPsimple(*ali,thresh,m,i,i+600);
 #endif
@@ -814,7 +814,7 @@ UnitigStatus_t is_IUM_MPsimple(IntUnitigMesg* ium, FragStoreHandle handle,
           if( ret != UNITIG_IS_REPETITIVE ){
 #ifdef RETURNPVALS
 	    ret = test_MPsimple(*ali,thresh,m,i,(*ali)->cols,&winpval);
-  	    *pval=MIN(*pval,winpval);
+  	    *pval=min(*pval,winpval);
 #else
 	    ret = test_MPsimple(*ali,thresh,m,i,(*ali)->cols);
 #endif
@@ -897,7 +897,7 @@ UnitigStatus_t is_IUM_PWsimple(IntUnitigMesg* ium, FragStoreHandle handle,
 #endif
 #ifdef RETURNPVALS
 	    simple = test_PWsimple(*ali,thresh,m,start,end,&segpval);
-	    *pval=MIN(*pval,segpval);
+	    *pval=min(*pval,segpval);
 #else
 	    simple = test_PWsimple(*ali,thresh,m,start,end);
 #endif
@@ -922,7 +922,7 @@ UnitigStatus_t is_IUM_PWsimple(IntUnitigMesg* ium, FragStoreHandle handle,
 #endif
 #ifdef RETURNPVALS
 	    simple = test_PWsimple(*ali,thresh,m,i,i+600,&winpval);
-	    *pval=MIN(*pval,winpval);
+	    *pval=min(*pval,winpval);
 #else
 	    simple = test_PWsimple(*ali,thresh,m,i,i+600);
 #endif
@@ -936,7 +936,7 @@ UnitigStatus_t is_IUM_PWsimple(IntUnitigMesg* ium, FragStoreHandle handle,
 
 #ifdef RETURNPVALS
 	    ret = test_PWsimple(*ali,thresh,m,i,(*ali)->cols,&winpval);
-	    *pval=MIN(*pval,winpval);
+	    *pval=min(*pval,winpval);
 #else
 	    ret = test_PWsimple(*ali,thresh,m,i,(*ali)->cols);
 #endif
@@ -1006,11 +1006,11 @@ MPSTAT MP_score_alignment(Alignment_t *alignment,double erate, int s, int e){
     D=alignment->countDash[col];
     n=A+C+G+T+D;
     if(n<4)continue; /* No way to save a step with < 4 sequences */
-    a=MAX(A-1,0);
-    c=MAX(C-1,0);
-    g=MAX(G-1,0);
-    t=MAX(T-1,0);
-    d=MAX(D-1,0);
+    a=max(A-1,0);
+    c=max(C-1,0);
+    g=max(G-1,0);
+    t=max(T-1,0);
+    d=max(D-1,0);
     result.Obs+=a+c+g+t+d-maxfive(a,c,g,t,d);
 #ifdef EXACT_EXPECTED_SAVEDSTEPS
     result.Exp+=expected_savedSteps(n,erate);

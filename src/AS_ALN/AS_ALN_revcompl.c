@@ -29,7 +29,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <AS_ALN_aligners.h>
+
+#ifndef min
+  #define min(a,b) ( a<b ? a : b ) 
+#endif
 
 /* Get_sequence gets the next FASTA formated sequence from input.  It
    assumes that it and only it is doing input and is designed to handle
@@ -276,7 +279,7 @@ int main(int argc, char *argv[])
     for(i=0;i<len;i+=60){
       //      printf("%.60s\n",Seqs[j]+i);
       int left;
-      left=MIN(60,len-i);
+      left=min(60,len-i);
       fwrite(Seqs[j]+i,sizeof(char),left,stdout);
       putc('\n',stdout);
     }

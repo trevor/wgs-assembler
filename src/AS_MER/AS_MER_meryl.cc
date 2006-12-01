@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "cds.h"
 
 #include "AS_MER_stream.h"
 
@@ -607,10 +607,6 @@ main(int argc, char **argv) {
         case 'o':
           arg++;
           outputFile = argv[arg];
-          break;
-        case 'V':
-          fprintf(stdout, "version: CA $Id: AS_MER_meryl.cc,v 1.5 2006-10-28 02:25:45 brianwalenz Exp $\n");
-          exit(0);
           break;
         default:
           fprintf(stderr, "Unknown option '%s'.\n", argv[arg]);

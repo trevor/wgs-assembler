@@ -22,7 +22,7 @@
 #define AS_ORA_INLINES_H
 /**********************************************************************
 $Source: /work/NIGHTLY/wgs-assembler-cvs/src/AS_ORA/Attic/AS_ORA_inlines.h,v $
-$Revision: 1.6 $
+$Revision: 1.4 $
 **********************************************************************/
 
 
@@ -31,4 +31,17 @@ $Revision: 1.6 $
 // project headers
 #include "AS_global.h"
 /*********************************************************************/
+
+
+/****************************************/
+// generic mins & maxs
+#ifndef min
+#define min(a,b) (((a) > (b)) ? (b) : (a))
+#endif
+
+#ifndef max
+#define max(a,b) (((a) < (b)) ? (b) : (a))
+#endif
+/****************************************/
+
 #endif

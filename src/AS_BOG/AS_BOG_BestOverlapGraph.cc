@@ -37,16 +37,15 @@
 *************************************************/
 
 /* RCS info
- * $Id: AS_BOG_BestOverlapGraph.cc,v 1.31 2006-11-10 20:00:45 eliv Exp $
- * $Revision: 1.31 $
+ * $Id: AS_BOG_BestOverlapGraph.cc,v 1.29 2006-04-10 18:07:22 eliv Exp $
+ * $Revision: 1.29 $
 */
 
-static const char CM_ID[] = "$Id: AS_BOG_BestOverlapGraph.cc,v 1.31 2006-11-10 20:00:45 eliv Exp $";
+static const char CM_ID[] = "$Id: AS_BOG_BestOverlapGraph.cc,v 1.29 2006-04-10 18:07:22 eliv Exp $";
 
 //  System include files
 #include<iostream>
 #include<vector>
-#include<limits>
 
 #include "AS_BOG_BestOverlapGraph.hh"
 //#include "AS_BOG_BestOverlapGraphVisitor.hh"
@@ -55,7 +54,6 @@ extern "C" {
 #include "AS_PER_fragStore.h"
 }
 
-#undef max
 namespace AS_BOG{
 
     ///////////////////////////////////////////////////////////////////////////
@@ -133,14 +131,6 @@ namespace AS_BOG{
         else if(which_end == THREE_PRIME){
             return(&_best_overlaps[frag_id].three_prime);
         }
-    }
-    BestEdgeOverlap *BestOverlapGraph::getBestEdgeOverlap(FragmentEnd* end) {
-        return getBestEdgeOverlap(end->id,end->end);
-    }
-    void BestOverlapGraph::followOverlap(FragmentEnd* end) {
-        BestEdgeOverlap* edge = getBestEdgeOverlap(end);
-        end->id = edge->frag_b_id;
-        end->end = edge->bend == FIVE_PRIME ? THREE_PRIME : FIVE_PRIME;
     }
 
     //  Given an overlap, determines which record (iuid and end) and sets the newScore.
@@ -305,8 +295,7 @@ namespace AS_BOG{
     uint16 BestOverlapGraph::fragLen( iuid iid ) {
         // If fragLength is not already cached, compute it after reading it
         //   in from the fragStore, store it and return it to the caller.
-//        if (BestOverlapGraph::fragLength[ iid ] == std::numeric_limits<uint16>::max()) 
-//            fprintf(stderr, "NULL fragLen for %d\n",iid);
+        assert(BestOverlapGraph::fragLength[ iid ] != 0);
         return BestOverlapGraph::fragLength[ iid ];
     }
 
@@ -581,15 +570,10 @@ For debugging i386, alpha differences on float conversion
 
         // Allocate and Initialize fragLength array
         BestOverlapGraph::fragLength = new uint16[BestOverlapGraph::lastFrg+1];
-        memset( BestOverlapGraph::fragLength, std::numeric_limits<uint16>::max(),
-                sizeof(uint16)*(BestOverlapGraph::lastFrg+1));
+        memset( BestOverlapGraph::fragLength, 0, sizeof(uint16)*(BestOverlapGraph::lastFrg+1));
         iuid iid = 1;
         while(nextFragStream( fragStream, fsread, FRAG_S_FIXED)) {
-            uint32 clrBgn, clrEnd, isDeleted;
-            getIsDeleted_ReadStruct(   fsread, &isDeleted);
-            if (isDeleted) {
-                iid++; continue;
-            }
+            uint32 clrBgn, clrEnd;
             getClearRegion_ReadStruct( fsread, &clrBgn, &clrEnd, READSTRUCT_OVL);
             BestOverlapGraph::fragLength[ iid++ ] = clrEnd - clrBgn;
         }

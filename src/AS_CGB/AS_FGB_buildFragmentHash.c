@@ -40,8 +40,8 @@ FragmentHashObject * build_FragmentHash
       for(iv=1;iv<nfrag;iv++) {
         const IntFragment_ID iid = get_iid_fragment(frags,iv);
         /* reset afr_to_avx[] */
-        max_iid = MAX(max_iid,iid);
-        min_iid = MIN(min_iid,iid);
+        max_iid = max(max_iid,iid);
+        min_iid = min(min_iid,iid);
       }
       max_frag_iid = max_iid;
       min_frag_iid = min_iid;
@@ -53,7 +53,7 @@ FragmentHashObject * build_FragmentHash
   fprintf(stderr,"** observed min_frag_iid=" F_IID "\n", min_frag_iid);
   fprintf(stderr,"** observed max_frag_iid=" F_IID "\n", max_frag_iid);
 
-  max_frag_iid = MAX(as_cgb_max_frag_iid, max_frag_iid);
+  max_frag_iid = max(as_cgb_max_frag_iid, max_frag_iid);
   fprintf(stderr,"as_cgb_max_frag_iid=" F_IID " max_frag_iid=" F_IID "\n",
           as_cgb_max_frag_iid, max_frag_iid);
 #if 0
@@ -91,7 +91,7 @@ static void check_for_fragment_corruption
   IntFragment_ID ifrag;
   IntFragment_ID *afr_to_avx = NULL;
 
-  afr_to_avx = safe_malloc(sizoef(IntFragment_ID) * (max_frag_iid+1));
+  SAFE_MALLOC(afr_to_avx, IntFragment_ID, (max_frag_iid+1));
   for( ifrag=0; ifrag <= max_frag_iid ; ifrag++ ) { 
     afr_to_avx[ifrag] = FRAGMENT_NOT_FOUND;
   }
@@ -107,6 +107,6 @@ static void check_for_fragment_corruption
       assert(FALSE);
     }
   }
-  safe_free(afr_to_avx);
+  SAFE_FREE(afr_to_avx);
 }
 #endif

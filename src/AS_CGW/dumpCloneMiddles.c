@@ -30,7 +30,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-
+#include "cds.h"
 #include "AS_global.h"
 #include "AS_UTL_Var.h"
 #include "AS_UTL_timer.h"
@@ -113,21 +113,8 @@ void finished_with_ovlStore(void){
 }
 
 void usage(char *pgm){
-  fprintf(stderr, "usage: %s -f <frgStore> -g <gkpStore> -o <ovlStore> -c <ckpName> -n <ckpNum> [other options]\n", pgm);
-  fprintf(stderr, "  META OPTION\n");
-  fprintf(stderr, "    -p <prefix>          -- attempt to guess all the required options, if your assembly\n");
-  fprintf(stderr, "                            follows runCA-OBT naming conventions.\n");
-  fprintf(stderr, "  REQUIRED OPTIONS\n");
-  fprintf(stderr, "    -f <FragStoreName>\n");
-  fprintf(stderr, "    -g <GatekeeperStoreName>\n");
-  fprintf(stderr, "    -o <OVLStoreName>\n");
-  fprintf(stderr, "    -c <CkptFileName>\n");
-  fprintf(stderr, "    -n <CkpPtNum>\n");
-  fprintf(stderr, "  OPTIONAL OPTIONS\n");
-  fprintf(stderr, "    -s <single scfIID>   -- generate a single scaffold\n");
-  fprintf(stderr, "    -l <min length>      -- generate only scaffolds larger than min length\n");
-  fprintf(stderr, "    -U                   -- name clones with the UID of their read\n");
-
+  fprintf (stderr, "USAGE:  %s -f <FragStoreName> -g <GatekeeperStoreName> -o <OVLStoreName> -c <CkptFileName> -n <CkpPtNum> [ -s <single scfIID> ] [-l <min length>] [-U] \n\t-s causes a single scaffold to be generated\n\t-l causes only scaffolds larger than min length to be generated\n\t-U causes clones to be named using the UIDs of their reads\n",
+		 pgm);
 }
 
 int main (int argc , char * argv[] ) {
@@ -158,61 +145,54 @@ int main (int argc , char * argv[] ) {
   { /* Parse the argument list using "man 3 getopt". */ 
     int ch,errflg=0;
     optarg = NULL;
-    while (!errflg && ((ch = getopt(argc, argv,"c:f:g:n:s:o:p:l:SU")) != EOF)){
+    while (!errflg && ((ch = getopt(argc, argv,"c:f:g:n:s:o:l:SU")) != EOF)){
       switch(ch) {
-        case 'c':
-          strcpy( data->File_Name_Prefix, argv[optind - 1]);
-          setPrefixName = TRUE;
-          break;
-        case 'f':
-          strcpy( data->Frag_Store_Name, argv[optind - 1]);
-          setFragStore = TRUE;
-          break;
-        case 'g':
-          strcpy( data->Gatekeeper_Store_Name, argv[optind - 1]);
-          setGatekeeperStore = TRUE;
-          break;	  
-        case 'l':
-          minLen=atoi(optarg);
-          assert(minLen>0);
-          break;
-        case 'n':
-          ckptNum = atoi(argv[optind - 1]);
-          break;
-        case 'o':
-          strcpy( data->OVL_Store_Name, argv[optind - 1]);
-          setOvlStore = TRUE;
-          break;	  
-        case 'p':
-          ckptNum = SetFileNamePrefix_CGW(data, argv[optind - 1]);
-          setFragStore       = TRUE;
-          setGatekeeperStore = TRUE;
-          setOvlStore        = TRUE;
-          setPrefixName      = TRUE;
-          break;
-        case 's':
-          specificScf = atoi(argv[optind - 1]);
-          break;
-        case 'S':
-          do_surrogate_tracking=0;
-          break;
-        case 'U':
-          printMateUIDs=1;
-          break;
-        case '?':
-          fprintf(stderr,"Unrecognized option -%c",optopt);
-        default :
-          errflg++;
+      case 'c':
+	strcpy( data->File_Name_Prefix, argv[optind - 1]);
+	setPrefixName = TRUE;		  
+	break;
+      case 'f':
+	strcpy( data->Frag_Store_Name, argv[optind - 1]);
+	setFragStore = TRUE;
+	break;
+      case 'g':
+	strcpy( data->Gatekeeper_Store_Name, argv[optind - 1]);
+	setGatekeeperStore = TRUE;
+	break;	  
+      case 'l':
+	minLen=atoi(optarg);
+	assert(minLen>0);
+	break;
+      case 'n':
+	ckptNum = atoi(argv[optind - 1]);
+	break;
+      case 'o':
+	strcpy( data->OVL_Store_Name, argv[optind - 1]);
+	setOvlStore = TRUE;
+	break;	  
+      case 's':
+	specificScf = atoi(argv[optind - 1]);
+	break;	  
+      case 'S':
+	do_surrogate_tracking=0;
+	break;
+      case 'U':
+	printMateUIDs=1;
+	break;
+      case '?':
+	fprintf(stderr,"Unrecognized option -%c",optopt);
+      default :
+	errflg++;
       }
     }
 
     if((setPrefixName == FALSE) || (setFragStore == 0) || (setGatekeeperStore == 0) || ( setOvlStore == 0)){
-      fprintf(stderr,"* argc = %d optind = %d setFragStore = %d setGatekeeperStore = %d\n",
-              argc, optind, setFragStore,setGatekeeperStore);
+	fprintf(stderr,"* argc = %d optind = %d setFragStore = %d setGatekeeperStore = %d\n",
+		argc, optind, setFragStore,setGatekeeperStore);
 
-      usage(argv[0]);
-      exit (-1);
-    }
+	usage(argv[0]);
+	exit (-1);
+      }
   }
 
   ScaffoldGraph = 
@@ -238,7 +218,7 @@ int main (int argc , char * argv[] ) {
 
     // over all scfs in graph
     if(specificScf!=NULLINDEX){
-      dumpCloneMiddle(specificScf);
+	dumpCloneMiddle(specificScf);
     } else {
       int sid;
       for (sid = 0; sid < GetNumGraphNodes(ScaffoldGraph->ScaffoldGraph); sid++){

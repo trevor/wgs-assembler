@@ -19,13 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-#include <string.h> // for memcpy
 #include <curl/curl.h>
 #include <curl/types.h>
 #include <curl/easy.h>
 
-#include "SYS_UIDcommon.h"
-
+#include "cds.h"
 
 struct JTC_GUIDMemoryStruct {
   char *memory;

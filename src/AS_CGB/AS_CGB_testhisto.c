@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 /*********************************************************************
- * $Id: AS_CGB_testhisto.c,v 1.6 2006-11-14 19:58:21 eliv Exp $
+ * $Id: AS_CGB_testhisto.c,v 1.4 2005-03-22 19:48:31 jason_miller Exp $
  * Module:
  * Description:
  * Assumptions:
@@ -28,11 +28,11 @@
 #include <stdio.h>
 #include "AS_CGB_histo.h"
 
-#define MIN(a,b) (a<b ? a : b)
-#define MAX(a,b) (a>b ? a : b)
+#define min(a,b) (a<b ? a : b)
+#define max(a,b) (a>b ? a : b)
 
 /*************************************************************************/
-static char CM_ID[] = "$Id: AS_CGB_testhisto.c,v 1.6 2006-11-14 19:58:21 eliv Exp $";
+static char CM_ID[] = "$Id: AS_CGB_testhisto.c,v 1.4 2005-03-22 19:48:31 jason_miller Exp $";
 /*************************************************************************/
 
 typedef struct {
@@ -53,8 +53,8 @@ MyDataType *indexdata(MyDataType *a,int i) {
 void aggregate(MyDataType *a,int i,MyDataType *b) {
   a[i].n += b->n;
   a[i].x += b->x;
-  a[i].y = MIN(a[i].y,b->y);
-  a[i].z = MAX(a[i].z,b->z);
+  a[i].y = min(a[i].y,b->y);
+  a[i].z = max(a[i].z,b->z);
 }
 int score(MyDataType *data) {
   int i;

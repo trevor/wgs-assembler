@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 /*********************************************************************
- * $Id: AS_CGB_histo.c,v 1.8 2006-11-14 19:58:21 eliv Exp $
+ * $Id: AS_CGB_histo.c,v 1.4 2005-03-22 19:48:27 jason_miller Exp $
  * Module:  AS_CGB_histo.c
  * Description: A histogramming routine and auxillary functions.
  * Assumptions:
@@ -29,14 +29,17 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
-#include "AS_global.h"
 #include "AS_CGB_histo.h"
+
+#define max(a,b) (a > b ? a : b)
+#define min(a,b) (a < b ? a : b)
+#define FALSE 0
 
 #undef DEBUGGING1
 #undef DEBUGGING2
 
 /*************************************************************************/
-static char CM_ID[] = "$Id: AS_CGB_histo.c,v 1.8 2006-11-14 19:58:21 eliv Exp $";
+static char CM_ID[] = "$Id: AS_CGB_histo.c,v 1.4 2005-03-22 19:48:27 jason_miller Exp $";
 /*************************************************************************/
 
 /* Histogram library */
@@ -89,9 +92,9 @@ Histogram_t *create_histogram(
   HISTOGRAM *h;
   int *bucket_cnt,*bucket_min,*bucket_max;
   int *thescore;
-  h = (HISTOGRAM *) safe_malloc(sizeof(HISTOGRAM));
-  thescore   = (int *)safe_calloc(nsample,sizeof(int));
-  bucket_cnt = (int *)safe_calloc(nbucket,sizeof(int));
+  h = (HISTOGRAM *) malloc(sizeof(HISTOGRAM));
+  thescore   = (int *)calloc(nsample,sizeof(int));
+  bucket_cnt = (int *)calloc(nbucket,sizeof(int));
   h->cnt         = 0;
   h->filled      = filled;
 #ifdef USE_SYNC
@@ -121,8 +124,8 @@ Histogram_t *create_histogram(
   h->aggregate   = NULL;
   h->printdata   = NULL;
   /* */
-  bucket_min = (int *)safe_calloc(nbucket,sizeof(int));
-  bucket_max = (int *)safe_calloc(nbucket,sizeof(int));
+  bucket_min = (int *)calloc(nbucket,sizeof(int));
+  bucket_max = (int *)calloc(nbucket,sizeof(int));
   h->bucket_min  = bucket_min;
   h->bucket_max  = bucket_max;
   
@@ -155,11 +158,16 @@ void extend_histogram(
 
   assert(h != NULL);
   assert(nbytes > 0 );
-  sample_data = (HistoDataType *) safe_malloc((h->nsample)*nbytes);
-  bucket_data = (HistoDataType *) safe_malloc((h->nbucket)*nbytes);
-  temp_data   = (HistoDataType *) safe_malloc(nbytes);
-  scan_data   = (HistoDataType *) safe_malloc(nbytes);
-  aggr_data   = (HistoDataType *) safe_malloc(nbytes);
+  sample_data = (HistoDataType *) malloc((h->nsample)*nbytes);
+  bucket_data = (HistoDataType *) malloc((h->nbucket)*nbytes);
+  temp_data   = (HistoDataType *) malloc(nbytes);
+  scan_data   = (HistoDataType *) malloc(nbytes);
+  aggr_data   = (HistoDataType *) malloc(nbytes);
+  assert(temp_data != NULL);
+  assert(indexdata != NULL);
+  assert(setdata   != NULL);
+  assert(aggregate != NULL);
+  assert(printdata != NULL);
 
   h->temp_data   = temp_data;
   h->scan_data   = scan_data;
@@ -192,8 +200,8 @@ void free_histogram(Histogram_t *histogram)
 
 static int bucket_from_score(HISTOGRAM *h, int thescore) {
   int ib;
-  h->max = MAX(thescore,h->max);
-  h->min = MIN(thescore,h->min);
+  h->max = max(thescore,h->max);
+  h->min = min(thescore,h->min);
   ib = thescore;
 
   if(! h->logarithmic) {
@@ -216,8 +224,8 @@ static int bucket_from_score(HISTOGRAM *h, int thescore) {
   }
 
   /* Place a floor and ceiling to the histogram. */
-  ib = MAX(ib,0);
-  ib = MIN(ib,h->nbucket-1);
+  ib = max(ib,0);
+  ib = min(ib,h->nbucket-1);
   return ib;
 }
 
@@ -237,8 +245,8 @@ static void fill(HISTOGRAM *h)
     int is;
     for (is = 1; is < h->cnt; is++) {
       const int thescore = h->thescore[is];
-      hgh = MAX(hgh,thescore);
-      low = MIN(low,thescore);
+      hgh = max(hgh,thescore);
+      low = min(low,thescore);
     }
   }
   /* hgh and low are the bounds on the sampled data values. */
@@ -271,8 +279,8 @@ static void fill(HISTOGRAM *h)
         h->bucket_min[ib] = thescore;
         h->bucket_max[ib] = thescore;
       } else {
-        h->bucket_min[ib] = MIN(h->bucket_min[ib],thescore);
-        h->bucket_max[ib] = MAX(h->bucket_max[ib],thescore);
+        h->bucket_min[ib] = min(h->bucket_min[ib],thescore);
+        h->bucket_max[ib] = max(h->bucket_max[ib],thescore);
       }
       if(h->extended) {
         HistoDataType *data;
@@ -327,8 +335,8 @@ void add_to_histogram(Histogram_t *histogram, int thescore, HistoDataType *data)
       h->bucket_min[ib] = thescore;
       h->bucket_max[ib] = thescore;
     } else {
-      h->bucket_min[ib] = MIN(h->bucket_min[ib],thescore);
-      h->bucket_max[ib] = MAX(h->bucket_max[ib],thescore);
+      h->bucket_min[ib] = min(h->bucket_min[ib],thescore);
+      h->bucket_max[ib] = max(h->bucket_max[ib],thescore);
     }
     if(h->extended) {
       if( h->bucket_cnt[ib] == 1) {
@@ -455,7 +463,7 @@ void print_histogram(FILE *fout, Histogram_t *histogram, int rez, int indent)
 #ifdef DEBUGGING2
   {
     int is;
-    for (is = 0; is < MIN((h->cnt),(h->nsample)); is++) {
+    for (is = 0; is < min((h->cnt),(h->nsample)); is++) {
       HistoDataType *data;
       fprintf(fout," %d : %d ",is,h->thescore[is]);
       if(h->extended) {
@@ -544,15 +552,15 @@ void print_histogram(FILE *fout, Histogram_t *histogram, int rez, int indent)
       int min_score = h->bucket_min[ib];
       int max_score = h->bucket_max[ib];
 
-      min_score = MAX(min_score,h->min);
-      max_score = MIN(max_score,h->max);
+      min_score = max(min_score,h->min);
+      max_score = min(max_score,h->max);
     
       for (j = 0; j < cm; j++) {
         if( (ib+j >= 0) && (ib+j < h->nbucket) )
           { 
             sum_of_cnt += h->bucket_cnt[ib+j];
-            min_score = MIN(min_score,h->bucket_min[ib+j]);
-            max_score = MAX(max_score,h->bucket_max[ib+j]);
+            min_score = min(min_score,h->bucket_min[ib+j]);
+            max_score = max(max_score,h->bucket_max[ib+j]);
             if(h->extended) {
               HistoDataType *data;
               data = (h->indexdata)(h->bucket_data,ib+j);

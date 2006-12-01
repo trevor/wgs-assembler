@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char CM_ID[] = "$Id: eCR.c,v 1.10 2006-11-14 19:58:21 eliv Exp $";
+static const char CM_ID[] = "$Id: eCR.c,v 1.7 2006-06-14 19:57:23 brianwalenz Exp $";
 
 #include "eCR.h"
 
@@ -299,10 +299,10 @@ main(int argc, char **argv) {
         case 's':
           fprintf(stderr, "singleSid is no longer a valid option; use -b and -e.\n");
           break;
-        default :
+        case '?':
           fprintf(stderr,"Unrecognized option -%c",optopt);
+        default :
           errflg++;
-          break;
       }
     }
   }
@@ -681,23 +681,23 @@ main(int argc, char **argv) {
               if (CONTIG_BASES < 2000) {
 
                 // these checks Granger suggested
-                if (ahang + currLength + bhang - 1000 > MIN(CONTIG_BASES, (int) lcontig->bpLength.mean) +
-                    MIN(CONTIG_BASES, (int) rcontig->bpLength.mean)) {
+                if (ahang + currLength + bhang - 1000 > min(CONTIG_BASES, (int) lcontig->bpLength.mean) +
+                    min(CONTIG_BASES, (int) rcontig->bpLength.mean)) {
                   fprintf(stderr, "at gapNumber %d, ahang + currLength + bhang - 1000 = %d\n",
                           gapNumber, ahang + currLength + bhang - 1000);
                   fprintf(stderr, "at gapNumber %d, back(A) + back(B) = %d\n",
-                          gapNumber, MIN(CONTIG_BASES, (int) lcontig->bpLength.mean) +
-                          MIN(CONTIG_BASES, (int) rcontig->bpLength.mean));
+                          gapNumber, min(CONTIG_BASES, (int) lcontig->bpLength.mean) +
+                          min(CONTIG_BASES, (int) rcontig->bpLength.mean));
                   keepGap = FALSE;
                 }
 				
-                if (ahang + currLength + bhang + 700 < MIN(CONTIG_BASES, (int) lcontig->bpLength.mean) +
-                    MIN(CONTIG_BASES, (int) rcontig->bpLength.mean)) {
+                if (ahang + currLength + bhang + 700 < min(CONTIG_BASES, (int) lcontig->bpLength.mean) +
+                    min(CONTIG_BASES, (int) rcontig->bpLength.mean)) {
                   fprintf(stderr, "at gapNumber %d, ahang + currLength + bhang + 500 = %d\n",
                           gapNumber, ahang + currLength + bhang + 500);
                   fprintf(stderr, "at gapNumber %d, back(A) + back(B) = %d\n",
-                          gapNumber, MIN(CONTIG_BASES, (int) lcontig->bpLength.mean) +
-                          MIN(CONTIG_BASES, (int) rcontig->bpLength.mean));
+                          gapNumber, min(CONTIG_BASES, (int) lcontig->bpLength.mean) +
+                          min(CONTIG_BASES, (int) rcontig->bpLength.mean));
                   keepGap = FALSE;
                 }
               }
@@ -767,7 +767,7 @@ main(int argc, char **argv) {
                 // how to adjust the offsets of the contigs further
                 // along the scaffold later
 
-                maxRContigOffset = MAX(rcontig->offsetAEnd.mean, rcontig->offsetBEnd.mean);
+                maxRContigOffset = max(rcontig->offsetAEnd.mean, rcontig->offsetBEnd.mean);
                 nextContigIndex = rcontig->BEndNext;
 				  
                 // alter the unitigs in cgw memory struct land
@@ -1030,7 +1030,7 @@ main(int argc, char **argv) {
                   if (nextContigIndex != NULLINDEX) {
                     LengthT scaffoldDelta;
 					  
-                    scaffoldDelta.mean = MAX(newContig->offsetAEnd.mean, newContig->offsetBEnd.mean) 
+                    scaffoldDelta.mean = max(newContig->offsetAEnd.mean, newContig->offsetBEnd.mean) 
                       - maxRContigOffset;
                     scaffoldDelta.variance = ComputeFudgeVariance(scaffoldDelta.mean);
                     AddDeltaToScaffoldOffsets(ScaffoldGraph, scaff->id, nextContigIndex,
@@ -1522,7 +1522,7 @@ findLastUnitig(ContigT *contig, int *unitigID) {
 #endif
 
     if (unitig->offsetAEnd.mean >= maxContigPos || unitig->offsetBEnd.mean >= maxContigPos) {
-      maxContigPos = MAX(unitig->offsetAEnd.mean, unitig->offsetBEnd.mean);
+      maxContigPos = max(unitig->offsetAEnd.mean, unitig->offsetBEnd.mean);
       *unitigID = unitig->id;
       isSurrogate = unitig->flags.bits.isSurrogate;
     }
@@ -1688,7 +1688,7 @@ int GetNewUnitigMultiAlign(NodeCGW_T *unitig, fragPositions *fragPoss, int exten
 
   ReLoadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, ma, unitig->id, TRUE);
 
-#if 0
+#if 1
   fprintf(stderr, "for unitig %d, before reforming, strlen(ma->consensus) = " F_SIZE_T "\n", unitig->id, strlen(Getchar(ma->consensus, 0)));
   fprintf(stderr, "for unitig %d, before reforming, consensus:\n%s\n", unitig->id, Getchar(ma->consensus, 0));
 #endif
@@ -1857,6 +1857,8 @@ getAlteredFragPositions(NodeCGW_T *unitig, fragPositions **fragPoss, int altered
   if (extension <= 0)
     fprintf(stderr, "negative extension: %d\n", extension);
 
+  // assert (extension > 0);
+
   uma = LoadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, unitig->id, TRUE);
 
   localFragPoss = (fragPositions *) safe_malloc( GetNumIntMultiPoss(uma->f_list) * sizeof(fragPositions));
@@ -2015,8 +2017,8 @@ rightShiftIUM(IntMultiPos *f_list, int numFrags, int extendedFragIid) {
     // look for a candidate frag
     i = currPos + numShifted + 1;
     while (i < numFrags) {
-      if ((MIN(f_list[i].position.bgn, f_list[i].position.end) < 
-           MIN(f_list[currPos + numShifted].position.bgn, f_list[currPos + numShifted].position.end)) &&
+      if ((min(f_list[i].position.bgn, f_list[i].position.end) < 
+           min(f_list[currPos + numShifted].position.bgn, f_list[currPos + numShifted].position.end)) &&
           f_list[i].contained == FALSE) {
         fragToMovePos = i;
         shiftedFrag = TRUE;

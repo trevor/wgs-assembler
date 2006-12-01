@@ -32,9 +32,6 @@ eval '$'.$1.'$2;' while $ARGV[0] =~ /^([A-Za-z_0-9]+=)(.*)/ && shift;
 
 use Math::BigInt;
 
-use FindBin;
-my $bin = "$FindBin::Bin";
-
 $[ = 1;			# set array base to 1
 $, = ' ';		# set output field separator
 $\ = "\n";		# set output record separator
@@ -88,9 +85,9 @@ $base_index{t} = 3;
 # $dummy is justa device to get around CVS mechanisms.  If there is just a $ then
 # Perl complains.  If you put \$ and check-in CVS removes the \.  So $dummy fools
 # them both.
-@revFields = split(' ', "\$Revision: 1.5 $dummy", 9999);
+@revFields = split(' ', "\$Revision: 1.4 $dummy", 9999);
 $revision = $revFields[2];
-@dateFields = split(' ', "\$Date: 2006-10-16 03:59:30 $dummy", 9999);
+@dateFields = split(' ', "\$Date: 2005-03-22 19:49:27 $dummy", 9999);
 $date = $dateFields[2];
 print $STDERR . 'date = ' . $date . ' revision = ' . $revision;
 while ($base < ($#ARGV+1) - 1) {
@@ -142,7 +139,12 @@ while ($base < ($#ARGV+1) - 1) {
     $base += 1;
 }
 if ($base != ($#ARGV+1) - 1) {
-    die ' *** Usage: celsim [-F] [-s #] [-d] [-p] [-u] [-f] [-n] [-b <batch size>] file\n';
+    print
+
+      ' *** Usage: celsim [-F] [-s #] [-d] [-p] [-u] [-f] [-n] [-b <batch size>] file';
+    $notdone = 0;
+    $ExitValue = (1);
+    goto line;  # MJF was: last line
 }
 
 $pfile = $ARGV[1] = $ARGV[($#ARGV+1) - 1];
@@ -485,7 +487,7 @@ if ($notdone) {
 	# do the header file first
 	{
 	    $frgfile = sprintf "%s_A%05.d.frg", $prefix, 1;
-	    $perlcmd = "perl $bin/AS_SIM_labelfrag.pl " . $outfile . ' '
+	    $perlcmd = "perl \$AS_ROOT/bin/AS_SIM_labelfrag.pl " . $outfile . ' '
 		. $frgfile . ' ' . $notfile;
 	    print "\n %%%%%%%%%%%%%%%%%%%%% command 3: " . $perlcmd;
 	    if (system($perlcmd) != 0) {
@@ -500,7 +502,7 @@ if ($notdone) {
 	for ($frgfileNum = 2; $frgfileNum < $frgfileCount; $frgfileNum++)
 	{
 	    $frgfile = sprintf "%s_B%05.d.frg", $prefix, $frgfileNum;
-	    $perlcmd = "perl $bin/AS_SIM_labelfrag.pl " . $outfile . ' '
+	    $perlcmd = "perl \$AS_ROOT/bin/AS_SIM_labelfrag.pl " . $outfile . ' '
 		. $frgfile . ' ' . $notfile;
 	    print "\n %%%%%%%%%%%%%%%%%%%%% command 3: " . $perlcmd;
 	    if (system($perlcmd) != 0) {
@@ -755,9 +757,9 @@ sub read_ubac_section {
 sub make_dna {
     delete $opened{$comfile} && close($comfile);
     print ' +++ Building DNA sequence';
-    print "command: $bin/AS_SIM_frag -s " . $seed . $protoflag . ' ' . $comfile . ' >' . $dnafile;
-    print "\n %%%%%%%%%%%%%%%%%%%%% command 5: " . "$bin/AS_SIM_frag -s " . $seed . $protoflag . ' ' . $comfile  . ' >' . $dnafile;
-    if (system("$bin/AS_SIM_frag -s " . $seed . $protoflag . ' ' . $comfile . ' >' . $dnafile) != 0) {
+    print "command: \$AS_ROOT/bin/frag -s " . $seed . $protoflag . ' ' . $comfile . ' >' . $dnafile;
+    print "\n %%%%%%%%%%%%%%%%%%%%% command 5: " . "\$AS_ROOT/bin/frag -s " . $seed . $protoflag . ' ' . $comfile  . ' >' . $dnafile;
+    if (system("\$AS_ROOT/bin/frag -s " . $seed . $protoflag . ' ' . $comfile . ' >' . $dnafile) != 0) {
 	print ' *** Dna spec error';
 	&cleanup(1);
     }
@@ -773,7 +775,7 @@ sub make_dna {
 	&Pick('>>', $adlfile) &&
 	    (print $fh $fileComment);
 	close($adlfile);  # force the write of the previous two lines
-	$perlcmd = "perl $bin/AS_SIM_extractLength.pl  < " . $dnafile
+	$perlcmd = "perl \$AS_ROOT/bin/AS_SIM_extractLength.pl  < " . $dnafile
 	  . ' >> ' . $adlfile;
 	# print STDERR perlcmd;
 	print "\n %%%%%%%%%%%%%%%%%%%%% command 6: " . $perlcmd;
@@ -841,7 +843,7 @@ sub make_polys {
 	$npoly += 1;
 	$ptotl += $pweight{$npoly};
 	print ' +++ Making polymorphism ' . $npoly;
-	$command = "$bin/AS_SIM_poly -s " . ($seed + $npoly) . ' ' .
+	$command = "\$AS_ROOT/bin/poly -s " . ($seed + $npoly) . ' ' .
 
 	  $comfile . ' > ' . $prefix . '.poly.' . $npoly;
 	print "\n %%%%%%%%%%%%%%%%%%%%% command 11: " . $command;
@@ -875,7 +877,7 @@ sub make_sample {
     # we always output an ADT record on the first go round
     if ($nlibs == 1 && !$fastaOutput) 
     {
-	$command = "$bin/AS_SIM_outputADT -b " . $acnum++ . " < " . $adlfile . '  > ' . $frgfile;
+	$command = "\$AS_ROOT/bin/outputADT -b " . $acnum++ . " < " . $adlfile . '  > ' . $frgfile;
 	print "\n %%%%%%%%%%%%%%%%%%%%% command 13: " . $command;
 	$v = system($command);
 	if ($v != 0) 
@@ -895,7 +897,7 @@ sub make_sample {
     if ($sawcmdlinebatchflag && !$fastaOutput) {
 	system( "echo celsim > $adlfile" . '.' . $frgfileCount );
 	system( "echo $dna_length >> $adlfile" . '.' . $frgfileCount );
-	$command = "$bin/AS_SIM_outputADT -b " . $acnum++ . " < " . $adlfile . '.' . $frgfileCount . '  > ' . $frgfile;
+	$command = "\$AS_ROOT/bin/outputADT -b " . $acnum++ . " < " . $adlfile . '.' . $frgfileCount . '  > ' . $frgfile;
 	print "\n %%%%%%%%%%%%%%%%%%%%% command 13: " . $command;
 	$v = system($command);
 	if ($v != 0) {
@@ -912,7 +914,7 @@ sub make_sample {
 	$dta = int(($splitFragSpec[10] - $splitFragSpec[9]) / 2);
 
 	if ($items > 12 && !$fastaOutput) {
-	    $command = "$bin/AS_SIM_outputDST " . $acnum . ' ' . $med . ' ' . $dta . ' >>' . $frgfile;
+	    $command = "\$AS_ROOT/bin/outputDST " . $acnum . ' ' . $med . ' ' . $dta . ' >>' . $frgfile;
 
 	    # print "fragspec " fragspec " \nend of fragpsec\n";
 	    # print command;
@@ -966,8 +968,8 @@ sub make_sample {
 	print "-----------------------------------------------------------";
 
 	if (!$fastaOutput) {
-	    $command = "$bin/AS_SIM_frag -s " . $c . $protoFlag . $uni .
-	      ' -F -N ' . $comfile . " | $bin/AS_SIM_massage -q " . $qltfile . ' ';
+	    $command = "\$AS_ROOT/bin/frag -s " . $c . $protoFlag . $uni .
+	      ' -F -N ' . $comfile . " | \$AS_ROOT/bin/massage -q " . $qltfile . ' ';
 	    $command = $command . $uni . $bac . $dist_id . ' ' . $acnum . ' ' .
 	      "@massageSpec" . ' >>' . $frgfile;
 
@@ -976,7 +978,7 @@ sub make_sample {
 	    #	print STDERR fragspec;
 	}
 	else {
-	    $command = "$bin/AS_SIM_frag -s " . $c . $uni . ' -F -N ' .
+	    $command = "\$AS_ROOT/bin/frag -s " . $c . $uni . ' -F -N ' .
 	      $comfile . ' >> ' . $frgfile;
 	}
 	print ' +++ Generating library ' . $nlibs . ' from poly ' . $i;
@@ -1087,7 +1089,7 @@ sub make_uflbacs {
     # we always output an ADT record on the first go round
     if ($nlibs == 1 && !$fastaOutput) 
     {
-	$command = "$bin/AS_SIM_outputADT -b " . $acnum++ . " < " . $adlfile . '  > ' . $frgfile;
+	$command = "\$AS_ROOT/bin/outputADT -b " . $acnum++ . " < " . $adlfile . '  > ' . $frgfile;
 	print $STDERR . 'adlfile = ' . $adlfile . ' frgfile= ' . $frgfile . ' command = ' . $command;
 	print "\n %%%%%%%%%%%%%%%%%%%%% command 132: " . $command;
 	$v = system($command);
@@ -1108,7 +1110,7 @@ sub make_uflbacs {
     if ($sawcmdlinebatchflag && !$fastaOutput) {
 	system( "echo celsim > $adlfile" . '.' . $frgfileCount );
 	system( "echo $dna_length >> $adlfile" . '.' . $frgfileCount );
-	$command = "$bin/AS_SIM_outputADT -b " . $acnum++ . " < " . $adlfile . '.' . $frgfileCount . '  > ' . $frgfile;
+	$command = "\$AS_ROOT/bin/outputADT -b " . $acnum++ . " < " . $adlfile . '.' . $frgfileCount . '  > ' . $frgfile;
 	print "\n %%%%%%%%%%%%%%%%%%%%% command 13: " . $command;
 	$v = system($command);
 	if ($v != 0) {
@@ -1307,7 +1309,7 @@ sub make_uflbacs {
 	    print ' +++ Generating library ' . $nlibs . ' from poly ' . $i;
 	    
 	    # massage and output the fragments
-	    $command = "$bin/AS_SIM_massage " . 
+	    $command = "\$AS_ROOT/bin/massage " . 
 		$uni . $bac . " $bactig_file" . ' ' . $bac_dist_id . ' ' . $locale . ' ' . $seq_id . ' ' . 
 		    ' ' . $first_frag_acnum . ' ' .
 			"@massageSpec" . ' >> ' . $frgfile . ' < ' . $temp_bac_file;
@@ -1337,7 +1339,7 @@ sub make_uflbacs {
 
 	    # frag the "bactig" that is the lbac
 	    $lbac_frags = 'lbac_frags_temp';
-	    $command = "$bin/AS_SIM_frag -s " . $c . $protoFlag . $uni . ' -F -N ' . $frag_specs . "> " . $lbac_frags;
+	    $command = "\$AS_ROOT/bin/frag -s " . $c . $protoFlag . $uni . ' -F -N ' . $frag_specs . "> " . $lbac_frags;
 
 	    print $STDERR . 'command: ' . $command;
 	    print "\n %%%%%%%%%%%%%%%%%%%%% command 25: " . $command;
@@ -1350,7 +1352,7 @@ sub make_uflbacs {
 	    # $bac_start is where the lbac starts
 	    # need to use the quality file created by frag in $temp_bac_file . "qlt"
 	    $temp_quality_file = $temp_bac_file . ".qlt";
-	    $command = "$bin/AS_SIM_massage -q " . $temp_quality_file . ' ' .
+	    $command = "\$AS_ROOT/bin/massage -q " . $temp_quality_file . ' ' .
 	               $uni . $bac . $dist_id . ' ' . $locale . ' ' . $bac_start{$bac_cnt} . ' ' .$acnum . ' ' .
 	               "@massageSpec" . ' >> ' . $frgfile  . ' < ' . $lbac_frags;
 	    print $STDERR . 'command: ' . $command;
@@ -1739,7 +1741,7 @@ sub emitDSTRecord
     }
     else
     {
-	$command = "$bin/AS_SIM_outputDST $dist_id $length $stddev >> $file";
+	$command = "\$AS_ROOT/bin/outputDST $dist_id $length $stddev >> $file";
 	    print $STDERR . 'command: ' . $command;
 	    print "\n %%%%%%%%%%%%%%%%%%%%% command 17: " . $command;
 	    $v = system($command);

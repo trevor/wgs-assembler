@@ -22,92 +22,58 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifdef _OSF_SOURCE
+#include <sys/mode.h>
+#endif
+#include <unistd.h>
+#include <dirent.h>
+#include "assert.h"
 #include "AS_global.h"
+#include "AS_PER_ReadStruct.h"
+#include "AS_PER_fragStore.h"
+#include "AS_PER_genericStore.h"
+#include "AS_UTL_Var.h"
+#include "AS_UTL_Hash.h"
+#include "AS_UTL_ID_store.h"
+#include "PrimitiveVA.h"
+#include "PrimitiveVA_MSG.h"
+#include "MultiAlignStore_CNS.h"
 
-int
-main(int argc, char **argv) {
-  MesgReader        reader;
-  GenericMesg      *pmesg;
-  SnapConConMesg   *contig;
-  char              status[265];
-  int               inclDegenerate = 0;
-  int               onlyDegenerate = 0;
+#define FASTA_SEQ_LINE_LENGTH 60
 
-  int arg=1;
-  int err=0;
-  while (arg < argc) {
-    if        (strcmp(argv[arg], "-d") == 0) {
-      inclDegenerate = 1;
-    } else if (strcmp(argv[arg], "-D") == 0) {
-      inclDegenerate = 1;
-      onlyDegenerate = 1;
-    } else {
-      fprintf(stderr, "unknown options '%s'\n", argv[arg]);
-      err = 1;
-    }
-    arg++;
-  }
+int main(int argc, char *argv[])
+{ GenericMesg *pmesg;
+  SnapConConMesg *contig;
+  MesgReader   reader;
 
-  if (isatty(fileno(stdin)) || (err > 0)) {
-    fprintf(stderr,"Usage: %s [-d | -D] < asmfile > contigs_fasta_file\n", argv[0]);
-    fprintf(stderr, "  -d (-D)    also (only) print degenerate contigs\n");
-    exit(1);
+  if ( argc> 1 ) {
+     fprintf(stderr,"Usage: %s < asmfile > contigs_fasta_file\n",argv[0]);
+     exit(1);
   }
   
-  reader = (MesgReader)InputFileType_AS(stdin);
+  reader = (MesgReader)InputFileType_AS( stdin );
 
-  while (reader(stdin, &pmesg) != EOF) {
+  while (reader(stdin,&pmesg) != EOF){
     if (pmesg->t ==MESG_CCO)  {
+      int intoline=0;
+      int i;
       contig = pmesg->m;
-
-      //  By "definition", a degenerate contig has one unitig and is
-      //  unplaced.
-      //
-      int isDeg = 0;
-      if ((contig->num_unitigs == 1) &&
-          (contig->placed      == AS_UNPLACED))
-        isDeg = 1;
-
-      if (((isDeg == 1) && (inclDegenerate == 0)) ||
-          ((isDeg == 0) && (onlyDegenerate == 1)))
-        continue;
-
-      assert(strlen(contig->consensus) == contig->length);
-
-      int src = 0;
-      int dst = 0;
-      while (src < contig->length) {
-        if (contig->consensus[src] != '-') {
-          if (src != dst)
-            contig->consensus[dst] = contig->consensus[src];
-          dst++;
-        }
-        src++;
+      printf(">" F_S64 " contig\n",contig->eaccession);
+      assert ( strlen(contig->consensus) == contig->length);
+      for(i=0;i<contig->length;i++){
+	if(contig->consensus[i] != '-'){
+	  if(intoline==FASTA_SEQ_LINE_LENGTH){
+	    intoline=0;
+	    printf("\n");
+	  }
+	  printf("%c",contig->consensus[i]);
+	  intoline++;
+	}
       }
-
-      contig->consensus[dst] = 0;
-
-      if (contig->placed  == AS_PLACED)
-        strcpy(status, "placed=true");
-      else if (contig->placed  == AS_UNPLACED)
-        strcpy(status, "placed=false");
-      else
-        strcpy(status, "placed=????");
-
-      if (contig->num_unitigs == 1)
-        strcat(status, " degenerate=true");
-      else
-        strcat(status, " degenerate=false");
-
-      printf(">contig"F_UID","F_IID" %s\n%s\n",
-             contig->eaccession,
-             contig->iaccession,
-             status,
-             contig->consensus);
+      printf("\n");
     }
-  }
-
-  return(0);
+ }
+ exit (0);
 }

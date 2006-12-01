@@ -62,23 +62,25 @@ sub preoverlap {
                 $cmd = "bzip2 -dc $frg | $bin/extractmessages -x ADT BAT >> $wrk/0-preoverlap/$asm.frg";
             }
 
-            if (runCommand("$wrk/0-preoverlap", "$cmd 2>> $wrk/0-preoverlap/extract.err")) {
+            if (runCommand("$cmd 2>> $wrk/0-preoverlap/extract.err")) {
+                print STDERR "Failed.\n";
                 rename "$wrk/0-preoverlap/$asm.frg", "$wrk/0-preoverlap/$asm.frg.FAILED";
-                die "Failed.\n";
+                exit(1);
             }
         }
     }
 
     if ((! -d "$wrk/$asm.gkpStore") || (! -e "$wrk/$asm.gkpStore/gkp.frg")) {
         my $cmd;
-        $cmd  = "$bin/gatekeeper -X -C -P -e 10000000 ";
+        $cmd  = "cd $wrk/0-preoverlap && ";
+        $cmd .= "$bin/gatekeeper -X -C -P -e 10000000 ";
         $cmd .= "-Q -T -N " if (getGlobal("doOverlapTrimming"));
         $cmd .= "-f $wrk/$asm.gkpStore ";
         $cmd .= "$wrk/0-preoverlap/$asm.frg ";
         $cmd .= "> $wrk/0-preoverlap/gatekeeper.out ";
         $cmd .= "2> $wrk/0-preoverlap/gatekeeper.err";
 
-        if (runCommand("$wrk/0-preoverlap", $cmd)) {
+        if (runCommand($cmd)) {
             print STDERR "Failed.\n";
             rename "$wrk/0-preoverlap/$asm.inp", "$wrk/0-preoverlap/$asm.inp.FAILED";
             rename "$wrk/$asm.gkpStore", "$wrk/$asm.gkpStore.FAILED";
@@ -90,14 +92,15 @@ sub preoverlap {
 
     if ((! -d "$wrk/$asm.frgStore") || (! -e "$wrk/$asm.frgStore/db.frg")) {
         my $cmd;
-        $cmd  = "$bin/PopulateFragStore -P -c -f ";
+        $cmd  = "cd $wrk/0-preoverlap && ";
+        $cmd .= "$bin/PopulateFragStore -P -c -f ";
         $cmd .= "-o $wrk/$asm.frgStore ";
         $cmd .= "-V $wrk/0-preoverlap/$asm.ofg ";
         $cmd .= "$wrk/0-preoverlap/$asm.inp";
         $cmd .= "> $wrk/0-preoverlap/populatefragstore.out ";
         $cmd .= "2> $wrk/0-preoverlap/populatefragstore.err";
 
-        if (runCommand("$wrk/0-preoverlap", $cmd)) {
+        if (runCommand($cmd)) {
             print STDERR "Failed.\n";
             rename "$wrk/0-preoverlap/$asm.ofg", "$wrk/0-preoverlap/$asm.ofg.FAILED";
             rename "$wrk/$asm.frgStore", "$wrk/$asm.frgStore.FAILED";

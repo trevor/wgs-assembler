@@ -361,8 +361,6 @@ $(LIBRARIES):
 	@ echo "################### " $@ "#####################";
 	cd $(LOCAL_OBJ); \
 	  $(AR) $(ARFLAGS) $(LOCAL_LIB)/$(notdir $@) $+ 
-	cd $(LOCAL_OBJ); \
-	  $(AR) $(ARFLAGS) $(LOCAL_LIB)/libCA.a $+ 
 
 $(PROGS):
 	@ echo "++++++++++++++++++++ " $@ "++++++++++++++++++++++";
@@ -372,7 +370,7 @@ $(PROGS):
 	  else \
 	    todo='$(CXX) -o $(LOCAL_BIN)/$(notdir $@) $(LD_DIRS) $(LDFLAGS) $(filter-out lib%.a, $+) $(patsubst lib%.a, -l%, $(filter lib%.a, $+))'; \
 	  fi ; \
-	  echo "$$todo"; \
+	  if [ -n "$(VERBOSE)" ]; then echo "$$todo"; fi; \
 	  if eval "$$todo"; then true; else rm -f $(LOCAL_BIN)/$(notdir $@); fi
 
 #### For making dependencies

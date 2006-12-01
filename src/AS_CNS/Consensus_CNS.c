@@ -27,7 +27,7 @@
                  
  *********************************************************************/
 
-static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.35 2006-11-17 22:24:19 brianwalenz Exp $";
+static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.29 2006-08-21 21:21:56 brianwalenz Exp $";
 
 // Operating System includes:
 #include <stdlib.h>
@@ -56,6 +56,7 @@ static const char CM_ID[] = "$Id: Consensus_CNS.c,v 1.35 2006-11-17 22:24:19 bri
 #include "AS_UTL_Var.h"
 #include "UtilsREZ.h"
 #include "AS_UTL_ID_store.h"
+#include "PrimitiveVA.h"
 #include "PrimitiveVA_MSG.h"
 #include "AS_UTL_version.h"
 #include "AS_SDB_SequenceDBPartition.h"
@@ -75,9 +76,9 @@ extern int NumColumnsInContigs;
 extern int NumRunsOfGapsInContigReads;
 extern int NumGapsInContigs;
 extern int NumAAMismatches;
+extern int NumFAMismatches;
 extern int NumVARRecords;
 extern int NumVARStringsWithFlankingGaps;
-extern int NumUnitigRetrySuccess;
 
 //  Multialignment_CNS.c options
 //
@@ -216,9 +217,8 @@ static void
 OutputScores(int NumColumnsInUnitigs,        int NumRunsOfGapsInUnitigReads, 
              int NumGapsInUnitigs,           int NumColumnsInContigs, 
              int NumRunsOfGapsInContigReads, int NumGapsInContigs,
-             int NumAAMismatches,          
-             int NumVARRecords,              int NumVARStringsWithFlankingGaps,
-             int NumUnitigRetrySuccess)
+             int NumAAMismatches,            int NumFAMismatches,
+             int NumVARRecords,              int NumVARStringsWithFlankingGaps)
 {
      fprintf(stderr, "\nNumColumnsInUnitigs      = %d\n", NumColumnsInUnitigs);
      fprintf(stderr, "NumGapsInUnitigs           = %d\n", NumGapsInUnitigs);
@@ -229,10 +229,10 @@ OutputScores(int NumColumnsInUnitigs,        int NumRunsOfGapsInUnitigReads,
      fprintf(stderr, "NumRunsOfGapsInContigReads = %d\n", 
          NumRunsOfGapsInContigReads);
      fprintf(stderr, "NumAAMismatches            = %d\n", NumAAMismatches);
+     fprintf(stderr, "NumFAMismatches            = %d\n", NumFAMismatches);
      fprintf(stderr, "NumVARRecords              = %d\n", NumVARRecords);
      fprintf(stderr, "NumVARStringsWithFlankingGaps = %d\n", 
          NumVARStringsWithFlankingGaps);
-     fprintf(stderr, "NumUnitigRetrySuccess      = %d\n", NumUnitigRetrySuccess);
 }
 
 static void
@@ -356,7 +356,6 @@ int main (int argc, char *argv[])
     partitioned=0;
     allow_forced_frags=0;
     allow_neg_hang=0;
-    allow_neg_hang_retry=0;
     ALIGNMENT_CONTEXT=AS_CONSENSUS;
    
     NumColumnsInUnitigs = 0;
@@ -366,8 +365,8 @@ int main (int argc, char *argv[])
     NumRunsOfGapsInContigReads = 0;
     NumGapsInContigs = 0;
     NumAAMismatches = 0;
-    NumUnitigRetrySuccess = 0;
-
+    NumFAMismatches = 0;
+ 
     while ( !errflg && 
            ( (ch = getopt(argc, argv, 
                  "a:d:e:fghil:mno:p:q:r:s:t:v:w:D:GIKM:NO:PR:S:T:UV:X")) != EOF))
@@ -383,10 +382,6 @@ int main (int argc, char *argv[])
           break;
         case 'g':
           allow_neg_hang = 1;
-          iflags++;
-          break;
-        case 'G':
-          allow_neg_hang_retry = 1;
           iflags++;
           break;
         case 'P':
@@ -546,6 +541,16 @@ int main (int argc, char *argv[])
             CNS_USE_PUBLIC = atoi(optarg);
           }
           iflags++;
+          iflags++;
+          break;
+        case 'G':
+          if ( ! expert ) {
+             fprintf(stderr,"Command line switch %c requires -X; try adding -X...\n",
+                  ch); 
+             illegal_use = 1;
+          } else {
+            CNS_CALL_PUBLIC = 1;
+          }
           iflags++;
           break;
         case 'q':
@@ -902,7 +907,7 @@ int main (int argc, char *argv[])
       VA_TYPE(char) *quality=CreateVA_char(200000);
       time_t t;
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.35 $ processing. Started %s\n",
+      fprintf(stderr,"# Consensus $Revision: 1.29 $ processing. Started %s\n",
         ctime(&t));
       InitializeAlphTable();
       if ( ! align_ium && USE_SDB && extract > -1 ) 
@@ -948,33 +953,32 @@ int main (int argc, char *argv[])
 #if 0
         fprintf(stderr, "After  MultiAlignContig #%d: ctmp.num_vars = %d\n", ctmp.iaccession, ctmp.num_vars);
 #endif
-	tmesg.t = MESG_ICM; 
-	tmesg.m = &ctmp; 
-	writer(cnsout,&tmesg); 
-	fflush(cnsout);
-
         if ( printwhat != CNS_STATS_ONLY && cnslog != NULL )
         {
            MultiAlignT *ma1 = CreateMultiAlignTFromICM(&ctmp,-1,0);
            PrintMultiAlignT(cnslog,ma1,global_fragStore,global_fragStorePartition, 
                             global_bactigStore, 1,0,READSTRUCT_LATEST);
            fflush(cnslog);
-           DeleteVA_char(ma1->consensus);
-           DeleteVA_char(ma1->quality);
-           DeleteVA_int32(ma1->delta);
-           DeleteVA_IntMultiPos(ma1->f_list);
-           DeleteVA_int32(ma1->udelta);
-           DeleteVA_IntUnitigPos(ma1->u_list);
-           DeleteVA_IntMultiVar(ma1->v_list);
+           tmesg.t = MESG_ICM; 
+           tmesg.m = &ctmp; 
+           writer(cnsout,&tmesg); 
+           fflush(cnsout);
+           if (ctmp.v_list != NULL)
+           {
+              int i;
+              for (i=0; i<ctmp.num_vars; i++)
+//                if (ctmp.v_list[i].var_seq != 0)
+                      free(ctmp.v_list[i].var_seq);      
+              free(ctmp.v_list);
+           }
            ctmp.num_vars = 0;
+//         FREE(ma1);
         }
-
         OutputScores(NumColumnsInUnitigs, NumRunsOfGapsInUnitigReads, 
                      NumGapsInUnitigs, NumColumnsInContigs, 
                      NumRunsOfGapsInContigReads, NumGapsInContigs,
-                     NumAAMismatches, 
-                     NumVARRecords, NumVARStringsWithFlankingGaps,
-                     NumUnitigRetrySuccess);
+                     NumAAMismatches, NumFAMismatches,
+                     NumVARRecords, NumVARStringsWithFlankingGaps);
 
         if (num_contig_failures > 0) {
           fprintf(stderr, "%d contigs failed.\n", num_contig_failures);
@@ -1056,40 +1060,22 @@ int main (int argc, char *argv[])
                     exit(0); 
                 break;
               }
-
+              if (MultiAlignUnitig(iunitig, global_fragStore, sequence,
+                  quality, deltas, printwhat, do_rez, COMPARE_FUNC, &options)
+                  == EXIT_FAILURE)
               {
-                int   unitigfail = 0;
-
-                unitigfail = MultiAlignUnitig(iunitig, global_fragStore, sequence,
-                                              quality, deltas, printwhat, do_rez, COMPARE_FUNC, &options);
-
-                if ((unitigfail == EXIT_FAILURE) &&
-                    (allow_neg_hang_retry) &&
-                    (allow_neg_hang == 0))
-                  {
-                    allow_neg_hang = 1;
-                    unitigfail = MultiAlignUnitig(iunitig, global_fragStore, sequence,
-                                                  quality, deltas, printwhat, do_rez, COMPARE_FUNC, &options);
-                    allow_neg_hang = 0;
-                    if (unitigfail != EXIT_FAILURE)
-                      NumUnitigRetrySuccess++;
-                  }
-
-                if (unitigfail == EXIT_FAILURE) {
                   num_unitig_failures++;
                   if (num_unitig_failures <= MAX_NUM_UNITIG_FAILURES)
-                    { 
-                      fprintf(stderr,"MultiAlignUnitig failed for unitig %d\n", iunitig->iaccession);
-                      writeFailure(OutputFileName, writer, std_output, pmesg);
-                    }
+                  { 
+                    fprintf(stderr,"MultiAlignUnitig failed for unitig %d\n", iunitig->iaccession);
+                    writeFailure(OutputFileName, writer, std_output, pmesg);
+                  }
                   else
-                    {
+                  {
                       CleanExit("MultiAlignUnitig failed  more than MAX_NUM_UNITIG_FAILURES times.Exit."
-                                ,__LINE__,1);
-                    } 
-                }
+                          ,__LINE__,1);
+                  } 
               }
-
               // Create a MultiAlignT from the MANode
             }
 
@@ -1215,22 +1201,18 @@ int main (int argc, char *argv[])
               //        pcontig->num_unitigs,global_fragStore);
               writer(cnsout,pmesg);
               OutputScores(NumColumnsInUnitigs, NumRunsOfGapsInUnitigReads,
-                           NumGapsInUnitigs, NumColumnsInContigs,
-                           NumRunsOfGapsInContigReads, NumGapsInContigs,
-                           NumAAMismatches, 
-                           NumVARRecords, NumVARStringsWithFlankingGaps,
-                           NumUnitigRetrySuccess);
+                     NumGapsInUnitigs, NumColumnsInContigs,
+                     NumRunsOfGapsInContigReads, NumGapsInContigs,
+                     NumAAMismatches, NumFAMismatches,
+                     NumVARRecords, NumVARStringsWithFlankingGaps);
                   exit(0);
             }
             if (pcontig->v_list != NULL) 
             {
                 int i;
                 for (i=0; i<pcontig->num_vars; i++)
-                {
-                    free(pcontig->v_list[i].nr_conf_alleles);
-                    free(pcontig->v_list[i].weights);
-                    free(pcontig->v_list[i].var_seq);
-                }
+//                  if (pcontig->v_list[i].var_seq != 0)
+                        free(pcontig->v_list[i].var_seq);
                 free(pcontig->v_list);
             }
             pcontig->num_vars = 0;
@@ -1253,7 +1235,7 @@ int main (int argc, char *argv[])
             {
               AuditLine auditLine;
               AppendAuditLine_AS(adt_mesg, &auditLine, t,
-                                 "Consensus", "$Revision: 1.35 $","(empty)");
+                                 "Consensus", "$Revision: 1.29 $","(empty)");
             }
 #endif
               VersionStampADT(adt_mesg,argc,argv);
@@ -1277,7 +1259,7 @@ int main (int argc, char *argv[])
       }
 
       t = time(0);
-      fprintf(stderr,"# Consensus $Revision: 1.35 $ Finished %s\n",ctime(&t));
+      fprintf(stderr,"# Consensus $Revision: 1.29 $ Finished %s\n",ctime(&t));
       if (printcns) 
       {
         int unitig_length = (unitig_count>0)? (int) input_lengths/unitig_count: 0; 
@@ -1323,12 +1305,10 @@ int main (int argc, char *argv[])
     }
 
     OutputScores(NumColumnsInUnitigs, NumRunsOfGapsInUnitigReads,
-                 NumGapsInUnitigs, NumColumnsInContigs,
-                 NumRunsOfGapsInContigReads, NumGapsInContigs,
-                 NumAAMismatches, 
-                 NumVARRecords, NumVARStringsWithFlankingGaps,
-                 NumUnitigRetrySuccess);
-
+                     NumGapsInUnitigs, NumColumnsInContigs,
+                     NumRunsOfGapsInContigReads, NumGapsInContigs,
+                     NumAAMismatches, NumFAMismatches,
+                     NumVARRecords, NumVARStringsWithFlankingGaps);
 
     if (num_unitig_failures)
         fprintf(stderr, "\nTotal number of unitig failures= %d\n", num_unitig_failures);

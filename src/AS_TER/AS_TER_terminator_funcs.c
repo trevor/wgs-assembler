@@ -25,7 +25,7 @@
  Assumptions: There is no UID 0
 **********************************************************************/
 
-static char CM_ID[] = "$Id: AS_TER_terminator_funcs.c,v 1.21 2006-11-06 23:01:10 brianwalenz Exp $";
+static char CM_ID[] = "$Id: AS_TER_terminator_funcs.c,v 1.17 2006-08-23 10:55:47 jason_miller Exp $";
 
 #include "AS_global.h"
 #include "AS_PER_ReadStruct.h"
@@ -34,6 +34,7 @@ static char CM_ID[] = "$Id: AS_TER_terminator_funcs.c,v 1.21 2006-11-06 23:01:10
 #include "AS_PER_gkpStore.h"
 #include "AS_UTL_Var.h"
 #include "AS_UTL_version.h"
+#include "PrimitiveVA.h"
 #include "PrimitiveVA_MSG.h"
 
 #include "AS_TER_terminator_funcs.h"
@@ -522,8 +523,8 @@ static SnapUnitigMesg* convert_IUM_to_UTG(IntUnitigMesg* iumMesg, int32 real)
   
   /* Set all toplevel fields */
   
-  utgMesg->eaccession      = uid;
   utgMesg->iaccession      = iumMesg->iaccession;
+  utgMesg->eaccession      = uid;
 #ifdef AS_ENABLE_SOURCE
   utgMesg->source         = strdup(iumMesg->source);
 #endif
@@ -536,9 +537,6 @@ static SnapUnitigMesg* convert_IUM_to_UTG(IntUnitigMesg* iumMesg, int32 real)
   utgMesg->quality        = strdup(iumMesg->quality);
   utgMesg->forced         = iumMesg->forced;
   utgMesg->num_frags      = iumMesg->num_frags;
-  utgMesg->num_vars       = 0;
-  utgMesg->f_list         = NULL;
-  utgMesg->v_list         = NULL;
 
   if( iumMesg->num_frags > 0 ){
     utgMesg->f_list = (SnapMultiPos*) safe_malloc(iumMesg->num_frags*sizeof(SnapMultiPos));
@@ -699,22 +697,19 @@ static SnapConConMesg* convert_ICM_to_CCO(IntConConMesg* icmMesg, int32 real)
   ccoMesg->num_pieces = icmMesg->num_pieces;
   ccoMesg->num_unitigs= icmMesg->num_unitigs;
   ccoMesg->num_vars   = icmMesg->num_vars;  // affects .asm/CCO
-  ccoMesg->pieces     = NULL;
-  ccoMesg->vars       = NULL;
-  ccoMesg->unitigs    = NULL;
-
+ 
   if (ccoMesg->num_vars > 0) {
      ccoMesg->vars = (IntMultiVar*) safe_malloc(icmMesg->num_vars*sizeof(IntMultiVar));
      for(i=0; i<icmMesg->num_vars; i++) // i loop
      {
-        ccoMesg->vars[i].position         = icmMesg->v_list[i].position;
-        ccoMesg->vars[i].num_reads        = icmMesg->v_list[i].num_reads; 
-        ccoMesg->vars[i].num_conf_alleles = icmMesg->v_list[i].num_conf_alleles;
-        ccoMesg->vars[i].anchor_size      = icmMesg->v_list[i].anchor_size;
-        ccoMesg->vars[i].var_length       = icmMesg->v_list[i].var_length ;
-        ccoMesg->vars[i].nr_conf_alleles  = strdup(icmMesg->v_list[i].nr_conf_alleles);
-        ccoMesg->vars[i].weights          = strdup(icmMesg->v_list[i].weights);
-        ccoMesg->vars[i].var_seq          = strdup(icmMesg->v_list[i].var_seq);  
+        ccoMesg->vars[i].position       = icmMesg->v_list[i].position;
+        ccoMesg->vars[i].num_reads      = icmMesg->v_list[i].num_reads; 
+        ccoMesg->vars[i].nr_best_allele = icmMesg->v_list[i].nr_best_allele;
+        ccoMesg->vars[i].num_alleles    = icmMesg->v_list[i].num_alleles;
+        ccoMesg->vars[i].ratio          = icmMesg->v_list[i].ratio;       
+        ccoMesg->vars[i].window_size    = icmMesg->v_list[i].window_size;
+        ccoMesg->vars[i].var_length     = icmMesg->v_list[i].var_length ;
+        ccoMesg->vars[i].var_seq        = strdup(icmMesg->v_list[i].var_seq);  
      }
       
   }
@@ -768,7 +763,7 @@ static SnapConConMesg* convert_ICM_to_CCO(IntConConMesg* icmMesg, int32 real)
       di = GetCDS_UID_t(IUMmap,icmMesg->unitigs[i].ident);
       if ((di == NULL) || (*di == 0)) {
 	sprintf(errorreport,"Reference before definition for unitig ID %d",
-		icmMesg->unitigs[i].ident);
+		icmMesg->pieces[i].ident);
 	error(errorreport,AS_TER_EXIT_FAILURE,__FILE__,__LINE__); 
       }
       ccoMesg->unitigs[i].eident = *di;
@@ -1311,68 +1306,64 @@ static AugFragMesg* convert_IAF_to_AFG(IntAugFragMesg* iafMesg, int32 real)
 /* free routines */
 /*****************/
 
-#ifndef TERFREE
-#define TERFREE(X) { free(X); (X) = NULL; }
-#endif
-
 static void free_DSC(SnapDegenerateScaffoldMesg* dscMesg){
-  TERFREE(dscMesg);
+  free(dscMesg);
 }
 
 static void free_UTG(SnapUnitigMesg* utgMesg){
   /*** DO NOT FREE DELTA ARRAYS...THESE WERE COPIED BY REFERENCE */
   if( utgMesg->f_list != NULL )
-    TERFREE(utgMesg->f_list);
+    free(utgMesg->f_list);
   if( utgMesg->consensus != NULL )
-    TERFREE(utgMesg->consensus);
+    free(utgMesg->consensus);
   if( utgMesg->quality != NULL )
-    TERFREE(utgMesg->quality);
-  TERFREE(utgMesg);
+    free(utgMesg->quality);
+  free(utgMesg);
 }
 
 static void free_ULK(SnapUnitigLinkMesg* ulkMesg){
   if( ulkMesg->jump_list != NULL )
-    TERFREE(ulkMesg->jump_list);
-  TERFREE(ulkMesg);
+    free(ulkMesg->jump_list);
+  free(ulkMesg);
 }
 
 static void free_CCO(SnapConConMesg* ccoMesg){
   /*** DO NOT FREE DELTA ARRAYS...THESE WERE COPIED BY REFERENCE */
   if( ccoMesg->num_vars > 0)
-    TERFREE(ccoMesg->vars);
+    free(ccoMesg->vars);
   if( ccoMesg->num_pieces > 0)
-    TERFREE(ccoMesg->pieces);
+    free(ccoMesg->pieces);
   if( ccoMesg->num_unitigs > 0)
-    TERFREE(ccoMesg->unitigs);
+    free(ccoMesg->unitigs);
   if( ccoMesg->consensus != NULL )
-    TERFREE(ccoMesg->consensus);
+    free(ccoMesg->consensus);
   if( ccoMesg->quality != NULL )
-    TERFREE(ccoMesg->quality);
-  TERFREE(ccoMesg);
+    free(ccoMesg->quality);
+  free(ccoMesg);
 }
 
 static void free_CLK(SnapContigLinkMesg* clkMesg){
   if( clkMesg->jump_list != NULL )
-    TERFREE(clkMesg->jump_list);
-  TERFREE(clkMesg);
+    free(clkMesg->jump_list);
+  free(clkMesg);
 }
 
 static void free_SLK(SnapScaffoldLinkMesg* slkMesg){
   if( slkMesg->jump_list != NULL )
-    TERFREE(slkMesg->jump_list);
-  TERFREE(slkMesg);
+    free(slkMesg->jump_list);
+  free(slkMesg);
 }
 
 static void free_SCF(SnapScaffoldMesg* scfMesg){
   if( scfMesg->contig_pairs != NULL )
-    TERFREE(scfMesg->contig_pairs);
-  TERFREE(scfMesg);
+    free(scfMesg->contig_pairs);
+  free(scfMesg);
 }
 
 static void free_MDI(SnapMateDistMesg* mdiMesg){
   if( mdiMesg->histogram != NULL )
-    TERFREE(mdiMesg->histogram);
-  TERFREE(mdiMesg);
+    free(mdiMesg->histogram);
+  free(mdiMesg);
 }
 
 static void free_AFG(AugFragMesg* afgMesg){
@@ -1381,10 +1372,10 @@ static void free_AFG(AugFragMesg* afgMesg){
   while( match != NULL)
     {
       next = match->next;
-      TERFREE(match);
+      free(match);
       match = next;
     }
-  TERFREE(afgMesg);
+  free(afgMesg);
 }
 
 
