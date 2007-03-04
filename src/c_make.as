@@ -37,12 +37,28 @@
 #
 # The final CFLAGS, CXXFLAGS and LDFLAGS are constructed from these.
 
+
 # You can enable a debugging build, disabling all optimizations, by
 # setting this to 1.
 #
 ifneq "$(origin BUILDDEBUG)" "environment"
 BUILDDEBUG  = 0
 endif
+
+# You can enable a profiling build by setting this to 1.
+#
+ifneq "$(origin BUILDPROFILE)" "environment"
+BUILDPROFILE  = 0
+endif
+
+# You can enable a line coverage build by setting this to 1.  This
+# implies a debug build with no optimization.
+#
+ifneq "$(origin BUILDCOVERAGE)" "environment"
+BUILDCOVERAGE  = 0
+endif
+
+
 
 OSTYPE      = $(shell echo `uname`)
 MACHINETYPE = $(shell echo `uname -m`)
@@ -88,13 +104,21 @@ endif
 ifeq ($(OSTYPE), FreeBSD)
   CC               = gcc
   CXX              = g++
-  ARCH_CFLAGS      = -DNEEDXDRUHYPER -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads 
-  ifeq ($(BUILDDEBUG), 1)
-    ARCH_CFLAGS   += -g -Wstrict-prototypes -Wimplicit
-  else
-    ARCH_CFLAGS   += -O3 -Wstrict-prototypes -Wimplicit
-  endif
+
   ARCH_LDFLAGS    += -llthread -llgcc_r
+  ARCH_CFLAGS      = -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads 
+
+  ifeq ($(BUILDCOVERAGE), 1)
+    ARCH_CFLAGS   += -g -Wimplicit -fprofile-arcs -ftest-coverage
+    ARCH_LDFLAGS  += -lgcov
+  else
+    ifeq ($(BUILDDEBUG), 1)
+      ARCH_CFLAGS   += -g -Wimplicit -pg
+    else
+      ARCH_CFLAGS   += -O3 -Wimplicit
+    endif
+  endif
+
   ARCH_INC         = /usr/local/include /usr/X11R6/include
   ARCH_LIB         = /usr/local/lib     /usr/X11R6/lib
 endif
@@ -211,6 +235,11 @@ ifeq ($(OSTYPE), OSF1)
   ARCH_INC         =  /usr/local/include /usr/include
 endif
 
+ifeq ($(BUILDPROFILE), 1)
+  ARCH_CFLAGS  += -pg
+  ARCH_LDFLAGS += -pg
+endif
+
 CFLAGS          += $(ARCH_CFLAGS)
 CXXFLAGS        += $(ARCH_CFLAGS)
 LDFLAGS         += $(ARCH_LDFLAGS)
@@ -227,33 +256,49 @@ OBJ_SEARCH_PATH  = $(LOCAL_OBJ)
 ifeq ($(SITE_NAME), TIGR)
   CFLAGS   += -DUSE_SOAP_UID
   CXXFLAGS += -DUSE_SOAP_UID
-else
+endif
+
+ifeq ($(SITE_NAME), JCVI)
   LDFLAGS += -lcurl
 endif
 
 #
 #  AS_SIM is no longer a supported component.
 #
+#  The order of compilation here is very carefully chosen to be the
+#  same as the order used in running an assembly.  It is extremely
+#  useful if you happen to be making changes to, say, the persistent
+#  stores.  Break the continuation lines after AS_GKP and you'll build
+#  just gatekeeper.
+#
+#  It's also more-or-less telling us link relationships.  CGB doesn't
+#  use REZ or CNS, etc.  It gets hairy at the end; REZ, CNS and CGW are
+#  all dependent on each other.  Everything after TER isn't needed for
+#  an assembly.
 
-SUBDIRS = AS_MSG \
+#CFLAGS += -I/n8/wgs/src/AS_CNS -I/n8/wgs/src/AS_CGW -I/n8/wgs/src/AS_ALN -I/n8/wgs/src/AS_REZ -I/n8/wgs/src/AS_SDB
+
+SUBDIRS = AS_RUN \
           AS_UTL \
+          AS_UID \
+          AS_MSG \
           AS_PER \
-          AS_ALN \
-          AS_OVL \
-          AS_CNS \
-          AS_CGB \
-          AS_ORA \
           AS_GKP \
+          AS_OBT \
+          AS_MER \
+          AS_OVL \
+          AS_ALN \
+          AS_BOG \
+          AS_CGB \
           AS_REZ \
+          AS_CNS \
+          AS_SDB \
           AS_LIN \
           AS_CGW \
+          AS_TER
+
+D=\
           AS_VWR \
-          AS_TER \
-          AS_SDB \
           AS_CVT \
-          AS_MER \
           AS_MPA \
-          AS_BOG \
-          AS_OBT \
-          AS_UID \
-          AS_RUN
+          AS_ORA \
