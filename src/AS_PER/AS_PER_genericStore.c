@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 brianwalenz Exp $";
+static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.7.2.1 2007-03-04 04:43:03 brianwalenz Exp $";
 /*************************************************************************
  Module:  AS_PER_genericStore
  Description:
@@ -52,8 +52,8 @@ static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 bria
  *************************************************************************/
 
 /* RCS Info
- * $Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 brianwalenz Exp $
- * $Revision: 1.7 $
+ * $Id: AS_PER_genericStore.c,v 1.7.2.1 2007-03-04 04:43:03 brianwalenz Exp $
+ * $Revision: 1.7.2.1 $
  *
  */
 
@@ -69,7 +69,7 @@ static char CM_ID[] = "$Id: AS_PER_genericStore.c,v 1.7 2006-10-17 21:18:06 bria
 
 
 #define INITIAL_ALLOCATION (2048)
-#define WRITING_BUFFER     (1024 * 1024)
+#define WRITING_BUFFER     (8 * 1024)
 
 /* This is the structure maintained in memory for each open Store */
 typedef struct{
