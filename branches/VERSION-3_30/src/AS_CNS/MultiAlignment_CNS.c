@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.124 2007-02-08 06:48:51 brianwalenz Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.124.2.1 2007-03-04 04:43:56 brianwalenz Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -3854,36 +3854,44 @@ int GetAlignmentTrace(int32 afid, int32 aoffset, int32 bfid, int32 *ahang,
   if ( O->begpos < 0 ) {  
      // this is an undesirable situation... by construction, we anticipate all 
      // ahangs to be non-negative
-     ReportTrick(cnslog,trick);
-     ReportOverlap(cnslog,COMPARE_FUNC,params,aiid,atype,biid,btype,O,ahang_input);
+     if (show_olap) {
+       ReportTrick(cnslog,trick);
+       ReportOverlap(cnslog,COMPARE_FUNC,params,aiid,atype,biid,btype,O,ahang_input);
+     }
 
      if ( O->begpos < CNS_NEG_AHANG_CUTOFF && ! allow_neg_hang)  {
-       if (O->begpos > -12) 
-         fprintf(stderr," DIAGNOSTIC: would have accepted bad olap with %d bp slip\n",ahang_input-O->begpos); // diagnostic - remove soon!
-       PrintOverlap(cnslog, a, b, O);
-       PrintAlarm(cnslog,"NOTE: Negative ahang is unacceptably large. Will not use this overlap.\n");
+       if (show_olap) {
+         if (O->begpos > -12) 
+           fprintf(stderr," DIAGNOSTIC: would have accepted bad olap with %d bp slip\n",ahang_input-O->begpos); // diagnostic - remove soon!
+         PrintOverlap(cnslog, a, b, O);
+         PrintAlarm(cnslog,"NOTE: Negative ahang is unacceptably large. Will not use this overlap.\n");
+       }
        if ( O->begpos < -10 ) //added to get lsat 3 human partitions through
-       return 0;
+         return 0;
      }
   }
   slip = O->begpos - ahang_input;
   if (slip < 0 ) slip *=-1;
   if ( ALIGNMENT_CONTEXT != AS_MERGE && bfrag->type != AS_UNITIG && slip > CNS_TIGHTSEMIBANDWIDTH && COMPARE_FUNC == DP_Compare ) {  
-     ReportTrick(cnslog,trick);
-     ReportOverlap(cnslog,COMPARE_FUNC,params,aiid,atype,biid,btype,O,ahang_input);
-     PrintOverlap(cnslog, a, b, O);
-     PrintAlarm(cnslog,"NOTE: Slip is unacceptably large. Will not use this overlap.\n");
-     fprintf(stderr," DIAGNOSTIC: would have accepted bad olap with %d bp slip\n",slip); // diagnostic - remove soon!
+     if (show_olap) {
+       ReportTrick(cnslog,trick);
+       ReportOverlap(cnslog,COMPARE_FUNC,params,aiid,atype,biid,btype,O,ahang_input);
+       PrintOverlap(cnslog, a, b, O);
+       PrintAlarm(cnslog,"NOTE: Slip is unacceptably large. Will not use this overlap.\n");
+       fprintf(stderr," DIAGNOSTIC: would have accepted bad olap with %d bp slip\n",slip); // diagnostic - remove soon!
+     }
      //     if (O->begpos < 0 && slip < 15 ) {} //added to get last 3 human partitions through
      //        else 
      return 0;
    }
 
-  if ( trick != CNS_ALN_NONE || show_olap) {
-     // write something to the logs to show that heroic efforts were made
-     ReportTrick(cnslog,trick);
-     ReportOverlap(cnslog,COMPARE_FUNC,params,aiid,atype,biid,btype,O,ahang_input);
-     PrintOverlap(cnslog, a, b, O);
+  if (show_olap) {
+    if (trick != CNS_ALN_NONE) {
+      // write something to the logs to show that heroic efforts were made
+      ReportTrick(cnslog,trick);
+      ReportOverlap(cnslog,COMPARE_FUNC,params,aiid,atype,biid,btype,O,ahang_input);
+      PrintOverlap(cnslog, a, b, O);
+    }
   }
 
   tmp = O->trace;
@@ -7473,7 +7481,7 @@ int MultiAlignUnitig(IntUnitigMesg *unitig,
          if ( ! olap_success && COMPARE_FUNC != DP_Compare ) {
            // try again, perhaps with alternate overlapper
            olap_success = GetAlignmentTrace(afrag->lid, 0, bfrag->lid, &ahang, 
-               ovl, trace, &otype,COMPARE_FUNC,SHOW_OLAP,0);
+               ovl, trace, &otype,COMPARE_FUNC,DONT_SHOW_OLAP,0);
          }
 #endif
          if ( !olap_success ) {
@@ -8730,9 +8738,9 @@ MultiAlignT *ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
          SeedMAWithFragment(ma->lid,aid,0, opp);
 
          //  do the alignment 
-         olap_success = GetAlignmentTrace(aid, 0,bid,&ahang,ovl,trace,&otype, DP_Compare,SHOW_OLAP,0);
+         olap_success = GetAlignmentTrace(aid, 0,bid,&ahang,ovl,trace,&otype, DP_Compare,DONT_SHOW_OLAP,0);
          if ( !olap_success && COMPARE_FUNC != DP_Compare )
-           olap_success = GetAlignmentTrace(aid, 0,bid,&ahang,ovl,trace,&otype, COMPARE_FUNC,SHOW_OLAP,0);
+           olap_success = GetAlignmentTrace(aid, 0,bid,&ahang,ovl,trace,&otype, COMPARE_FUNC,DONT_SHOW_OLAP,0);
 
          //  If the alignment fails -- usually because the ahang is
          //  negative -- return an empty alignment.  This causes
