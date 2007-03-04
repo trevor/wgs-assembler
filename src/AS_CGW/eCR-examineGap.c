@@ -93,7 +93,7 @@ examineGap(ContigT *lcontig, int lFragIid, ContigT *rcontig, int rFragIid,
   static VA_TYPE(char) *ungappedSequence=NULL, *ungappedQuality=NULL;
   char lFragSeqBuffer[AS_READ_MAX_LEN+1], lqltbuffer[AS_READ_MAX_LEN+1];
   char rFragSeqBuffer[AS_READ_MAX_LEN+1], rqltbuffer[AS_READ_MAX_LEN+1];
-  char lcompBuffer[AS_READ_MAX_LEN+1],    rcompBuffer[AS_READ_MAX_LEN+1];
+  char lcompBuffer[AS_READ_MAX_LEN+CONTIG_BASES+1],    rcompBuffer[AS_READ_MAX_LEN+CONTIG_BASES+1];
   uint lclr_bgn, lclr_end;
   uint rclr_bgn, rclr_end;
   char tmp_char, *lSequence, *rSequence;
