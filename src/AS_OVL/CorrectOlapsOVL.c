@@ -34,11 +34,11 @@
 *************************************************/
 
 /* RCS info
- * $Id: CorrectOlapsOVL.c,v 1.7 2007-01-29 20:41:17 brianwalenz Exp $
- * $Revision: 1.7 $
+ * $Id: CorrectOlapsOVL.c,v 1.7.2.1 2007-05-16 15:43:43 skoren Exp $
+ * $Revision: 1.7.2.1 $
 */
 
-static char CM_ID[] = "$Id: CorrectOlapsOVL.c,v 1.7 2007-01-29 20:41:17 brianwalenz Exp $";
+static char CM_ID[] = "$Id: CorrectOlapsOVL.c,v 1.7.2.1 2007-05-16 15:43:43 skoren Exp $";
 
 
 //  System include files
@@ -2796,8 +2796,8 @@ static void  Redo_Olaps
    int  lo_frag, hi_frag;
    int  next_olap;
    Correction_Output_t  msg;
-   Correction_t  correct [MAX_FRAG_LEN];
-   Adjust_t  adjust [MAX_FRAG_LEN];
+   Correction_t  correct [MAX_FRAG_LEN+1];
+   Adjust_t  adjust [MAX_FRAG_LEN+1];
    int16  adjust_ct;
    int  num_corrects;
    uint32  correct_iid = 0, next_iid;

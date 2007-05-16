@@ -20,7 +20,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 static char CM_ID[] 
-= "$Id: AS_CGB_branchpts.c,v 1.8 2007-01-29 20:40:56 brianwalenz Exp $";
+= "$Id: AS_CGB_branchpts.c,v 1.8.2.1 2007-05-16 15:37:50 skoren Exp $";
 /* *******************************************************************
  *
  * Module: AS_CGB_branchpts.c
@@ -496,7 +496,7 @@ static void  Get_Chunk_End_Sequence
     iret = getFragStore( frag_store, frag_iid, FRAG_S_SEQUENCE, Branch_Pt_Read);
     assert(iret == 0);
     iret = getSequence_ReadStruct
-      (Branch_Pt_Read, sequence, quality, AS_CGB_BPT_SEQ_LENGTH);
+      (Branch_Pt_Read, sequence, quality, AS_CGB_BPT_SEQ_LENGTH+1);
     assert(iret == 0); // Will fail if buffer is to short.
     getClearRegion_ReadStruct( Branch_Pt_Read, & clear_start, & clear_end,
 			       READSTRUCT_LATEST);
@@ -544,7 +544,7 @@ static void  Get_Fragment_End_Sequence
   iret = getFragStore( frag_store, frag_iid, FRAG_S_SEQUENCE, Branch_Pt_Read);
   assert(iret == 0);
   iret = getSequence_ReadStruct
-    (Branch_Pt_Read, sequence, quality, AS_CGB_BPT_SEQ_LENGTH);
+    (Branch_Pt_Read, sequence, quality, AS_CGB_BPT_SEQ_LENGTH+1);
   assert(iret == 0); // Will fail if buffer is to short.
   getClearRegion_ReadStruct( Branch_Pt_Read, & clear_start, & clear_end,
 			     READSTRUCT_LATEST);

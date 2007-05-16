@@ -729,8 +729,8 @@ int GetUnitigData( BreakerSetp chims, BreakerSetp craps, char * cgb_filename )
 int PopulateFragmentSequence( IntMultiPos * f, FragStoreHandle fs )
 {
   ReadStructp rs;
-  char temp_seq[AS_READ_MAX_LEN];
-  char temp_qvs[AS_READ_MAX_LEN];
+  char temp_seq[AS_READ_MAX_LEN+1];
+  char temp_qvs[AS_READ_MAX_LEN+1];
   cds_uint32 bgn, end;
 
   if( (rs = new_ReadStruct()) == NULL )
@@ -746,7 +746,7 @@ int PopulateFragmentSequence( IntMultiPos * f, FragStoreHandle fs )
   }
   
   getClearRegion_ReadStruct( rs, &bgn, &end, READSTRUCT_LATEST );
-  getSequence_ReadStruct( rs, temp_seq, temp_qvs, AS_READ_MAX_LEN );
+  getSequence_ReadStruct( rs, temp_seq, temp_qvs, AS_READ_MAX_LEN + 1 );
   f->delta_length = end - bgn;
   
   if( (f->delta = (cds_int32 *) safe_calloc( f->delta_length + 1,
@@ -1353,7 +1353,7 @@ typedef CheckGlobals * CheckGlobalsp;
 void InitializeGlobals( CheckGlobalsp globals, char * program_name )
 {
   globals->program_name = program_name;
-  globals->version = "$Revision: 1.11 $";
+  globals->version = "$Revision: 1.11.2.1 $";
   globals->chims_file = NULL;
   globals->craps_file = NULL;
   globals->cgb_file = NULL;

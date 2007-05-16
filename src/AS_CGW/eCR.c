@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char CM_ID[] = "$Id: eCR.c,v 1.11 2007-02-08 06:48:51 brianwalenz Exp $";
+static const char CM_ID[] = "$Id: eCR.c,v 1.11.2.1 2007-05-16 15:39:59 skoren Exp $";
 
 #include "eCR.h"
 
@@ -1288,7 +1288,7 @@ findFirstExtendableFrags(ContigT *contig, extendableFrag *extFragsArray) {
 	  
       getFragStore(ScaffoldGraph->fragStore, frag->iid, FRAG_S_ALL, fsread);
       getClearRegion_ReadStruct(fsread, &clr_bgn, &clr_end, READSTRUCT_CNS);
-      getSequence_ReadStruct(fsread, seqbuffer, qltbuffer, AS_READ_MAX_LEN);
+      getSequence_ReadStruct(fsread, seqbuffer, qltbuffer, AS_READ_MAX_LEN + 1);
 
 
       //                 <--------------------------------------------------------------------------- contig
@@ -1413,7 +1413,7 @@ findLastExtendableFrags(ContigT *contig, extendableFrag *extFragsArray) {
 
       getFragStore(ScaffoldGraph->fragStore, frag->iid, FRAG_S_ALL, fsread);
       getClearRegion_ReadStruct(fsread, &clr_bgn, &clr_end, READSTRUCT_CNS);
-      getSequence_ReadStruct(fsread, seqbuffer, qltbuffer, AS_READ_MAX_LEN);
+      getSequence_ReadStruct(fsread, seqbuffer, qltbuffer, AS_READ_MAX_LEN + 1);
 
       //    contig ----------------------------------------------------------------------------------->
       //                                  5p -------|---------------------------------------------|------------> 3p 
