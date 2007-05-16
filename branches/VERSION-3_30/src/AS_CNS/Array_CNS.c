@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: Array_CNS.c,v 1.9 2007-02-08 06:48:51 brianwalenz Exp $";
+static char CM_ID[] = "$Id: Array_CNS.c,v 1.9.2.1 2007-05-16 15:30:05 skoren Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -148,8 +148,8 @@ int IMP2Array(IntMultiPos *all_frags,
   Lane null_lane;
   int next_lane; Lane *free_lane,*lane; LaneNode *new_mlp; Lane space;
   int rc;
-  char seq[AS_READ_MAX_LEN];
-  char qv[AS_READ_MAX_LEN];
+  char seq[AS_READ_MAX_LEN+1];
+  char qv[AS_READ_MAX_LEN+1];
   static ReadStructp fsread=NULL;
   VA_TYPE(Lane) *Packed;
   if ( fsread == NULL ) fsread = new_ReadStruct();
