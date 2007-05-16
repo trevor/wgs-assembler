@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.124.2.1 2007-03-04 04:43:56 brianwalenz Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.124.2.2 2007-05-16 15:21:46 skoren Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -954,7 +954,7 @@ int32 AppendFragToLocalStore(FragType type, int32 iid, int complement,int32 cont
       getFragStore(global_fragStore,iid,FRAG_S_ALL,fsread);
     }
     getClearRegion_ReadStruct(fsread, &clr_bgn,&clr_end, READSTRUCT_LATEST);
-    getSequence_ReadStruct(fsread, seqbuffer, qltbuffer, AS_READ_MAX_LEN);
+    getSequence_ReadStruct(fsread, seqbuffer, qltbuffer, AS_READ_MAX_LEN + 1);
     getAccID_ReadStruct(fsread, &fragment.uid);
     getReadType_ReadStruct(fsread, &fragment.type);
     fragment.source = source;
@@ -4486,7 +4486,7 @@ int PrintFrags(FILE *out, int accession, IntMultiPos *all_frags, int num_frags,
            } else {
              getFragStore(global_fragStore,all_frags[i].ident,FRAG_S_ALL,fsread);
            }
-           getSequence_ReadStruct(fsread, fmesg.sequence, fmesg.quality, 200000);
+           getSequence_ReadStruct(fsread, fmesg.sequence, fmesg.quality, 200001);
            getClearRegion_ReadStruct (fsread,(uint32 *)&fmesg.clear_rng.bgn,
 	                                     (uint32 *)&fmesg.clear_rng.end, READSTRUCT_LATEST);
 
