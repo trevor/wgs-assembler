@@ -217,7 +217,7 @@ int PopulateFragment( FragMesg * f,
   f->clear_rng.bgn = bgn;
   f->clear_rng.end = end;
   getSource_ReadStruct( rs, f->source, STRING_LENGTH );
-  getSequence_ReadStruct( rs, f->sequence, f->quality, AS_READ_MAX_LEN );
+  getSequence_ReadStruct( rs, f->sequence, f->quality, AS_READ_MAX_LEN + 1);
   getReadIndex_ReadStruct( rs, &(f->iaccession) );
   
   return 0;
@@ -263,7 +263,7 @@ int PopulateFile( char * prog_name,
     adl.next = NULL;
     adl.name = prog_name;
     adl.complete = time(0);
-    adl.version = "$Revision: 1.3 $";
+    adl.version = "$Revision: 1.3.2.1 $";
     adl.comment = "Contact Ian @x3036 to report problems";
 
     gen.m = &adt;
@@ -308,8 +308,8 @@ int PopulateFile( char * prog_name,
     LinkMesg lkg;
     ReadStructp rs;
     char src[STRING_LENGTH];
-    char seq[AS_READ_MAX_LEN];
-    char qvs[AS_READ_MAX_LEN];
+    char seq[AS_READ_MAX_LEN + 1];
+    char qvs[AS_READ_MAX_LEN + 1];
     VA_TYPE(char) * used;
     char used_val=(char) 1;
 

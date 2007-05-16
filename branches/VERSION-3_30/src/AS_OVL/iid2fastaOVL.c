@@ -34,8 +34,8 @@
 *************************************************/
 
 /* RCS info
- * $Id: iid2fastaOVL.c,v 1.4 2005-03-22 19:49:19 jason_miller Exp $
- * $Revision: 1.4 $
+ * $Id: iid2fastaOVL.c,v 1.4.8.1 2007-05-16 15:43:43 skoren Exp $
+ * $Revision: 1.4.8.1 $
 */
 
 
@@ -100,7 +100,7 @@ int  main
    while  (scanf ("%d", & iid) == 1)
      {
       getFragStore (store, iid, FRAG_S_SEQUENCE, fsread);
-      getSequence_ReadStruct (fsread, sequence, quality, AS_READ_MAX_LEN);
+      getSequence_ReadStruct (fsread, sequence, quality, AS_READ_MAX_LEN + 1);
       getClearRegion_ReadStruct (fsread, & clear_begin, & clear_end, 
 				 READSTRUCT_LATEST);
 

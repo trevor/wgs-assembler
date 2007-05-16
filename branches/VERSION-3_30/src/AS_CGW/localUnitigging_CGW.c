@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: localUnitigging_CGW.c,v 1.15 2007-02-08 06:48:51 brianwalenz Exp $";
+static char CM_ID[] = "$Id: localUnitigging_CGW.c,v 1.15.2.1 2007-05-16 15:39:59 skoren Exp $";
 
 
 /*********************************************************************
@@ -985,7 +985,7 @@ static int OverlapPieceList(VA_TYPE(ChunkPlacement) *piece_list, VA_TYPE(OFGMesg
           // get the read and its sequence
           getFragStore( ScaffoldGraph->fragStore, this_chunk, FRAG_S_ALL, fsread);
           getClearRegion_ReadStruct( fsread, &clr_bgn, &clr_end, READSTRUCT_CNS);
-          getSequence_ReadStruct( fsread, frgSeqBuffer, frgQltbuffer, AS_READ_MAX_LEN);
+          getSequence_ReadStruct( fsread, frgSeqBuffer, frgQltbuffer, AS_READ_MAX_LEN + 1);
           frgSeqBuffer[clr_end]='\0';
 
           // copy its sequence

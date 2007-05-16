@@ -143,13 +143,13 @@ examineGap(ContigT *lcontig, int lFragIid, ContigT *rcontig, int rFragIid,
   if (lFragIid != -1) {
     getFragStore(ScaffoldGraph->fragStore, lFragIid, FRAG_S_ALL, fsread);
     getClearRegion_ReadStruct(fsread, &lclr_bgn, &lclr_end, READSTRUCT_CNS);
-    getSequence_ReadStruct(fsread, lFragSeqBuffer, lqltbuffer, AS_READ_MAX_LEN);
+    getSequence_ReadStruct(fsread, lFragSeqBuffer, lqltbuffer, AS_READ_MAX_LEN + 1);
   }
   
   if (rFragIid != -1) {
     getFragStore(ScaffoldGraph->fragStore, rFragIid, FRAG_S_ALL, fsread);
     getClearRegion_ReadStruct(fsread, &rclr_bgn, &rclr_end, READSTRUCT_CNS);
-    getSequence_ReadStruct(fsread, rFragSeqBuffer, rqltbuffer, AS_READ_MAX_LEN);
+    getSequence_ReadStruct(fsread, rFragSeqBuffer, rqltbuffer, AS_READ_MAX_LEN + 1);
   }
   
   // Get the consensus sequences for both chunks from the Store

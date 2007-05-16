@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: AS_CGB_repair_breakers.c,v 1.7 2007-01-29 20:40:58 brianwalenz Exp $";
+static char CM_ID[] = "$Id: AS_CGB_repair_breakers.c,v 1.7.2.1 2007-05-16 15:37:50 skoren Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -607,8 +607,8 @@ static int PopulateFragment
   )
 {
   static ReadStructp rs = NULL;
-  char temp_seq[AS_READ_MAX_LEN];
-  char temp_qvs[AS_READ_MAX_LEN];
+  char temp_seq[AS_READ_MAX_LEN+1];
+  char temp_qvs[AS_READ_MAX_LEN+1];
   cds_uint32 bgn, end;
 
   rs = (rs == NULL) ? new_ReadStruct() : rs;
@@ -624,7 +624,7 @@ static int PopulateFragment
     return 1;
   }
   
-  getSequence_ReadStruct( rs, temp_seq, temp_qvs, AS_READ_MAX_LEN );
+  getSequence_ReadStruct( rs, temp_seq, temp_qvs, AS_READ_MAX_LEN + 1 );
   getClearRegion_ReadStruct( rs, &bgn, &end, READSTRUCT_LATEST );
   ifg->clear_rng.bgn = 0;
   ifg->clear_rng.end = end - bgn;
@@ -1264,7 +1264,7 @@ static int write_overlap_file
     adl.next = NULL;
     adl.name = rg->program_name;
     adl.complete = time(0);
-    adl.version = "$Revision: 1.7 $";
+    adl.version = "$Revision: 1.7.2.1 $";
     adl.comment = "";
     adt.list = &adl;
     gen.m = &adt;

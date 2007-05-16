@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: extract_multiple.c,v 1.6 2007-02-08 06:48:52 brianwalenz Exp $";
+static char CM_ID[] = "$Id: extract_multiple.c,v 1.6.2.1 2007-05-16 15:42:32 skoren Exp $";
 
 /*
   IMPORTANT NOTE:
@@ -249,7 +249,7 @@ int PopulateFragment( FragMesg * f,
   f->clear_rng.bgn = bgn;
   f->clear_rng.end = end;
   getSource_ReadStruct( rs, f->source, STRING_LENGTH );
-  getSequence_ReadStruct( rs, f->sequence, f->quality, AS_READ_MAX_LEN );
+  getSequence_ReadStruct( rs, f->sequence, f->quality, AS_READ_MAX_LEN + 1 );
   getReadIndex_ReadStruct( rs, &(f->iaccession) );
   
   return 0;
@@ -883,8 +883,8 @@ int WriteComponents(Globalsp globals)
   FragMesg     frg;
   LinkMesg     lkg;
   char     src[STRING_LENGTH];
-  char     seq[AS_READ_MAX_LEN];
-  char     qvs[AS_READ_MAX_LEN];
+  char     seq[AS_READ_MAX_LEN + 1];
+  char     qvs[AS_READ_MAX_LEN + 1];
   Component  * comp;
   int write_lkg;
   
