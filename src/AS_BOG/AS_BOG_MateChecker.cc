@@ -19,8 +19,8 @@
  *************************************************************************/
 
 /* RCS info
- * $Id: AS_BOG_MateChecker.cc,v 1.14 2007-05-31 15:41:48 eliv Exp $
- * $Revision: 1.14 $
+ * $Id: AS_BOG_MateChecker.cc,v 1.13 2007-05-09 19:35:22 eliv Exp $
+ * $Revision: 1.13 $
 */
 
 #include <math.h>
@@ -303,18 +303,14 @@ namespace AS_BOG{
     }
     ///////////////////////////////////////////////////////////////////////////
 
-    void findPeakBad( short* badGraph, int tigLen, int &peakBegin, int &peakEnd);
-
     static const bool MATE_3PRIME_END = true;
     void MateChecker::computeMateCoverage( Unitig* tig, LibraryStats& globalStats )
     {
         int tigLen = tig->getLength();
         short goodGraph[tigLen]; 
-        short  badFwdGraph[tigLen];
-        short  badRevGraph[tigLen];
+        short  badGraph[tigLen];
         memset( goodGraph, 0, tigLen * sizeof(short));
-        memset(  badFwdGraph, 0, tigLen * sizeof(short));
-        memset(  badRevGraph, 0, tigLen * sizeof(short));
+        memset(  badGraph, 0, tigLen * sizeof(short));
         IdMap seenMates;
         MateLocation positions(this);
         std::set<iuid> badMates;
@@ -346,29 +342,28 @@ namespace AS_BOG{
             iuid fragId         =  loc.id1;
             MateInfo mateInfo   =  getMateInfo( fragId );
             iuid mateId         =  mateInfo.mate;
-            iuid lib            =  mateInfo.lib;
-            DistanceCompute *gdc = &(globalStats[ lib ]);
+            DistanceCompute *gdc = &(globalStats[ mateInfo.lib ]);
             int badMax = static_cast<int>(gdc->mean + 5 * gdc->stddev);
             int frgBgn = loc.pos1.bgn;
             int frgEnd = loc.pos1.end;
-            if ( loc.unitig1 != loc.unitig2) {
+            if ( loc.pos2.bgn == NULL_FRAG_ID && loc.pos2.end == NULL_FRAG_ID) {
                 // mate in another tig, mark bad only if max range exceeded
                 if (isReverse(loc.pos1)) {
                     if ( frgBgn > badMax ) {
                         if (MATE_3PRIME_END) frgEnd = loc.pos1.bgn;
-                        incrRange( badRevGraph, -1, frgBgn - badMax, frgEnd );
+                        incrRange( badGraph, -1, frgBgn - badMax, frgEnd );
                         badMates.insert( fragId );
-                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                fragId, frgBgn, loc.pos1.end, mateId, lib);
+                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                fragId, frgBgn, loc.pos1.end, mateId);
                     }
                 } else {
                     if ( frgBgn + badMax < tigLen ) {
                         iuid beg = frgBgn;
                         if (MATE_3PRIME_END) beg = frgEnd;
-                        incrRange( badFwdGraph, -1, beg, frgBgn + badMax );
+                        incrRange( badGraph, -1, beg, frgBgn + badMax );
                         badMates.insert( fragId );
-                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                fragId, frgBgn, frgEnd, mateId, lib);
+                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                fragId, frgBgn, frgEnd, mateId);
                     }
                 }
             } else {
@@ -378,10 +373,10 @@ namespace AS_BOG{
                 if (isReverse( loc.pos1 )) {
                     // 1st reversed, so bad 
                     iuid beg = MAX( 0, frgBgn - badMax );
-                    incrRange( badRevGraph, -1, beg, frgEnd);
+                    incrRange( badGraph, -1, beg, frgEnd);
                     badMates.insert( fragId );
-                    fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                fragId, frgBgn, frgEnd, mateId, lib);
+                    fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                fragId, frgBgn, frgEnd, mateId);
                     iuid end;
                     if (isReverse( loc.pos2 )) {
                         // 2nd mate is reversed, so mark bad towards tig begin
@@ -389,18 +384,17 @@ namespace AS_BOG{
                         end = mateBgn;
                         if (MATE_3PRIME_END)
                             end = mateEnd;
-                        incrRange( badRevGraph, -1, beg, end);
                     } else {
                         // 2nd mate is forward, so mark bad towards tig end
                         end = MIN( tigLen-1, mateBgn + badMax );
                         beg = mateBgn;
                         if (MATE_3PRIME_END)
                             beg = mateEnd;
-                        incrRange( badFwdGraph, -1, beg, end);
                     }
+                    incrRange( badGraph, -1, beg, end);
                     badMates.insert( mateId );
-                    fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                mateId, mateBgn, mateEnd, fragId, lib);
+                    fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                mateId, mateBgn, mateEnd, fragId);
 
                 } else {
                     // 1st forward
@@ -419,20 +413,20 @@ namespace AS_BOG{
                             if (MATE_3PRIME_END)
                                 end = mateEnd;
 
-                            incrRange(badRevGraph, -1, beg, end);
+                            incrRange(badGraph, -1, beg, end);
                             badMates.insert( mateId );
-                            fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                    mateId, mateBgn, mateEnd, fragId, lib);
+                            fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                    mateId, mateBgn, mateEnd, fragId);
 
                             end = MIN( tigLen-1, frgBgn + badMax );
                             beg = frgBgn;
                             if (MATE_3PRIME_END)
                                 beg = frgEnd;
 
-                            incrRange(badFwdGraph,-1, beg, end);
+                            incrRange(badGraph,-1, beg, end);
                             badMates.insert( fragId );
-                            fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                    fragId, frgBgn, frgEnd, mateId, lib);
+                            fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                    fragId, frgBgn, frgEnd, mateId);
                         }
                     } else {
                         // 1st and 2nd forward so both bad 
@@ -441,11 +435,11 @@ namespace AS_BOG{
                         if (MATE_3PRIME_END)
                             beg = frgEnd;
 
-                        incrRange(badFwdGraph,-1, beg, end);
+                        incrRange(badGraph,-1, beg, end);
                         badMates.insert( fragId );
 
-                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                fragId, frgBgn, frgEnd, mateId, lib);
+                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                fragId, frgBgn, frgEnd, mateId);
 
                         // 2nd mate is forward, so mark bad towards tig end
                         end = MIN( tigLen-1, mateBgn + badMax );
@@ -453,10 +447,10 @@ namespace AS_BOG{
                         if (MATE_3PRIME_END)
                             beg = mateEnd;
 
-                        incrRange( badFwdGraph, -1, beg, end);
+                        incrRange( badGraph, -1, beg, end);
                         badMates.insert( mateId );
-                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld lib %d\n",
-                                mateId, mateBgn, mateEnd, fragId, lib);
+                        fprintf(stderr,"Bad mate %ld pos %ld %ld mate %ld\n",
+                                mateId, mateBgn, mateEnd, fragId);
                     }
                 }
             }
@@ -472,17 +466,8 @@ namespace AS_BOG{
             }
             sum += goodGraph[ i ];
         }
-        fprintf(stderr,"\nPer 300 bases bad fwd graph:\n");
-        int fwdBgn,fwdEnd,revBgn,revEnd;
-        findPeakBad( badFwdGraph, tigLen, fwdBgn, fwdEnd );
-        fprintf(stderr,"\nPer 300 bases bad rev graph:\n");
-        findPeakBad( badRevGraph, tigLen, revBgn, revEnd );
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-
-    void findPeakBad( short* badGraph, int tigLen, int &peakBegin, int &peakEnd) {
-        long sum = 0;
+        fprintf(stderr,"\nPer 300 bases bad graph:\n");
+        sum = 0;
         for(int i=0; i < tigLen; i++) {
             if (i > 1 && i % 300 == 0) {
                 fprintf(stderr,"%d ", sum / 300);
@@ -491,7 +476,7 @@ namespace AS_BOG{
             sum += badGraph[ i ];
         }
         fprintf(stderr,"\n");
-        int badBegin, peakBad, lastBad;
+        int badBegin, peakBad, peakBegin, peakEnd, lastBad;
         peakBad = peakBegin = peakEnd = lastBad = badBegin = 0;
         for(int i=0; i < tigLen; i++) {
             if( badGraph[ i ] < -3 ) {
@@ -521,7 +506,6 @@ namespace AS_BOG{
         if ( _iidIndex.find( fragID) != _iidIndex.end() )
             return false; // Entry already exists, can't start new
 
-        assert( fragID != NULL_FRAG_ID );
         MateLocationEntry entry;
         entry.id1     = fragID;
         entry.pos1    = fragPos;
@@ -591,9 +575,8 @@ namespace AS_BOG{
 
     std::ostream& operator<< (std::ostream& os, MateLocationEntry& e)
     {
-        int dist = e.pos2.bgn - e.pos1.bgn;
-        os << e.pos1.bgn <<","<< e.pos1.end <<" -> "<< e.pos2.bgn <<","<< e.pos2.end
-           << " "<< dist << " Frg " << e.id1 << " mate " << e.id2 ;
+        os << e.pos1.end <<","<< e.pos1.bgn <<" -> "<< e.pos2.bgn <<","<< e.pos2.end
+           << " Frg " << e.id1 << " mate " << e.id2 ;
         return os;
     }
 
