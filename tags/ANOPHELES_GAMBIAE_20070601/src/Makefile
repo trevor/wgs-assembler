@@ -1,0 +1,43 @@
+#
+###########################################################################
+#
+# This file is part of Celera Assembler, a software program that 
+# assembles whole-genome shotgun reads into contigs and scaffolds.
+# Copyright (C) 1999-2004, Applera Corporation. All rights reserved.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received (LICENSE.txt) a copy of the GNU General Public 
+# License along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+###########################################################################
+#
+
+## Enable verbose mode in c_make.as
+
+## Make all is equivalent to 'make objs libs progs all' in each subdir
+all: objs libs progs version
+	@ $(dosubdirs)
+
+objs libs progs install clean tester regression:
+	@ $(dosubdirs)
+
+
+# Include for AS project rules
+LOCAL_WORK = $(shell cd ..; pwd)
+include $(LOCAL_WORK)/src/c_make.as
+
+.PHONY: version
+version:
+	cat version.c.tmpl | sed 's/CA_BUILDER_STR/${USER}/' | sed 's/CA_BUILD_DATE_STR/$(shell date)/' > version.c
+	$(CC) -o $(LOCAL_BIN)/version version.c
+	rm -f version.c
