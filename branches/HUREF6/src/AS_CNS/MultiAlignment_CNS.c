@@ -24,7 +24,7 @@
    Assumptions:  
  *********************************************************************/
 
-static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.112 2006-10-26 00:32:43 gdenisov Exp $";
+static char CM_ID[] = "$Id: MultiAlignment_CNS.c,v 1.112.2.1 2007-08-10 11:46:19 gdenisov Exp $";
 
 /* Controls for the DP_Compare and Realignment schemes */
 #include "AS_global.h"
@@ -2074,8 +2074,8 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
              * or be confirmed by another base, also of reasonably high quality 
              * (Granger's suggestion - GD)
              */
-            if (best_read_qv_count[bi]   >  1 &&
-                best_read_qv_count[bi]   >= MIN_SUM_QVS_FOR_VARIATION)
+            if (best_read_base_count[bi]   >  1 &&
+                best_read_qv_count[bi]   > MIN_SUM_QVS_FOR_VARIATION)
             {
                 sum_qv_all += best_read_qv_count[bi];
                 if (IntToBase(bi) == cbase)
@@ -2085,13 +2085,13 @@ BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
         if ((b_read_count == 1 ) || (sum_qv_all == 0))
         {
            *var = 0.;
-            if (cbase == '-')
+            if (opp->smooth_win > 0 && cbase == '-')
               *var = -2;
         }
         else
         {
            *var = 1. - (double)sum_qv_cbase / (double)sum_qv_all;
-            if (cbase == '-')
+            if (opp->smooth_win > 0 && cbase == '-')
             {
                 *var = - (*var);
             }
@@ -2198,6 +2198,11 @@ SmoothenVariation(double *var, int len, int window)
 {
     int i;
     double *y = (double *)safe_malloc(len * sizeof(double));
+    if (window == 0)
+    {
+        safe_free(y);
+        return;
+    }
     for (i=0; i<len; i++)
     {
         int j, left_win=0, right_win=0;
@@ -2756,25 +2761,6 @@ PopulateDistMatrix(Read *reads, int len, VarRegion  *vreg)
     }
 }
 
-static int
-GetTheMostDistantRead(int curr_read_id, int32 nr, int32 **dist_matrix)
-{
-    int i, dist_read_id = -1;
-    int max_dist = -1;
-    for (i=0; i<nr; i++)
-    {
-        if (i == curr_read_id)
-            continue;
-
-        if (max_dist < dist_matrix[curr_read_id][i])
-        {
-            max_dist = dist_matrix[curr_read_id][i];
-            dist_read_id = i;
-        }
-    }
-    return dist_read_id; 
-}
-
 static void
 OutputReads(FILE *fout, Read *reads, int32 nr, int32 width)
 {
@@ -2865,8 +2851,7 @@ PopulateVarRecord(int32 *cids, int32 *nvars, int32 *min_len_vlist,
         int distant_read_id = -42, distant_allele_id = -42;
         if (vreg.nca < 2)
         {
-            distant_read_id = GetTheMostDistantRead(vreg.alleles[0].read_ids[0],
-                vreg.nr, vreg.dist_matrix);
+            distant_read_id = vreg.alleles[1].read_ids[0];
             distant_allele_id = vreg.reads[distant_read_id].allele_id;
         }
 #if DEBUG_VAR_RECORDS
@@ -3184,15 +3169,15 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp,
             double fict_var;
             vreg.beg = vbeg = vend = i;
 
-            while (DBL_EQ_DBL(varf[vreg.beg], (double)0.0))
+            while (vreg.beg < len_manode - 1 && DBL_EQ_DBL(varf[vreg.beg], (double)0.0))
                 vreg.beg++;
             
-            while ((vend < len_manode) && (svarf[vend] > ZERO_PLUS))
+            while ((vend < len_manode-1) && (svarf[vend] > ZERO_PLUS))
                 vend++;
 
             vreg.end = vend;
 
-            while (varf[vreg.end] < ZERO_PLUS)
+            while (vreg.end >0 && varf[vreg.end] < ZERO_PLUS)
                 vreg.end--;
 
             // Store iids of all the reads in current region
