@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static const char CM_ID[] = "$Id: AS_CGW_main.c,v 1.45 2007-08-20 17:24:24 brianwalenz Exp $";
+static const char CM_ID[] = "$Id: AS_CGW_main.c,v 1.45.2.1 2007-08-23 14:34:03 eliv Exp $";
 
 
 static const char *usage = 
@@ -996,7 +996,9 @@ int main(int argc, char *argv[]){
                                  GlobalData -> stoneLevel, 0);
       StopTimerT (& data -> StoneThrowingTimer);
       ValidateAllContigEdges(ScaffoldGraph, FIX_CONTIG_EDGES);
-      CheckCIScaffoldTs (ScaffoldGraph);
+      // EV 7/20/07 added LeastSquares call for testing negative variance stuff
+      LeastSquaresGapEstimates( ScaffoldGraph, TRUE, FALSE, FALSE, FALSE, FALSE);
+//      CheckCIScaffoldTs (ScaffoldGraph);
       fprintf (GlobalData -> stderrc,
                "**** Finished Final Contained Stones level %d ****\n",
                GlobalData -> stoneLevel);

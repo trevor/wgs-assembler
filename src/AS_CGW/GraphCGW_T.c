@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char CM_ID[] = "$Id: GraphCGW_T.c,v 1.50 2007-08-22 21:09:55 eliv Exp $";
+static char CM_ID[] = "$Id: GraphCGW_T.c,v 1.50.2.1 2007-08-23 14:34:04 eliv Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -4981,9 +4981,9 @@ void  CheckSurrogateUnitigs()
     {
         if((curChunk->type == UNRESOLVEDCHUNK_CGW) && (curChunk->info.CI.numInstances > 1))
         {
-            if(curChunk->info.CI.numInstances == 2)
-            {
-            } else {
+//            if(curChunk->info.CI.numInstances == 2)
+//            {
+//            } else {
                 int numVaInstances = GetNumCDS_CID_ts(curChunk->info.CI.instances.va);
                 assert(curChunk->info.CI.instances.va != NULL);
                 if (   curChunk->info.CI.numInstances !=
@@ -4996,7 +4996,7 @@ void  CheckSurrogateUnitigs()
                            );
                     //                assert(0);
                 }
-            }
+//            }
         }
     }
 }

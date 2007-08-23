@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: TransitiveReduction_CGW.c,v 1.14 2007-08-04 22:27:35 brianwalenz Exp $";
+static char CM_ID[] = "$Id: TransitiveReduction_CGW.c,v 1.14.2.1 2007-08-23 14:34:07 eliv Exp $";
 
 // This file contains the code for computing the candidate
 // chunks of scaffolds.
@@ -2354,6 +2354,8 @@ void ActuallyInsertCIsIntoScaffolds(CDS_CID_t *currentScaffoldID,  int verbose)
 {
   ChunkInstanceT *thisCI;
   GraphNodeIterator nodes;
+  double lastVariance = -1.0;
+  CDS_CID_t lastCID = 0;
   InitGraphNodeIterator(&nodes, ScaffoldGraph->RezGraph, GRAPH_NODE_UNIQUE_ONLY);
 
   while((thisCI = NextGraphNodeIterator(&nodes)) != NULL){
@@ -2366,6 +2368,8 @@ void ActuallyInsertCIsIntoScaffolds(CDS_CID_t *currentScaffoldID,  int verbose)
     ChunkOrient orientCI;
     CDS_CID_t cid;
     cid = thisCI->id;
+
+    assert( thisCI->offsetAEnd.variance >= 0 && thisCI->offsetBEnd.variance >= 0);
 
     if(thisCI->scaffoldID != NULLINDEX){
       continue;// This CI has already been placed in a Scaffold.
@@ -2416,9 +2420,7 @@ void ActuallyInsertCIsIntoScaffolds(CDS_CID_t *currentScaffoldID,  int verbose)
       edge = (CIEdgeT *)NULL;
       neighbor = (ChunkInstanceT *)NULL;
     }
-    if(*currentScaffoldID == 404){
-      fprintf(stderr,"* Scaffold 404\n");
-    }
+
     InitializeScaffold(&CIScaffold, REAL_SCAFFOLD);
     CIScaffold.info.Scaffold.AEndCI = NULLINDEX;
     CIScaffold.info.Scaffold.BEndCI = NULLINDEX;
@@ -2443,10 +2445,21 @@ void ActuallyInsertCIsIntoScaffolds(CDS_CID_t *currentScaffoldID,  int verbose)
       bEndOffset = NullLength;
       aEndOffset = thisCI->bpLength;
     }
+    //assert( thisCI->offsetAEnd.mean     >= 0 && thisCI->offsetBEnd.mean >= 0);
+    assert( thisCI->offsetAEnd.variance >= 0 && thisCI->offsetBEnd.variance >= 0);
     /* DON'T ContigNOW!!! */
     InsertCIInScaffold(ScaffoldGraph, thisCI->id, *currentScaffoldID,
-                       aEndOffset, bEndOffset,  TRUE /* Should be FALSE */, FALSE);
+                       aEndOffset, bEndOffset,  TRUE, /* Should be FALSE */ FALSE);
     currentOffset = thisCI->bpLength;
+    // if we started with a contained, shift the coords to make the container 0
+    if (edge != NULL && edge->idA == cid && edge->flags.bits.bContainsA) {
+        assert( edge->distance.mean < 0 );
+        assert( -edge->distance.mean > thisCI->bpLength.mean );
+        double shiftContain = edge->distance.mean + thisCI->bpLength.mean;
+        thisCI->offsetAEnd.mean -= shiftContain;
+        thisCI->offsetBEnd.mean -= shiftContain; 
+        currentOffset.mean      -= shiftContain;
+    }
 
     while(neighbor != (ChunkInstanceT *)NULL){
       ChunkOrientationType edgeOrient = GetEdgeOrientationWRT(edge,
@@ -2486,7 +2499,7 @@ void ActuallyInsertCIsIntoScaffolds(CDS_CID_t *currentScaffoldID,  int verbose)
       }
       /* Don't Contig NOW!!! */
       InsertCIInScaffold(ScaffoldGraph, thisCI->id, *currentScaffoldID,
-                         aEndOffset, bEndOffset,  TRUE /* Should be FALSE */, FALSE);
+                         aEndOffset, bEndOffset,  TRUE, /* Should be FALSE */ FALSE);
       if(orientCI == A_B){
         if(thisCI->essentialEdgeB != NULLINDEX){
           edge = GetGraphEdge(ScaffoldGraph->RezGraph, thisCI->essentialEdgeB);

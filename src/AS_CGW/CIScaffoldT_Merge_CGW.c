@@ -18,8 +18,9 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: CIScaffoldT_Merge_CGW.c,v 1.31 2007-06-22 20:25:48 eliv Exp $";
+static char CM_ID[] = "$Id: CIScaffoldT_Merge_CGW.c,v 1.31.2.1 2007-08-23 14:34:04 eliv Exp $";
 
+#define DEBUG_INSERTSCAFFOLDCONTENTS
 
 #undef ORIG_MERGE_EDGE_INVERT
 #define MINSATISFIED_CUTOFF 0.985
@@ -5305,6 +5306,8 @@ void MergeScaffoldsAggressive(ScaffoldGraphT *graph, int logicalcheckpointnumber
   }
   DestroyChunkOverlapper(iSpec.badSEdges);
   
+  // EV 8/22/07 add LeastSquares call to cleanup before CheckCI
+  LeastSquaresGapEstimates( ScaffoldGraph, TRUE, FALSE, FALSE, FALSE, FALSE);
   CheckCIScaffoldTs(ScaffoldGraph);
   t = time(0);
   fprintf(GlobalData->stderrc,"* Exiting MSA at %s *\n", ctime(&t));
