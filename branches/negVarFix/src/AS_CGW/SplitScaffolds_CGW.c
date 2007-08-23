@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: SplitScaffolds_CGW.c,v 1.8 2007-04-16 17:36:31 brianwalenz Exp $";
+static char CM_ID[] = "$Id: SplitScaffolds_CGW.c,v 1.8.2.1 2007-08-23 14:34:06 eliv Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,9 +122,18 @@ void SplitScaffolds(ScaffoldGraphT *graph){
 	  offsetAEnd.mean = thisNode->offsetAEnd.mean - firstOffset.mean;
 	  offsetAEnd.variance = thisNode->offsetAEnd.variance -
 	    firstOffset.variance;
+      if (offsetAEnd.mean < 0 || offsetAEnd.variance < 0) {
+          fprintf(stderr,"Negative Aend mean or variance\n");
+          assert(0);
+      }
+	  offsetBEnd.mean = thisNode->offsetBEnd.mean - firstOffset.mean;
 	  offsetBEnd.mean = thisNode->offsetBEnd.mean - firstOffset.mean;
 	  offsetBEnd.variance = thisNode->offsetBEnd.variance -
 	    firstOffset.variance;
+      if (offsetBEnd.mean < 0 || offsetBEnd.variance < 0) {
+          fprintf(stderr,"Negative Bend mean or variance\n");
+          assert(0);
+      }
 	  InsertCIInScaffold(graph, thisNode->id, newScaffoldID,
 			     offsetAEnd, offsetBEnd, TRUE, FALSE);
 	}

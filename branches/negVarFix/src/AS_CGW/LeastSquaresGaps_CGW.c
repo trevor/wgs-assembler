@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: LeastSquaresGaps_CGW.c,v 1.23 2007-08-04 22:27:35 brianwalenz Exp $";
+static char CM_ID[] = "$Id: LeastSquaresGaps_CGW.c,v 1.23.2.1 2007-08-23 14:34:05 eliv Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1895,7 +1895,7 @@ int IsInternalEdgeStatusVaguelyOK(EdgeCGW_T *edge,CDS_CID_t thisCIid){
   //                        ALL_EDGES, 
   //                        GRAPH_EDGES_RAW_ONLY,
   //                        &edges); 
-  //  while((edge = NextGraphEdgeIterator(&edges))!= NULL){
+  //  while((edge = NextGraphEdgeIterator(&edges))!= NULL)
   //
 
   int isA = (edge->idA == thisCI->id);
