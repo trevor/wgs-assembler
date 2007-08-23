@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: TransitiveReduction_CGW.c,v 1.14.2.1 2007-08-23 14:34:07 eliv Exp $";
+static char CM_ID[] = "$Id: TransitiveReduction_CGW.c,v 1.14.2.2 2007-08-23 18:17:27 eliv Exp $";
 
 // This file contains the code for computing the candidate
 // chunks of scaffolds.
@@ -2452,13 +2452,17 @@ void ActuallyInsertCIsIntoScaffolds(CDS_CID_t *currentScaffoldID,  int verbose)
                        aEndOffset, bEndOffset,  TRUE, /* Should be FALSE */ FALSE);
     currentOffset = thisCI->bpLength;
     // if we started with a contained, shift the coords to make the container 0
-    if (edge != NULL && edge->idA == cid && edge->flags.bits.bContainsA) {
+    if (edge != NULL && ( edge->idA == cid && edge->flags.bits.bContainsA ||
+                          edge->idB == cid && edge->flags.bits.aContainsB)) {
         assert( edge->distance.mean < 0 );
         assert( -edge->distance.mean > thisCI->bpLength.mean );
         double shiftContain = edge->distance.mean + thisCI->bpLength.mean;
         thisCI->offsetAEnd.mean -= shiftContain;
-        thisCI->offsetBEnd.mean -= shiftContain; 
+        thisCI->offsetBEnd.mean -= shiftContain;
         currentOffset.mean      -= shiftContain;
+        fprintf(GlobalData->stderrc,"Shift contain %ld and container %ld by %lf, aCb %d bCa %d, scf %ld\n",
+                cid, neighbor->id, shiftContain, edge->flags.bits.aContainsB, 
+                edge->flags.bits.bContainsA, *currentScaffoldID );
     }
 
     while(neighbor != (ChunkInstanceT *)NULL){
