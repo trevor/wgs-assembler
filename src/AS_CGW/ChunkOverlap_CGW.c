@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: ChunkOverlap_CGW.c,v 1.20 2007-08-18 11:42:07 brianwalenz Exp $";
+static char CM_ID[] = "$Id: ChunkOverlap_CGW.c,v 1.20.2.1 2007-08-23 14:34:04 eliv Exp $";
 
 #include <assert.h>
 #include <stdio.h>
@@ -172,6 +172,8 @@ ChunkOverlapperT *  LoadChunkOverlapperFromStream(FILE *stream){
     status = AS_UTL_safeRead(stream, &olap, "LoadChunkOverlapperFromStream", sizeof(ChunkOverlapCheckT), 1);
     assert(status == 1);
     assert(olap.errorRate > 0.0);
+    assert(olap.AContainsB == TRUE || olap.AContainsB == FALSE);
+    assert(olap.BContainsA == TRUE || olap.BContainsA == FALSE);
     InsertChunkOverlap(chunkOverlapper, &olap);
   }
 
@@ -272,6 +274,9 @@ void CreateChunkOverlapFromEdge(GraphCGW_T *graph,
   olap.quality = edge->quality;
   olap.ahg = olap.bhg = 0;
   olap.min_offset = olap.max_offset = 0;
+
+  olap.AContainsB = FALSE; // not sure if this is actually true
+  olap.BContainsA = FALSE; // but these values need to be set somewhere
 #if 0
   fprintf(GlobalData->stderrc,"* CreateChunkOverlapFromEdge bayes:%d\n",
           olap.hasBayesianQuality);
@@ -499,6 +504,9 @@ void CollectChunkOverlap(GraphCGW_T *graph,
   CDS_COORD_t delta;
   CDS_COORD_t minOverlap,maxOverlap;
 
+  canOlap.AContainsB = FALSE; // must initialize somewhere
+  canOlap.BContainsA = FALSE; 
+  
   delta = (CDS_COORD_t)(3.0 * deltaOverlap);
   delta = MAX(delta, 10);
   minOverlap = MAX(meanOverlap - delta, 0);

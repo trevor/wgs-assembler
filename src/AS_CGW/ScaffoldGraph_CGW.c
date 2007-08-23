@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: ScaffoldGraph_CGW.c,v 1.25 2007-05-02 09:30:13 brianwalenz Exp $";
+static char CM_ID[] = "$Id: ScaffoldGraph_CGW.c,v 1.25.2.1 2007-08-23 14:34:06 eliv Exp $";
 
 //#define DEBUG 1
 #include <stdio.h>
@@ -658,10 +658,23 @@ void AddDeltaToScaffoldOffsets(ScaffoldGraphT *graph,
     thisNode->offsetAEnd.variance += delta.variance;
     thisNode->offsetBEnd.mean += delta.mean;
     thisNode->offsetBEnd.variance += delta.variance;
+    if (thisNode->offsetAEnd.mean < 0 || thisNode->offsetBEnd.mean < 0 || 
+        thisNode->offsetAEnd.variance < 0 || thisNode->offsetBEnd.variance < 0) {
+        fprintf(stderr,
+"Bad increment gives negative scaf:%ld aMean:%lf aVar:%lf bMean:%lf bVar:%lf\n",
+               scaffold->id, thisNode->offsetAEnd.mean, thisNode->offsetBEnd.mean,
+               thisNode->offsetAEnd.variance, thisNode->offsetBEnd.variance);
+        assert(0);
+    }
   }
 
   scaffold->bpLength.mean += delta.mean;
   scaffold->bpLength.variance += delta.variance;
+  if (scaffold->bpLength.mean < 0 || scaffold->bpLength.variance < 0) {
+      fprintf(stderr, "Bad increment gives negative scaf:%ld mean:%lf var:%lf\n",
+              scaffold->id, scaffold->bpLength.mean, scaffold->bpLength.variance );
+      assert(0);
+  }
   return;
 }
 
@@ -883,6 +896,7 @@ void RebuildScaffolds(ScaffoldGraphT *ScaffoldGraph,
 #else
   BuildUniqueCIScaffolds(ScaffoldGraph, markShakyBifurcations, FALSE);
 #endif   
+  //CheckCIScaffoldTs(ScaffoldGraph);
   CheckEdgesAgainstOverlapper(ScaffoldGraph->RezGraph);
   fprintf(GlobalData->stderrc,"* Report Memory Size in RebuildScaffolds\n");
   ReportMemorySize(ScaffoldGraph, GlobalData->stderrc);
@@ -1068,5 +1082,3 @@ void BuildScaffoldsFromFirstPriniciples(ScaffoldGraphT *ScaffoldGraph,
   DumpCIScaffolds(GlobalData->stderrc,ScaffoldGraph,FALSE);
 #endif
 }
-
-

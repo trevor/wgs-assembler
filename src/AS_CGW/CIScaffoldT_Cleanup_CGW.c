@@ -18,10 +18,11 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: CIScaffoldT_Cleanup_CGW.c,v 1.30 2007-08-22 21:09:55 eliv Exp $";
+static char CM_ID[] = "$Id: CIScaffoldT_Cleanup_CGW.c,v 1.30.2.1 2007-08-23 14:34:03 eliv Exp $";
 
-#undef DEBUG_CHECKFORCTGS
-#undef DEBUG_DETAILED
+#define DEBUG_CREATEACONTIG
+#define DEBUG_CHECKFORCTGS
+#define DEBUG_DETAILED
 #undef DEBUG_CONNECTEDNESS
 
 
@@ -1762,6 +1763,8 @@ int CheckForContigs(ScaffoldGraphT *sgraph,
 
   // iterate over all contigs in this scaffold to append those that overlap
   // with the offsetAEnd-offsetBEnd interval
+  float maxVar = 0.0;
+  float ctgVar = 0.0;
   InitCIScaffoldTIterator(ScaffoldGraph, scaffold, TRUE,
                           FALSE, &contigIterator);
   while((contig = NextCIScaffoldTIterator(&contigIterator)) != NULL)
@@ -1775,6 +1778,8 @@ int CheckForContigs(ScaffoldGraphT *sgraph,
 #ifdef DEBUG_CHECKFORCTGS
           fprintf(stderr," overlap!\n");
 #endif
+          maxVar = MAX( contig->offsetAEnd.variance, contig->offsetBEnd.variance );
+          ctgVar = contig->bpLength.variance;
           pos.ident = contig->id;
           pos.position.bgn = contig->offsetAEnd.mean;
           pos.position.end = contig->offsetBEnd.mean;
@@ -1810,6 +1815,16 @@ int CheckForContigs(ScaffoldGraphT *sgraph,
         }
       }
     }
+  if (maxVar > 0.0)
+      myOffsetAEnd.variance = myOffsetBEnd.variance = maxVar;
+  if(myOffsetAEnd.mean > myOffsetBEnd.mean)
+      myOffsetAEnd.variance += ctgVar;
+  else
+      myOffsetBEnd.variance += ctgVar;
+
+  contig = GetGraphNode(sgraph->ContigGraph, cid );
+  contig->offsetAEnd.variance = myOffsetAEnd.variance;
+  contig->offsetBEnd.variance = myOffsetBEnd.variance;
 
 #ifdef DEBUG_CHECKFORCTGS
   fprintf(stderr,"  should insert a new contig based on %d old ones\n",
@@ -2172,6 +2187,18 @@ int  CreateAContigInScaffold(CIScaffoldT *scaffold,
       oldOffsetBEnd = extremeB->offsetAEnd;
     else
       oldOffsetBEnd = extremeB->offsetBEnd;
+
+    if (extremeB->BEndNext != -1) {
+        NodeCGW_T *afterB = GetGraphNode(ScaffoldGraph->ContigGraph, extremeB->BEndNext);
+        float minAfterVar = MIN(afterB->offsetAEnd.variance,afterB->offsetBEnd.variance);
+        if ( oldOffsetBEnd.variance > minAfterVar ) {
+            fprintf(stderr,"Warning variance of contig after replacement is lower: %d %f\n",
+                    afterB->id, minAfterVar);
+            oldOffsetBEnd.variance = minAfterVar;
+            // Without this fixup this leads to a large delta below, and then
+            // a negative variance when the offset is added
+        }
+    }
 
     {
       // In the course of interleaved scaffold merging, we may create a new contig

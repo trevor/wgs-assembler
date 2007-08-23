@@ -486,6 +486,11 @@ void PopulateScaffoldStuff(ScaffoldStuff * ss,
   LengthT lastRight;
   int contigCount = 0;
   int isA = (sEdge->idA == scaffold->id) ? TRUE : FALSE;
+  if (sEdge->distance.variance < 0) {
+      fprintf(stderr,"sqrt of -variance scaf:%ld mean:%lf var:%lf \n",
+              scaffold->id, sEdge->distance.mean, sEdge->distance.variance);
+      assert(0);
+  }
   float thinEdge = -(sEdge->distance.mean +
                      INTERLEAVE_CUTOFF *
                      sqrt((double) sEdge->distance.variance));
@@ -525,6 +530,11 @@ void PopulateScaffoldStuff(ScaffoldStuff * ss,
     NOTE: increase variance going away from the end of scaffold
     'in the edge'
   */
+  if (osLength.variance < 0) {
+      fprintf(stderr,"sqrt of -variance scaf:%ld mean:%lf var:%lf \n",
+              scaffold->id, osLength.mean, osLength.variance);
+      assert(0);
+  }
   if(isA)
     {
       osMin = CGW_DP_MINLEN;
@@ -649,6 +659,12 @@ void PopulateScaffoldStuff(ScaffoldStuff * ss,
           AppendVA_Scaffold_Gap(ss->pools->gapPool, &gap);
         }
     
+      if (thisLeft.variance < 0 || thisRight.variance < 0) {
+          fprintf(stderr,"sqrt of -variance scaf %ld\n",scaffold->id);
+          fprintf(stderr,"left mean %lf var %lf\n",thisLeft.mean,thisLeft.variance);
+          fprintf(stderr,"right mean %lf var %lf\n",thisRight.mean,thisRight.variance);
+          assert(0);
+      }
       // compute distance measured from left end of scaffoldB
       // with edge slop factored into scaffoldA's distances
       if(isA)
@@ -733,6 +749,11 @@ void PopulateScaffoldStuff(ScaffoldStuff * ss,
       lastRight = thisRight;
     }
 
+  if (scaffold->bpLength.variance < 0) {
+      fprintf(stderr,"sqrt of -variance scaf:%ld mean:%lf var:%lf\n",
+              scaffold->id, scaffold->bpLength.mean, scaffold->bpLength.variance);
+      assert(0);
+  }
   // make sure minAHang & maxAHang are acceptable
   if(isA)
     {
@@ -814,6 +835,16 @@ Overlap * LookForChunkOverlapFromContigElements(ContigElement * ceA,
   contigA = GetGraphNode(ScaffoldGraph->RezGraph, ceA->id);
   contigB = GetGraphNode(ScaffoldGraph->RezGraph, ceB->id);
   
+  if (contigA->bpLength.variance < 0) {
+      fprintf(stderr,"sqrt of -var ctgA:%ld mean:%lf var:%lf\n",
+              contigA->id, contigA->bpLength.mean, contigA->bpLength.variance);
+      assert(0);
+  }
+  if (contigB->bpLength.variance < 0) {
+      fprintf(stderr,"sqrt of -var ctgB:%ld mean:%lf var:%lf\n",
+              contigB->id, contigB->bpLength.mean, contigB->bpLength.variance);
+      assert(0);
+  }
   minLengthA = contigA->bpLength.mean - 5. * sqrt(contigA->bpLength.variance);
   maxLengthA = contigA->bpLength.mean + 5. * sqrt(contigA->bpLength.variance);
   minLengthB = contigB->bpLength.mean - 5. * sqrt(contigB->bpLength.variance);
@@ -1022,6 +1053,11 @@ int PopulateScaffoldAlignmentInterface(CIScaffoldT * scaffoldA,
   CDS_CID_t idB;
   ChunkOrientationType orient;
 
+  if (sEdge->distance.variance < 0) {
+      fprintf(stderr,"sqrt of -variance scafA:%ld scafB:%ld mean:%lf var:%lf \n",
+              sEdge->idA,sEdge->idB, sEdge->distance.mean, sEdge->distance.variance);
+      assert(0);
+  }
   if(sEdge->distance.mean -
      INTERLEAVE_CUTOFF * sqrt((double) sEdge->distance.variance) >= 0.0)
     {
@@ -2006,6 +2042,11 @@ void AdjustForPureInterleaving(Scaffold_Tig * contigsA,
   // get at least one contig in each scaffold set then call other function
   int ia;
   int ib;
+  if (sEdge->distance.variance < 0) {
+      fprintf(stderr,"sqrt of -variance scafA:%ld scafB:%ld mean:%lf var:%lf \n",
+              sEdge->idA,sEdge->idB, sEdge->distance.mean, sEdge->distance.variance);
+      assert(0);
+  }
   double edgeStddev = sqrt((double) sEdge->distance.variance);
   double deltaAB;
   double deltaBA;
