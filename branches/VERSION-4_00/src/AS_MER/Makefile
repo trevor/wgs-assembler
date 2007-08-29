@@ -1,0 +1,89 @@
+#
+###########################################################################
+#
+# This file is part of Celera Assembler, a software program that 
+# assembles whole-genome shotgun reads into contigs and scaffolds.
+# Copyright (C) 1999-2004, Applera Corporation. All rights reserved.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received (LICENSE.txt) a copy of the GNU General Public 
+# License along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+###########################################################################
+#
+
+LOCAL_WORK = $(shell cd ../..; pwd)
+
+#  KMER should point to a configured and compiled copy of
+#  http://sourceforge.net/projects/kmer/
+#
+#  We attempt to find it in the same place that our src/ directory is.
+#
+ifneq "$(origin KMER)" "environment"
+ifeq ($(shell ls -d $(LOCAL_WORK)/kmer 2> /dev/null), $(LOCAL_WORK)/kmer)
+  KMER = $(LOCAL_WORK)/kmer
+endif
+endif
+
+
+ifdef KMER
+  MERYLSOURCE      = meryl.C
+  MERYLOBJECTS     = meryl.o AS_MER_gkpStore_to_FastABase.o
+  SOURCES          = $(MERYLSOURCE) mercy.C mercy-regions.C overmerry.C AS_MER_gkpStore_to_FastABase.C
+  OBJECTS          = $(SOURCES:.C=.o)
+  PROGS            = meryl mercy overmerry
+  INC_IMPORT_DIRS += $(KMER)/meryl $(KMER)/libutil $(KMER)/libmeryl $(KMER)/libbio $(KMER)/libkmer
+  LIB_IMPORT_DIRS += $(KMER)/meryl $(KMER)/libutil $(KMER)/libmeryl $(KMER)/libbio $(KMER)/libkmer
+  KMERLIBS         = libmerylguts.a libkmer.a libmeryl.a libbio.a libutil.a
+else
+  MERYLSOURCE      = AS_MER_meryl.cc
+  MERYLOBJECTS     = AS_MER_meryl.o
+  SOURCES          = $(MERYLSOURCE)
+  OBJECTS          = $(SOURCES:.cc=.o)
+  PROGS            = meryl
+endif
+
+
+include $(LOCAL_WORK)/src/c_make.as
+
+
+#  This must come after c_make.as, grrr.
+ifdef KMER
+  #  See also AS_OVL/Makefile
+  ifeq ($(OSTYPE), Linux)
+    LDFLAGS  += -lpthread
+    CFLAGS   += -pthread
+    CPPFLAGS += -pthread
+  endif
+
+  ifeq ($(OSTYPE), OSF1)
+    LDFLAGS  += -lpthread
+    CFLAGS   += -pthread
+    CPPFLAGS += -pthread
+  endif
+
+  ifeq ($(OSTYPE), FreeBSD)
+  endif
+
+  ifeq ($(OSTYPE), Darwin)
+  endif
+endif
+
+all: $(OBJECTS) $(LIBRARIES) $(PROGS) 
+	@test -n nop
+
+meryl: $(MERYLOBJECTS) libAS_PER.a libAS_UTL.a $(KMERLIBS)
+
+mercy: mercy.o libAS_PER.a libAS_UTL.a $(KMERLIBS)
+
+overmerry: overmerry.o AS_MER_gkpStore_to_FastABase.o libAS_OVS.a libAS_PER.a libAS_UTL.a $(KMERLIBS)
