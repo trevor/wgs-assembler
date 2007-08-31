@@ -9498,3 +9498,21 @@ Replace stack-based array with variable array.
 
 Limit the stddev of distances to be 10% of the mean, unless forced to use
 the input values.
+
+----------------------------------------
+2007/08/31 17:32:14     1.48.2.1    skoren  
+/cvsroot/wgs-assembler/src/AS_CGW/AS_CGW_main.c
+
+Modified default sample size of library restat to be 100 instead of 1000
+
+----------------------------------------
+2007/08/31 17:33:06     1.18.2.1    skoren  
+/cvsroot/wgs-assembler/src/AS_RUN/runCA-OBT/runCAutil/preoverlap.pl
+2007/08/31 17:33:06     1.34.2.1    skoren  
+/cvsroot/wgs-assembler/src/AS_RUN/runCA-OBT/runCAutil/scaffolder.pl
+2007/08/31 17:33:07     1.56.2.1    skoren  
+/cvsroot/wgs-assembler/src/AS_RUN/runCA-OBT/runCAutil/util.pl
+
+Added options to control sample size for cgw recomputing library stats and 
+to force GKP to accept supplied library stddevs
+
