@@ -9512,3 +9512,9 @@ Modified default sample size of library restat to be 100 instead of 1000
 Added options to control sample size for cgw recomputing library stats and 
 to force GKP to accept supplied library stddevs
 
+----------------------------------------
+2007/08/31 17:33:06     1.34.2.2    skoren  AS_RUN/runCA-OBT/runCAutil/scaffolder.pl
+
+always trust the supplied stddev estimates when updating distances after 
+CGW
+
