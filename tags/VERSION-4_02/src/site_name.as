@@ -1,0 +1,38 @@
+#
+# $Id: site_name.as,v 1.7 2007-03-28 13:59:05 skoren Exp $
+#
+# Set the name of the site/location where the assembler is buing built.
+#
+# This mostly controls the behavior of the UID client/server, but
+# may affect other components.
+#
+# Other site-specific settings can be made in c_make.as.
+#
+# The default site name is invalid to force the user to pick the correct
+# site.  A reasonable default would be the LOCAL site, but this would
+# generate numerous errors at TIGR and JCVI when those users forget to
+# set the proper site name.
+
+ifeq ($(SITE_NAME),)
+
+  #  The default site.
+  #
+  SITE_NAME=CELERA
+
+  #  TIGR uses a SOAP server to get UIDs.
+  #
+  #SITE_NAME=TIGR
+
+  #  JCVI uses a web server via curl to get UIDs.
+  #
+  #SITE_NAME=JCVI
+
+  #  The "LOCAL" site uses a text file in the current directory
+  #  to remember what the last UID used is.
+  #
+  #SITE_NAME=LOCAL
+endif
+
+ifeq (,$(findstring $(SITE_NAME),"JCVI LOCAL"))
+  $(error Invalid SITE_NAME $(SITE_NAME).  Must be one of JCVI, LOCAL.  Please edit this file)
+endif
