@@ -52,6 +52,7 @@ SCRIPTS = runCA-OBT.pl \
           ca2ace.pl \
           asmToAGP.pl \
           mateLinkIIDRanges.rb \
+	  carun \
           OBT.spec \
           noOBT.specFile \
           noVec.specFile
@@ -89,6 +90,42 @@ mateLinkIIDRanges.rb: asmQC/mateLinkIIDRanges.rb
 
 TIGR: asmQC/TIGR
 	@cp -rp $< $(LOCAL_BIN)
+	
+ARUN = arun/APREP_aget.txt \
+       arun/APREP.conf \
+       arun/aprep.pl \
+       arun/APREP_recipe.sh \
+       arun/APREP.setup \
+       arun/ARUN.conf \
+       arun/arun.pl \
+       arun/ARUN_scriptRunning.pl \
+       arun/CARUN.conf \
+       arun/carun.pl \
+       arun/CARUN_recipe_hybrid.sh \
+       arun/CARUN_recipe_noOBT.sh \
+       arun/CARUN_recipe_noVec.sh \
+       arun/CARUN_recipe_OBT.sh \
+       arun/CARUN.setup \
+       arun/tarun.pl \
+       arun/TARUN_recipe.sh \
+       arun/TIGR/ConfigFile.pm \
+       arun/TIGR/Foundation.pm \
+       arun/tools/buildTiling.pl \
+       arun/tools/ca2scaff.pl \
+       arun/tools/ca2ta.pl \
+       arun/tools/casper.pl \
+       arun/tools/convertContig.pl \
+       arun/tools/recall.pl \
+       arun/tools/reclip.pl \
+       arun/tools/restat.pl \
+       arun/tools/subfrag.pl \
+       arun/tools/subtasm.pl
+
+carun: $(ARUN)
+	@mkdir -p $(LOCAL_BIN)/CARUN
+	@chmod 775 $(LOCAL_BIN)/CARUN
+	@cp $? $(LOCAL_BIN)/CARUN/.
+	@chmod 775 $(LOCAL_BIN)/CARUN/*
 
 caqc_help.ini: asmQC/caqc_help.ini
 	@cp $< $(LOCAL_BIN)/$@
@@ -138,8 +175,6 @@ glen_est_truncadjusted.pl: dataQC/$@
 	@cp dataQC/$@ $(LOCAL_BIN)/$@
 	@chmod 775 $(LOCAL_BIN)/$@
 
-fragmentDepth: fragmentDepth.o libAS_UTL.a
-
 OBT.spec: OBT.specFile
 	@cp $< $(LOCAL_BIN)/$@
 
@@ -148,3 +183,5 @@ noOBT.spec: noOBT.specFile
 
 noVec.spec: noVec.specFile
 	@cp $< $(LOCAL_BIN)/$@
+
+fragmentDepth: fragmentDepth.o libAS_UTL.a

@@ -318,5 +318,6 @@ SUBDIRS = AS_RUN \
           AS_CVT \
           AS_VWR \
           AS_MPA \
-	  AS_ENV
+	  AS_ENV \
+	  AS_SHR
 
