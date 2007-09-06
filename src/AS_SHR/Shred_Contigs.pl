@@ -22,11 +22,13 @@
 #
 ##########################################################################
 
-# $Id: Shred_Contigs.pl,v 1.2 2006-01-11 20:58:00 eliv Exp $
+# $Id: Shred_Contigs.pl,v 1.2.6.1 2007-09-06 17:02:02 moweis Exp $
 
 use strict;
 use Getopt::Std;
 use FileHandle;
+use FindBin;
+use lib "$FindBin::Bin";
 use Annotation::UID;
 use vars qw($opt_r $opt_f);
 
