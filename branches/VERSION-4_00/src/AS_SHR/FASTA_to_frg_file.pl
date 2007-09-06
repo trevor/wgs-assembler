@@ -22,11 +22,14 @@
 #
 ##########################################################################
 
-# $Id: FASTA_to_frg_file.pl,v 1.6 2007-07-23 18:34:47 brianwalenz Exp $
+# $Id: FASTA_to_frg_file.pl,v 1.6.2.1 2007-09-06 17:02:02 moweis Exp $
 
 use strict;
 use Getopt::Std;
 use FileHandle;
+use FindBin;
+use lib "$FindBin::Bin";
+use Annotation::UID;
 use vars qw($opt_q $opt_f);
 
 print STDERR "WARNING!\n";
