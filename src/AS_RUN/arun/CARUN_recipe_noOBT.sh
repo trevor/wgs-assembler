@@ -16,7 +16,7 @@ echo $AS_CGW_ERROR_RATE
 #> Gatekeeper
 
 mkdir -p $WORKDIR/0-preoverlap && cd $WORKDIR/0-preoverlap
-$CA_BIN/gatekeeper -e 10000000 -Q -T $AS_GKP_BELIEVE_STATS \
+$CA_BIN/gatekeeper -e 10000000 $AS_GKP_BELIEVE_STATS \
    -o $WORKDIR/$PREFIX.gkpStore \
    $WORKDIR/$PREFIX.frg \
    > $WORKDIR/0-preoverlap/gatekeeper.out \
