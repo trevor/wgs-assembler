@@ -51,7 +51,10 @@ SCRIPTS = runCA-OBT.pl \
           caqc-diff.pl \
           ca2ace.pl \
           asmToAGP.pl \
-          mateLinkIIDRanges.rb
+          mateLinkIIDRanges.rb \
+          OBT.spec \
+          noOBT.specFile \
+          noVec.specFile
 
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
@@ -136,3 +139,12 @@ glen_est_truncadjusted.pl: dataQC/$@
 	@chmod 775 $(LOCAL_BIN)/$@
 
 fragmentDepth: fragmentDepth.o libAS_UTL.a
+
+OBT.spec: OBT.specFile
+	@cp $< $(LOCAL_BIN)/$@
+
+noOBT.spec: noOBT.specFile
+	@cp $< $(LOCAL_BIN)/$@
+
+noVec.spec: noVec.specFile
+	@cp $< $(LOCAL_BIN)/$@
