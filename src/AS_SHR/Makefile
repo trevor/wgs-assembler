@@ -32,14 +32,14 @@ COPY = FASTA_to_frg_file.pl \
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
 
-all: PL UID
+all: PL UID.pm
 	@test -n nop
 
 PL: $(COPY)
 	@chmod 775 $?
 	@cp $? $(LOCAL_BIN)/.
 
-UID: Annotation/UID.pm
+UID.pm: Annotation/UID.pm
 	@mkdir -p $(LOCAL_BIN)/Annotation
 	@chmod -f 775 $(LOCAL_BIN)/Annotation
 	@cp $< $(LOCAL_BIN)/Annotation/$@
