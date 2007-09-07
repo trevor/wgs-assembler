@@ -54,8 +54,8 @@ SCRIPTS = runCA-OBT.pl \
           mateLinkIIDRanges.rb \
 	  carun \
           OBT.spec \
-          noOBT.specFile \
-          noVec.specFile
+          noOBT.spec \
+          noVec.spec
 
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
@@ -176,12 +176,12 @@ glen_est_truncadjusted.pl: dataQC/$@
 	@chmod 775 $(LOCAL_BIN)/$@
 
 OBT.spec: OBT.specFile
-	@cp $< $(LOCAL_BIN)/$@
+	@cp $< $(LOCAL_BIN)/$<
 
 noOBT.spec: noOBT.specFile
-	@cp $< $(LOCAL_BIN)/$@
+	@cp $< $(LOCAL_BIN)/$<
 
 noVec.spec: noVec.specFile
-	@cp $< $(LOCAL_BIN)/$@
+	@cp $< $(LOCAL_BIN)/$<
 
 fragmentDepth: fragmentDepth.o libAS_UTL.a
