@@ -19,13 +19,13 @@ echo "Quality score is set to be"
 echo $QUAL
 
 
-BINDIR=/usr/local/devel/ATG/moweis/VERSION-4_00-RELEASE/src/AS_SHR/
+BINDIR=/usr/local/devel/CA/bin
 
 echo ">>Generate_NonShallow_Contigs..."
 $BINDIR/Generate_NonShallow_Contigs.pl -a $ACE -f pyro.contigs
 
 echo ">>Shred_Contigs..."
-$BINDIR/Shred_Contigs.pl -u -f pyro.contigs > pyro.shreds
+$BINDIR/Shred_Contigs.pl -f pyro.contigs > pyro.shreds
 
 echo ">>FASTA_to_frg_file..."
 $BINDIR/FASTA_to_frg_file.pl -f pyro.shreds  -q $QUAL> pyro.frg
