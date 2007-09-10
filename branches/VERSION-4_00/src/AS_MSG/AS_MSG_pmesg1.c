@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[]= "$Id: AS_MSG_pmesg1.c,v 1.12 2007-07-19 09:50:33 brianwalenz Exp $";
+static char CM_ID[]= "$Id: AS_MSG_pmesg1.c,v 1.12.2.1 2007-09-10 19:42:26 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -156,9 +156,9 @@ static void *Read_Frag_Mesg(FILE *fin, int frag_class)
   fmesg.plate_location = 0;
   fmesg.is_random      = 1;
   fmesg.status_code    = 'G';
-  fmesg.clear_vec.bgn  = 0;
+  fmesg.clear_vec.bgn  = 1;  //  Format 1 cannot have vec or qlt; these disable them
   fmesg.clear_vec.end  = 0;
-  fmesg.clear_qlt.bgn  = 0;
+  fmesg.clear_qlt.bgn  = 1;
   fmesg.clear_qlt.end  = 0;
   
   if (frag_class == MESG_FRG) { 
