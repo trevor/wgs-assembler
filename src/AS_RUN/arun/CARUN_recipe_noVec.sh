@@ -13,6 +13,9 @@ echo $AS_OVL_ERROR_RATE
 echo $AS_CNS_ERROR_RATE
 echo $AS_CGW_ERROR_RATE
 
+#> Print Version
+$CA_BIN/version
+
 #> Gatekeeper
 
 mkdir -p $WORKDIR/0-preoverlap && cd $WORKDIR/0-preoverlap
