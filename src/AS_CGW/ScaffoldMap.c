@@ -18,25 +18,39 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-
-
-/**************************************************************************
- * This utility reports release information on stderr.
- *************************************************************************/
+/* ScaffoldMap
+ *    Prints an iid-uid map of the SCF messages in a protoIO file
+ *
+ * $Id: ScaffoldMap.c,v 1.7 2007-01-29 20:41:01 brianwalenz Exp $
+ *
+ */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include "AS_global.h"
+#include <assert.h>
 
-char CA_RELEASE_ID [] = "4.00";
-char CA_BUILDER    [] = "CA_BUILDER_STR";
-char CA_BUILD_DATE [] = "CA_BUILD_DATE_STR";
+#define MAX_MESG (NUM_OF_REC_TYPES)
+int main(int argc, char *argv[])
+{ 
+  GenericMesg *pmesg;
+  int i = 0;
 
-int main (int argc, char ** argv) 
-{
-
-  fprintf(stderr, "CA Release Version %s\n"
-                  "Build by %s on %s\n",
-                  CA_RELEASE_ID,
-                  CA_BUILDER,
-                  CA_BUILD_DATE);
-  return 0;
+  while (ReadProtoMesg_AS(stdin,&pmesg) != EOF){
+    assert(pmesg->t <= MAX_MESG );
+    switch(pmesg->t){
+      default:
+        break;
+      case MESG_SCF:
+        {
+          SnapScaffoldMesg *m = pmesg->m;
+          if(i++ == 0){
+            fprintf(stdout,"* Int  Ext IDs of Scaffolds\n");
+          }
+          fprintf(stdout,F_IID " " F_UID "\n",
+                  m->iaccession, m->eaccession);
+        }
+    }
+  }
+  exit (0);
 }

@@ -18,25 +18,29 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
+/**************************************************************
+ * AS_CNS/PublicAPI_CNS.h
+ *
+ * 'Public' functions that other subsystems are invited to link to.
+ * CNS is the Consensus sybsystem of the Celera WGS assembler.
+ *
+ **************************************************************/
+/*********************************************************************
+ $Id: PublicAPI_CNS.h,v 1.8 2007-02-12 22:16:56 brianwalenz Exp $
+ *********************************************************************/
+
+#ifndef PUBLICAPI_CNS_INCLUDE
+#define PUBLICAPI_CNS_INCLUDE
+
+#include "Globals_CNS.h"
+
+int MultiAlignUnitig(IntUnitigMesg *, GateKeeperStore *, VA_TYPE(char) *,
+    VA_TYPE(char) *, VA_TYPE(int32) *, CNS_PrintKey , int, 
+    Overlap *(*)(COMPARE_ARGS), CNS_Options *opp);
+
+int MultiAlignContig(IntConConMesg *, VA_TYPE(char) *, VA_TYPE(char) *, 
+    VA_TYPE(int32) *, CNS_PrintKey , Overlap *(*)(COMPARE_ARGS), CNS_Options *opp);
+
+#endif // PUBLICAPI_CNS_INCLUDE
 
 
-/**************************************************************************
- * This utility reports release information on stderr.
- *************************************************************************/
-
-#include <stdio.h>
-
-char CA_RELEASE_ID [] = "4.00";
-char CA_BUILDER    [] = "CA_BUILDER_STR";
-char CA_BUILD_DATE [] = "CA_BUILD_DATE_STR";
-
-int main (int argc, char ** argv) 
-{
-
-  fprintf(stderr, "CA Release Version %s\n"
-                  "Build by %s on %s\n",
-                  CA_RELEASE_ID,
-                  CA_BUILDER,
-                  CA_BUILD_DATE);
-  return 0;
-}

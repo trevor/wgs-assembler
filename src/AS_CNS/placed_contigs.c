@@ -18,25 +18,33 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-
-
-/**************************************************************************
- * This utility reports release information on stderr.
- *************************************************************************/
+/* $Id: placed_contigs.c,v 1.9 2007-05-29 10:54:28 brianwalenz Exp $ */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include "assert.h"
+#include "AS_global.h"
+#include "AS_UTL_Var.h"
+#include "MultiAlignStore_CNS.h"
+#include "MultiAlignment_CNS.h"
 
-char CA_RELEASE_ID [] = "4.00";
-char CA_BUILDER    [] = "CA_BUILDER_STR";
-char CA_BUILD_DATE [] = "CA_BUILD_DATE_STR";
 
-int main (int argc, char ** argv) 
-{
+int main(int argc, char *argv[])
+{ GenericMesg *pmesg;
+  IntConConMesg *contig;
+  FILE *out = NULL;
 
-  fprintf(stderr, "CA Release Version %s\n"
-                  "Build by %s on %s\n",
-                  CA_RELEASE_ID,
-                  CA_BUILDER,
-                  CA_BUILD_DATE);
-  return 0;
+ while (ReadProtoMesg_AS(stdin,&pmesg) != EOF){
+    if (pmesg->t ==MESG_ICM)  {
+      contig = pmesg->m;
+        
+        if (contig->placed == AS_PLACED) {
+          WriteProtoMesg_AS(stdout,pmesg);
+        } 
+         
+        fflush(out);
+        fflush(out);
+    }
+ }
+ exit (0);
 }

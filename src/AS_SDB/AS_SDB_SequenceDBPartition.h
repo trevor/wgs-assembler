@@ -19,24 +19,31 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
+#ifndef AS_SDB_SEQUENCEDB_PARTITION_H
+#define AS_SDB_SEQUENCEDB_PARTITION_H
 
-/**************************************************************************
- * This utility reports release information on stderr.
- *************************************************************************/
+#include "AS_UTL_Hash.h"
+#include "AS_SDB_SequenceDB.h"
 
-#include <stdio.h>
+typedef struct {
+  int elemID;
+  int partitionID;
+}tPartitionElement;
 
-char CA_RELEASE_ID [] = "4.00";
-char CA_BUILDER    [] = "CA_BUILDER_STR";
-char CA_BUILD_DATE [] = "CA_BUILD_DATE_STR";
+VA_DEF(tPartitionElement)
 
-int main (int argc, char ** argv) 
-{
+typedef struct {
+  char *sequenceDBPath;      
+  VA_TYPE(tMARecord) *multiAligns; // the fileID in the tMARecord is used for the multi-alignID
+  FILE *datafp;                    // single FILE* for the data, all is loaded into memory
+  HashTable_AS *index;
+} tSequenceDBPartition;
 
-  fprintf(stderr, "CA Release Version %s\n"
-                  "Build by %s on %s\n",
-                  CA_RELEASE_ID,
-                  CA_BUILDER,
-                  CA_BUILD_DATE);
-  return 0;
-}
+tSequenceDBPartition *openSequenceDBPartition(char *path, int32 revision, int32 partition);
+
+// Returns a reference to a multiAlignT from this partition
+//
+MultiAlignT *loadFromSequenceDBPartition(tSequenceDBPartition *partition, int32 indx);
+
+
+#endif

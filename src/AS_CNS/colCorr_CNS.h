@@ -18,25 +18,21 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
+#ifndef AS_CNS_COLCORR
+#define AS_CNS_COLCORR
 
+#include "AS_global.h"
+#include "AS_UTL_Var.h"
 
-/**************************************************************************
- * This utility reports release information on stderr.
- *************************************************************************/
+#include "MultiAlignStore_CNS.h"
 
-#include <stdio.h>
+typedef struct{
+  int col;
+  int corr;
+} ColumnCorrelationT;
 
-char CA_RELEASE_ID [] = "4.00";
-char CA_BUILDER    [] = "CA_BUILDER_STR";
-char CA_BUILD_DATE [] = "CA_BUILD_DATE_STR";
+ColumnCorrelationT *test_correlated_columns(MultiAlignT         *ma, 
+					    GateKeeperStore     *handle);
 
-int main (int argc, char ** argv) 
-{
+#endif
 
-  fprintf(stderr, "CA Release Version %s\n"
-                  "Build by %s on %s\n",
-                  CA_RELEASE_ID,
-                  CA_BUILDER,
-                  CA_BUILD_DATE);
-  return 0;
-}

@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl -w
-# $Id: carun.pl,v 1.2 2007-08-15 22:33:09 moweis Exp $
+# $Id: carun.pl,v 1.2.2.1 2007-09-13 19:24:17 moweis Exp $
 #
 # Celera Assembler front-end script calls runs assembly pipline 
 # recipes on the grid or on the local host.
@@ -9,7 +9,7 @@
 
 # Program configuration
 my @MY_DEPENDS = ( "TIGR::Foundation", "TIGR::ConfigFile" );
-my $MY_VERSION = " 1.5 (Build " . (qw/$Revision: 1.2 $/)[1] . ")";
+my $MY_VERSION = " 1.6 (Build " . (qw/$Revision: 1.2.2.1 $/)[1] . ")";
 my $HELPTEXT =
   qq~Request a whole-genome shotgun assembly using Celera Assembler.
 
@@ -36,10 +36,9 @@ my $HELPTEXT =
   -wait             Wait for job completion before exiting
 
  recipe options:
-  -R <recipe>       Specify recipe to execute Celera Assembler 
+  -R <recipe>       Specify recipe to execute Celera Assembler (default: OBT) 
                     [no]OBT - run with OBT 
                     noVec   - run w/OBT but w/o Vector
-                    hybrid  - run w/OBT using hybrid reads
   -before           Print the recipe and exit
   -after            Print the generated shell script and exit
  
