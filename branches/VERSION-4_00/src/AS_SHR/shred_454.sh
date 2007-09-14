@@ -19,7 +19,7 @@ echo "Quality score is set to be"
 echo $QUAL
 
 
-BINDIR=/usr/local/devel/CA/bin
+BINDIR=/usr/local/packages/CA/bin
 
 echo ">>Generate_NonShallow_Contigs..."
 $BINDIR/Generate_NonShallow_Contigs.pl -a $ACE -f pyro.contigs
