@@ -89,7 +89,7 @@ AS_OVS_openOverlapStorePrivate(const char *path, int useBackup, int saveSpace) {
   char            name[FILENAME_MAX];
   FILE           *ovsinfo;
 
-  OverlapStore   *ovs = (OverlapStore *)safe_calloc(1, sizeof(OverlapStore));
+  OverlapStore   *ovs = (OverlapStore *)safe_malloc(sizeof(OverlapStore));
 
   //  Overlap store cannot be from stdin!
   assert((path != NULL) && (strcmp(path, "-") != 0));
@@ -117,24 +117,6 @@ AS_OVS_openOverlapStorePrivate(const char *path, int useBackup, int saveSpace) {
   }
   AS_UTL_safeRead(ovsinfo, &ovs->ovs, "AS_OVS_openOverlapStore info", sizeof(OverlapStoreInfo), 1);
   fclose(ovsinfo);
-
-
-  //  If we're not supposed to be using the backup, load the stats.
-  //
-  if (ovs->useBackup == 0) {
-    FILE *ost;
-
-    sprintf(name, "%s/ost", ovs->storePath);
-    errno = 0;
-    ost = fopen(name, "r");
-    if (errno) {
-      fprintf(stderr, "failed to open the stats file '%s': %s\n", name, strerror(errno));
-      exit(1);
-    }
-
-    AS_UTL_safeRead(ost, &ovs->stats, "AS_OVS_openOverlapStore", sizeof(OverlapStoreStats), 1);
-    fclose(ost);
-  }
 
 
   //  If we're supposed to be using the backup, actually make the
@@ -185,10 +167,10 @@ AS_OVS_openOverlapStorePrivate(const char *path, int useBackup, int saveSpace) {
 
 void
 AS_OVS_restoreBackup(OverlapStore *ovs) {
-  char            name[FILENAME_MAX];
+	char            name[FILENAME_MAX];
 	
   //  Restore the backup for an overlap store.
-  //
+	//
   if (ovs->useBackup) {
     int i;
     renameFromBackup(ovs->storePath, "ovs");
@@ -381,13 +363,13 @@ AS_OVS_closeOverlapStore(OverlapStore *ovs) {
         ovs->missing.numOlaps  = 0;
         AS_UTL_safeWrite(ovs->offsetFile,
                          &ovs->missing,
-                         "AS_OVS_closeOverlapStore offset",
+                         "AS_OVS_writeOverlapToStore offset",
                          sizeof(OverlapStoreOffsetRecord),
                          1);
         ovs->missing.a_iid++;
       }
 
-      AS_UTL_safeWrite(ovs->offsetFile, &ovs->offset, "AS_OVS_closeOverlapStore offset",
+      AS_UTL_safeWrite(ovs->offsetFile, &ovs->offset, "AS_OVS_writeOverlapToStore offset",
                        sizeof(OverlapStoreOffsetRecord), 1);
     }
 
@@ -404,32 +386,6 @@ AS_OVS_closeOverlapStore(OverlapStore *ovs) {
     ovs->ovs.highestFileIndex = ovs->currentFileIndex;
     AS_UTL_safeWrite(ovsinfo, &ovs->ovs, "AS_OVS_closeOverlapStore", sizeof(OverlapStoreInfo), 1);
     fclose(ovsinfo);
-
-    fprintf(stderr, "Closing the new store:\n");
-    fprintf(stderr, "ovs->ovs.ovsMagic           = "F_U64"\n", ovs->ovs.ovsMagic);
-    fprintf(stderr, "ovs->ovs.ovsVersion         = "F_U64"\n", ovs->ovs.ovsVersion);
-    fprintf(stderr, "ovs->ovs.numOverlapsPerFile = "F_U64"\n", ovs->ovs.numOverlapsPerFile);
-    fprintf(stderr, "ovs->ovs.smallestIID        = "F_U64"\n", ovs->ovs.smallestIID);
-    fprintf(stderr, "ovs->ovs.largestIID         = "F_U64"\n", ovs->ovs.largestIID);
-    fprintf(stderr, "ovs->ovs.numOverlapsTotal   = "F_U64"\n", ovs->ovs.numOverlapsTotal);
-    fprintf(stderr, "ovs->ovs.highestFileIndex   = "F_U64"\n", ovs->ovs.highestFileIndex);
-  }
-
-  if (ovs->statsUpdated) {
-    FILE *ost;
-
-    fprintf(stderr, "Writing new stats.\n");
-
-    sprintf(name, "%s/ost", ovs->storePath);
-    errno = 0;
-    ost = fopen(name, "w");
-    if (errno) {
-      fprintf(stderr, "failed to write overlap stats '%s': %s\n", name, strerror(errno));
-      exit(1);
-    }
-
-    AS_UTL_safeWrite(ost, &ovs->stats, "AS_OVS_closeOverlapStore", sizeof(OverlapStoreStats), 1);
-    fclose(ost);
   }
 
   AS_OVS_closeBinaryOverlapFile(ovs->bof);
@@ -452,7 +408,7 @@ AS_OVS_createOverlapStore(const char *path, int failOnExist) {
 
   assert((path != NULL) && (strcmp(path, "-") != 0));
 
-  OverlapStore   *ovs = (OverlapStore *)safe_calloc(1, sizeof(OverlapStore));
+  OverlapStore   *ovs = (OverlapStore *)safe_malloc(sizeof(OverlapStore));
   strcpy(ovs->storePath, path);
 
   ovs->isOutput  = TRUE;
@@ -584,7 +540,7 @@ AS_OVS_writeOverlapToStore(OverlapStore *ovs, OVSoverlap *overlap) {
     ovs->offset.offset    = ovs->overlapsThisFile;
   }
 
-  AS_OVS_accumulateStats(ovs, overlap);
+
   AS_OVS_writeOverlap(ovs->bof, overlap);
   ovs->offset.numOlaps++;
   ovs->ovs.numOverlapsTotal++;

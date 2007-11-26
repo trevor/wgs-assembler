@@ -26,9 +26,9 @@ LOCAL_WORK = $(shell cd ../../; pwd)
 
 include $(LOCAL_WORK)/src/site_name.as
 
-SOURCES = AS_TER_terminator.c asmOutputFasta.c
+SOURCES = AS_TER_terminator.c asmProcessScaffolds_TER.c asmOutputContigsFasta.c
 OBJECTS = (SOURCES:.c=.o)
-PROGS   = terminator asmOutputFasta
+PROGS   = terminator asmProcessScaffolds_TER asmOutputContigsFasta
 
 include $(LOCAL_WORK)/src/c_make.as
 
@@ -37,4 +37,5 @@ all: $(OBJECTS) $(LIBRARIES) $(PROGS)
 	@chmod 775 $(LOCAL_BIN)/buildFragContigPosMap.pl
 
 terminator:              AS_TER_terminator.o        libCA.a
-asmOutputFasta:          asmOutputFasta.o           libCA.a
+asmProcessScaffolds_TER: asmProcessScaffolds_TER.o  libCA.a
+asmOutputContigsFasta:   asmOutputContigsFasta.o    libCA.a

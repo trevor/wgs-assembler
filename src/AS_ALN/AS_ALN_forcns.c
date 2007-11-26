@@ -104,16 +104,12 @@ Overlap *Local_Overlap_AS_forCNS(char *a, char *b,
 
   assert((0.0 <= erate) && (erate <= AS_MAX_ERROR_RATE));
 
-  A.sequence = safe_copy_Astring_with_preceding_null(a);
   A.quality = NULL;
-  A.iaccession = 1;
-  A.eaccession = AS_UID_fromInteger(A.iaccession);
-
-  B.sequence = safe_copy_Bstring_with_preceding_null(b);
   B.quality = NULL;
-  B.iaccession = 2;
-  B.eaccession = AS_UID_fromInteger(B.iaccession);
-
+  A.sequence = safe_copy_Astring_with_preceding_null(a);
+  B.sequence = safe_copy_Bstring_with_preceding_null(b);
+  A.iaccession = A.eaccession = 1;
+  B.iaccession = B.eaccession = 2;
   O = Local_Overlap_AS(&A,&B,beg,end,
 		       opposite,
 		       erate,
@@ -226,15 +222,12 @@ Overlap *Affine_Overlap_AS_forCNS(char *a, char *b,
   orig_TEST_NUM_INDELS = AS_ALN_TEST_NUM_INDELS;
   AS_ALN_TEST_NUM_INDELS = 0;
 
-  A.sequence = safe_copy_Astring_with_preceding_null(a);
   A.quality = NULL;
-  A.iaccession = 1;
-  A.eaccession = AS_UID_fromInteger(A.iaccession);
-
-  B.sequence = safe_copy_Bstring_with_preceding_null(b);
   B.quality = NULL;
-  B.iaccession = 2;
-  B.eaccession = AS_UID_fromInteger(B.iaccession);
+  A.sequence = safe_copy_Astring_with_preceding_null(a);
+  B.sequence = safe_copy_Bstring_with_preceding_null(b);
+  A.iaccession = A.eaccession = 1;
+  B.iaccession = B.eaccession = 2;
 
   O =AS_ALN_affine_overlap(&A,&B,beg,end,
 		       opposite,

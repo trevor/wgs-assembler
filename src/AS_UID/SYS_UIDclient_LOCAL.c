@@ -39,9 +39,9 @@ void SYS_UIDset_euid_namespace(const char * namespaceName)
 	// do nothing for local server
 }
 
-uint64
+CDS_UID_t
 getGUIDBlock(int guidRequestSize) {
-  uint64   guidStart = 7180000;
+  CDS_UID_t guidStart = 7180000;
 
   guidStart *= 1000;  //  Gets around integer overflow on 32-bit.
   guidStart *= 1000;
@@ -51,15 +51,15 @@ getGUIDBlock(int guidRequestSize) {
   if (errno == ENOENT) {
     //  Dang, doesn't exist!  Make it.
     F = fopen(".local-guid", "w+");
-    fprintf(F, F_U64"\n", guidStart);
+    fprintf(F, F_UID"\n", guidStart);
   } else if (errno) {
     fprintf(stderr, "getGUIDBlock()-- Can't open '.local-guid' for read/write, can't get last UID used: %s\n", strerror(errno));
     exit(1);
   } else {
-    fscanf(F, F_U64"\n", &guidStart);
+    fscanf(F, F_UID"\n", &guidStart);
   }
   rewind(F);
-  fprintf(F, F_U64"\n", guidStart + guidRequestSize);
+  fprintf(F, F_UID"\n", guidStart + guidRequestSize);
   fclose(F);
 
   return(guidStart);

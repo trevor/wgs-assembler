@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char const *rcsid = "$Id: AS_GKP_buildPartition.c,v 1.9 2007-11-08 12:38:12 brianwalenz Exp $";
+static char const *rcsid = "$Id: AS_GKP_buildPartition.c,v 1.8 2007-10-04 06:38:54 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,7 +48,8 @@ Build_Partition(char      *gatekeeperName,
 
   GateKeeperStore **gkpart = NULL;
 
-  fragRecord        fr;
+  fragRecord       *fr  = new_fragRecord();
+  StoreStat         stats;
   char              encodedsequence[AS_FRAG_MAX_LEN];
 
   uint64            seqLen = 0;
@@ -100,7 +101,7 @@ Build_Partition(char      *gatekeeperName,
   for (iid=1; iid<maxIID; iid++) {
     int p;
 
-    getFrag(gkp, iid, &fr, flags);
+    getFrag(gkp, iid, fr, flags);
 
     p = partition[iid];
 
@@ -111,26 +112,31 @@ Build_Partition(char      *gatekeeperName,
 
     //  update pointers
 
-    fr.gkfr.seqOffset = -1;
+    fr->gkfr.seqOffset = -1;
 
-    fr.gkfr.qltOffset = getLastElemStore(gkpart[p]->partqlt);
-    fr.gkfr.hpsOffset = getLastElemStore(gkpart[p]->parthps);
-    fr.gkfr.srcOffset = getLastElemStore(gkpart[p]->partsrc);
+    statsStore(gkpart[p]->partqlt, &stats);
+    fr->gkfr.qltOffset = stats.lastElem;
+
+    statsStore(gkpart[p]->parthps, &stats);
+    fr->gkfr.hpsOffset = stats.lastElem;
+
+    statsStore(gkpart[p]->partsrc, &stats);
+    fr->gkfr.srcOffset = stats.lastElem;
 
     //  append the elements
 
-    appendIndexStore(gkpart[p]->partfrg, &fr.gkfr);
+    appendIndexStore(gkpart[p]->partfrg, &fr->gkfr);
 
-    encodeSequenceQuality(encodedsequence, fr.seq, fr.qlt);
-    appendStringStore(gkpart[p]->partqlt, encodedsequence, fr.gkfr.seqLen);
+    encodeSequenceQuality(encodedsequence, fr->seq, fr->qlt);
+    appendVLRecordStore(gkpart[p]->partqlt, encodedsequence, fr->gkfr.seqLen);
 
-    appendStringStore(gkpart[p]->parthps, NULL,    0);
+    appendVLRecordStore(gkpart[p]->parthps, NULL,    0);
 
-    appendStringStore(gkpart[p]->partsrc, fr.src, fr.gkfr.srcLen);
+    appendVLRecordStore(gkpart[p]->partsrc, fr->src, fr->gkfr.srcLen);
 
-    seqLen += fr.gkfr.seqLen;
+    seqLen += fr->gkfr.seqLen;
     hpsLen += 0;
-    srcLen += fr.gkfr.srcLen;
+    srcLen += fr->gkfr.srcLen;
 
     if ((iid % 100000) == 0) {
       fprintf(stderr, "frags:%6d  seqLen:%9.3fMbp  hpsLen:%9.3fM  srcLen:%9.3fM\n",
@@ -148,6 +154,8 @@ Build_Partition(char      *gatekeeperName,
     closeGateKeeperStore(gkpart[iid]);
 
   closeGateKeeperStore(gkp);
+
+  del_fragRecord(fr);
 }
 
 

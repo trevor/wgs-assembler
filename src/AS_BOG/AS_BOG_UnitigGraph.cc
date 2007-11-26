@@ -34,11 +34,11 @@
 *************************************************/
 
 /* RCS info
- * $Id: AS_BOG_UnitigGraph.cc,v 1.71 2007-11-08 19:42:35 eliv Exp $
- * $Revision: 1.71 $
+ * $Id: AS_BOG_UnitigGraph.cc,v 1.67 2007-10-24 20:55:55 eliv Exp $
+ * $Revision: 1.67 $
 */
 
-//static char AS_BOG_UNITIG_GRAPH_CC_CM_ID[] = "$Id: AS_BOG_UnitigGraph.cc,v 1.71 2007-11-08 19:42:35 eliv Exp $";
+//static char AS_BOG_UNITIG_GRAPH_CC_CM_ID[] = "$Id: AS_BOG_UnitigGraph.cc,v 1.67 2007-10-24 20:55:55 eliv Exp $";
 static char AS_BOG_UNITIG_GRAPH_CC_CM_ID[] = "gen> @@ [0,0]";
 
 #include "AS_BOG_Datatypes.hh"
@@ -58,7 +58,6 @@ namespace AS_BOG{
 
 	//////////////////////////////////////////////////////////////////////////////
     
-    int BogOptions::badMateBreakThreshold    = -7;
     bool BogOptions::unitigIntersectBreaking = false;
     bool BogOptions::ejectUnhappyContained   = false;
     bool BogOptions::useGkpStoreLibStats     = false;
@@ -1041,7 +1040,6 @@ namespace AS_BOG{
         _avgRho = -1;
 		dovetail_path_ptr = new DoveTailPath;
         _id=accession;
-        std::cerr << "Creating Unitig " << _id << std::endl;
 	}
 	//////////////////////////////////////////////////////////////////////////////
 
@@ -1052,29 +1050,8 @@ namespace AS_BOG{
 	//////////////////////////////////////////////////////////////////////////////
 
     void Unitig::addFrag( DoveTailNode node) {
-
-        // keep track of the unitig a frag is in
-        _inUnitig[ node.ident ] = id();
-
-        // keep track of max position in unitig
-        int frgEnd = MAX( node.position.bgn, node.position.end);
-        if ( frgEnd > _length)
-            _length = frgEnd;
-
-        if ( node.contained ) {
-            if ( _inUnitig[ node.contained ] != id())
-                node.contained = NULL_FRAG_ID;
-        }
-
         dovetail_path_ptr->push_back( node );
-    }
-
-    void Unitig::addFrag( DoveTailNode node, int offset) {
-        node.position.bgn += offset;
-        assert( node.position.bgn >= 0 );
-        node.position.end += offset;
-        assert( node.position.end >= 0 );
-        addFrag( node );
+        _inUnitig[ node.ident ] = id();
     }
 
 	//////////////////////////////////////////////////////////////////////////////
@@ -1188,9 +1165,6 @@ namespace AS_BOG{
 		if(dovetail_path_ptr->size()==0){
 			std::cerr << "This Unitig has an empty fragPositions." << std::endl;	
 		}
-        return _length;
-        // Dead code below, since length is now tracked in addFrag as reads are added
-        
         // used to use getLastBackboneNode(), but that's not required to be the 
         // highest base, we can have a read stick out further, but not contain the last
         int bgn = 0;
@@ -1492,7 +1466,6 @@ namespace AS_BOG{
 		}
         this->sort();
         delete containPartialOrder;
-        containPartialOrder = NULL;
         // Compute assuming that containee is the same orientation as container
         //	if(cntnr_intvl.begin < cntnr_intvl.end)
 
@@ -1713,6 +1686,7 @@ namespace AS_BOG{
                     // create singleton when breaking at both ends of a fragment
                     fprintf(stderr,"  Breaking tig %d at both ends of %d num %d\n",
                             tig->id(), breakPoint.fragEnd.id, breakPoint.fragNumber);
+                    newTig->shiftCoordinates( offset ); // set coords for last piece
                     newTig = new Unitig();              // create the singlenton
                     splits->push_back( newTig );        // add to list of new untigs
                     frg.position.bgn = 0;               // set begin and end
@@ -1727,12 +1701,13 @@ namespace AS_BOG{
                     // break at left end of frg, frg starts new tig
                     fprintf(stderr,"  Break tig %d before %d num %d\n",
                             tig->id(), breakPoint.fragEnd.id, breakPoint.fragNumber);
+                    newTig->shiftCoordinates( offset ); // set coords for last piece
                     newTig = new Unitig();              // create next new unitig
                     // record offset of start of new unitig
                     offset = reverse ? -frg.position.end : -frg.position.bgn;
                     fprintf(stderr,"Offset is %d for frg %d %d,%d ",
                             offset,frg.ident,frg.position.bgn,frg.position.end);
-                    newTig->addFrag( frg, offset );     // add frag as 1st in unitig
+                    newTig->addFrag( frg );             // add frag as 1st in unitig
                 }
                 else if (breakPoint.fragEnd.end ==  FIVE_PRIME && reverse ||
                          breakPoint.fragEnd.end == THREE_PRIME && !reverse )
@@ -1740,7 +1715,8 @@ namespace AS_BOG{
                     // break at right end of frg, frg goes in existing tig
                     fprintf(stderr,"  Break tig %d after %d num %d\n",
                             tig->id(), breakPoint.fragEnd.id, breakPoint.fragNumber);
-                    newTig->addFrag( frg, offset );     // add frag as last
+                    newTig->addFrag( frg );             // add frag as last
+                    newTig->shiftCoordinates( offset );
                     newTig = new Unitig();              // create new empty unitig
                 } else {
                     // logically impossible!
@@ -1763,12 +1739,17 @@ namespace AS_BOG{
                 if (newTig->dovetail_path_ptr->empty()) {
                     // if it's empty, this is it's 1st frag, store the offset
                     offset = reverse ? -frg.position.end : -frg.position.bgn;
-                    fprintf(stderr,"Offset is %d for frg %d %d,%d\n",
+                    fprintf(stderr,"Offset is %d for frg %d %d,%d ",
                             offset,frg.ident,frg.position.bgn,frg.position.end);
                 }
-                newTig->addFrag( frg, offset );
+                if (frg.contained) {
+                    if (Unitig::fragIn(frg.contained) != newTig->id())
+                        frg.contained = NULL_FRAG_ID;
+                }
+                newTig->addFrag( frg );
             }
         }
+        newTig->shiftCoordinates( offset );
         // should be zero
         fprintf(stderr,"After break size is %d\n",breaks.size());
         return splits;
@@ -1911,10 +1892,10 @@ namespace AS_BOG{
                      filename, strerror(errno));
             exit(1);
         }
-        Unitig::resetFragUnitigMap(maxIID+1);
-        BestOverlapGraph::fragLength = new uint16[maxIID+1];
+        Unitig::resetFragUnitigMap(maxIID);
+        BestOverlapGraph::fragLength = new uint16[maxIID];
         memset( BestOverlapGraph::fragLength, std::numeric_limits<uint16>::max(),
-                sizeof(uint16)*(maxIID+1) );
+                sizeof(uint16)*maxIID );
 
         GenericMesg *pmesg = NULL;
         while ((ReadProtoMesg_AS( iumIn, &pmesg ) != EOF)) {
@@ -1941,73 +1922,5 @@ namespace AS_BOG{
 
 	//////////////////////////////////////////////////////////////////////////////
 
-    BestEdgeCounts UnitigGraph::countInternalBestEdges( const Unitig *tig) {
-        DoveTailConstIter iter = tig->dovetail_path_ptr->begin();
-        DoveTailNode prevFrag;
-        BestEdgeCounts cnts;
-        for(; iter != tig->dovetail_path_ptr->end(); iter++) {
-            DoveTailNode frag = *iter;
-            if (iter == tig->dovetail_path_ptr->begin()){
-                prevFrag = frag;
-                continue;
-            }
-            if (frag.contained) {
-                cnts.contained++;
-                continue;
-            }
-
-            BestEdgeOverlap* prevBestEdge;
-            if( isReverse( prevFrag.position ) )
-                prevBestEdge = bog_ptr->getBestEdgeOverlap( prevFrag.ident, FIVE_PRIME);
-            else
-                prevBestEdge = bog_ptr->getBestEdgeOverlap( prevFrag.ident, THREE_PRIME);
-
-            BestEdgeOverlap* bestEdge;
-            if( isReverse( frag.position ) )
-                bestEdge = bog_ptr->getBestEdgeOverlap( frag.ident, THREE_PRIME);
-            else
-                bestEdge = bog_ptr->getBestEdgeOverlap( frag.ident, FIVE_PRIME);
-
-            if ( prevBestEdge->frag_b_id == frag.ident ) {
-                // Either one way best or dovetail
-                if (bestEdge->frag_b_id == prevFrag.ident) // dovetail
-                    cnts.dovetail++;
-                else
-                    cnts.oneWayBest++;
-            } else {
-                // Either one way best or neither
-                if (bestEdge->frag_b_id == prevFrag.ident)
-                    cnts.oneWayBest++;
-                else
-                    cnts.neither++;
-            }
-            prevFrag = frag;
-        }
-        return cnts;
-    }
-
-	//////////////////////////////////////////////////////////////////////////////
-
-    BestEdgeCounts UnitigGraph::countInternalBestEdges() {
-        BestEdgeCounts allTigs;
-        UnitigsConstIter iter = unitigs->begin();
-		for(iter = unitigs->begin(); iter != unitigs->end(); iter++){
-            if( *iter == NULL)
-                continue;
-
-            if( (*iter)->getNumFrags() == 0 )
-                continue;
-
-            Unitig* tig = *iter;
-            BestEdgeCounts cnts = countInternalBestEdges(tig);
-            std::cerr << "Tig " << tig->id() << " overlap counts, dovetail " << cnts.dovetail
-                  << " oneWayBest " << cnts.oneWayBest << " neither " << cnts.neither
-                  << " contained " << cnts.contained << std::endl;
-            allTigs += cnts;
-        }
-        return allTigs;
-    }
-
-	//////////////////////////////////////////////////////////////////////////////
 
 } //AS_BOG namespace

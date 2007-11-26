@@ -33,8 +33,8 @@
 *************************************************/
 
 /* RCS info
- * $Id: AS_BOG_Datatypes.hh,v 1.19 2007-11-08 19:42:35 eliv Exp $
- * $Revision: 1.19 $
+ * $Id: AS_BOG_Datatypes.hh,v 1.17 2007-10-24 20:55:55 eliv Exp $
+ * $Revision: 1.17 $
 */
 
 #ifndef INCLUDE_AS_BOG_DATATYPES
@@ -99,7 +99,7 @@ namespace AS_BOG{
 		REVERSE
 	} orientation_type;
 
-	typedef AS_IID    iuid;
+	typedef CDS_IID_t iuid;
 	const iuid NULL_FRAG_ID=0;
 
     typedef std::list<SeqInterval> IntervalList;
@@ -126,7 +126,6 @@ namespace AS_BOG{
     };
 
     struct BogOptions {
-        static int badMateBreakThreshold;
         static bool unitigIntersectBreaking;
         static bool ejectUnhappyContained;
         static bool useGkpStoreLibStats;

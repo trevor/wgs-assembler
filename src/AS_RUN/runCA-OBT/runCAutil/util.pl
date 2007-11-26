@@ -213,7 +213,7 @@ sub setDefaults () {
 
     $global{"createAGP"}                   = 0;
     $global{"createACE"}                   = 0;
-    $global{"createPosMap"}                = 1;
+    $global{"createPosMap"}                = 0;
 
     $global{"merQC"}                       = 0;
     $global{"merQCmemory"}                 = 1024;
@@ -231,7 +231,6 @@ sub setDefaults () {
     $global{"useBogUnitig"}                = 0;
     $global{"bogPromiscuous"}              = 0;
     $global{"bogEjectUnhappyContain"}      = 0;
-    $global{"bogBadMateDepth"}             = undef;
     $global{"vectorIntersect"}             = undef;
 
     $global{"ovlErrorRate"}                = 0.06;

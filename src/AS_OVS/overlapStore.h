@@ -30,7 +30,7 @@
 #include "AS_global.h"
 
 void
-buildStore(char *storeName, char *gkpName, uint64 memoryLimit, uint32 nThreads, uint32 fileListLen, char **fileList);
+buildStore(char *storeName, uint64 memoryLimit, uint64 maxIID, uint32 nThreads, uint32 fileListLen, char **fileList);
 
 void
 mergeStore(char *storeName, char *mergeName);
@@ -42,10 +42,7 @@ void
 dumpStore(char *storeName, uint32 dumpBinary, double dumpERate, uint32 bgnIID, uint32 endIID);
 
 void
-dumpStats(char *storeName);
-
-void
-rebuildStats(char *storeName, char *gkpName);
+statsStore(char *storeName);
 
 int
 OVSoverlap_sort(const void *a, const void *b);
@@ -60,9 +57,8 @@ OVSoverlap_sort(const void *a, const void *b);
 #define OP_BUILD          1
 #define OP_MERGE          2
 #define OP_DUMP           3
-#define OP_STATS_DUMP     4
-#define OP_STATS_REBUILD  5
-#define OP_UPDATE_ERATES  6
+#define OP_STATS          4
+#define OP_UPDATE_ERATES  5
 
 
 #endif  //  OVERLAPSTORE_H

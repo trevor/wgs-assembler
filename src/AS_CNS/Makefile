@@ -23,6 +23,7 @@
 
 LIB_SOURCES = Array_CNS.c \
               MultiAlign.c \
+              MultiAlignFromCCO.c \
               MultiAlignFromICM.c \
               MultiAlignFromIUM.c \
               MultiAlignPrint.c \
@@ -35,7 +36,8 @@ LOCAL_WORK  = $(shell cd ../..; pwd)
 
 AS_CNS_SRCS = $(LIB_SOURCES) \
               Consensus_CNS.c \
-              AS_CNS_asmReBaseCall.c
+              AS_CNS_asmReBaseCall.c \
+              dumpUnitigConsensusFromIUM.c
 
 AS_CNS_OBJS = $(AS_CNS_SRCS:.c=.o)
 
@@ -44,7 +46,8 @@ OBJECTS   = $(AS_CNS_OBJS)
 LIBRARIES = libAS_CNS.a libCA.a
 
 PROGS = consensus \
-        asmReBaseCall
+        asmReBaseCall \
+        dumpUnitigConsensusFromIUM
 
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
@@ -59,3 +62,4 @@ LIBS =  libCA.a
 
 consensus:                    Consensus_CNS.o                $(LIBS)
 asmReBaseCall:                AS_CNS_asmReBaseCall.o         $(LIBS)
+dumpUnitigConsensusFromIUM:   dumpUnitigConsensusFromIUM.o   $(LIBS)

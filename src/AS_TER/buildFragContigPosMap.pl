@@ -80,7 +80,7 @@ while (!eof(STDIN)) {
         my $for = <STDIN>;
         my $nfr = <STDIN>;
 
-        if ($acc =~ m/acc:\((\w+),(\w+)\)/) {
+        if ($acc =~ m/acc:\((\d+),(\d+)\)/) {
             $acc= $1;
         } else {
             die "Failed to find acc in $acc\n";
@@ -106,7 +106,7 @@ while (!eof(STDIN)) {
                     skipRecord();
                 }
 
-                if ($mid =~ m/mid:(\w+)$/) {
+                if ($mid =~ m/mid:(\d+)$/) {
                     $mid = $1;
                     $surrFrags{ $acc }{ $mid } = 1;
                 } else {
@@ -141,7 +141,7 @@ while (!eof(STDIN)) {
 
         #  Process what we have so far.
 
-        if ($acc =~ m/acc:\((\w+),(\w+)\)/) {
+        if ($acc =~ m/acc:\((\d+),(\d+)\)/) {
             $acc= $1;
         } else {
             die "Failed to find acc in $acc\n";
@@ -190,7 +190,7 @@ while (!eof(STDIN)) {
             my $rid = readMultiLineDot();
             my $jnk = <STDIN>;  chomp $jnk;  #  closing bracket
 
-            if ($pos =~ m/pos:(\w+),(\w+)$/) {
+            if ($pos =~ m/pos:(\d+),(\d+)$/) {
                 my $b = $ctgCoords[$1];
                 my $e = $ctgCoords[$2];
                 print VARCTG "$var $acc $b $e $nrd $nca $anc $len $nra $wgt\n";
@@ -221,7 +221,7 @@ while (!eof(STDIN)) {
                 skipRecord();
             }
 
-            if ($mid =~ m/mid:(\w+)$/) {
+            if ($mid =~ m/mid:(\d+)$/) {
                 $mid = $1;
             } else {
                 die "Failed to find mid in $mid\n";
@@ -274,7 +274,7 @@ while (!eof(STDIN)) {
                 skipRecord();
             }
 
-            if ($lid =~ m/lid:(\w+)$/) {
+            if ($lid =~ m/lid:(\d+)$/) {
                 $lid = $1;
             } else {
                 die "Failed to find lid in $lid\n";
@@ -321,13 +321,13 @@ while (!eof(STDIN)) {
         #  Yes, the acc is unused -- processScaffolds uses the contig
         #  UID in the dregs file, not the scaffold UID.
         #
-        if ($acc =~ m/acc:(\w+)$/) {
+        if ($acc =~ m/acc:(\d+)$/) {
             $acc = $1;
         } else {
             die "Failed to find acc in DSC '$acc'\n";
         }
 
-        if ($ctg =~ m/ctg:(\w+)$/) {
+        if ($ctg =~ m/ctg:(\d+)$/) {
             $ctg = $1;
 
             print CTGSCF "$ctg $ctg 0 $contigLength{$ctg} 0\n";
@@ -341,7 +341,7 @@ while (!eof(STDIN)) {
         my $acc = <STDIN>;  chomp $acc;
         my $noc = <STDIN>;  chomp $noc;
 
-        if ($acc =~ m/acc:\((\w+),\w+\)$/) {
+        if ($acc =~ m/acc:\((\d+),\d+\)$/) {
             $acc = $1;
         } else {
             die "Failed to find acc in SCF '$acc'\n";
@@ -369,13 +369,13 @@ while (!eof(STDIN)) {
 
             $numCTPs++;
 
-            if ($ct1 =~ m/ct1:(\w+)$/) {
+            if ($ct1 =~ m/ct1:(\d+)$/) {
                 $ct1 = $1;
             } else {
                 die "Failed to find ct1 in MPS '$ct1'\n";
             }
 
-            if ($ct2 =~ m/ct2:(\w+)$/) {
+            if ($ct2 =~ m/ct2:(\d+)$/) {
                 $ct2 = $1;
             } else {
                 die "Failed to find ct2 in MPS '$ct2'\n";

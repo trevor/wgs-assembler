@@ -29,13 +29,10 @@ char   SYS_UIDdebug_flag = 0;
 
 
 
-//  Drop in replacement for missing xdr_u_hyper on FreeBSD4 (4.X) and
-//  OS-X (10.3).  Set this in c_make.as if needed.
+//  Drop in replacement for missing xdr_u_hyper on FreeBSD4 and OS-X.
+//  Set this in c_make.as if needed.
 //
-//  __APPLE_CC__ 1671 for Panther 10.3.9
-//  __APPLE_CC__ 5465 for Leopard
-//
-#if (defined(__APPLE_CC__) && (__APPLE_CC__ < 1672))
+#ifdef NEEDXDRUHYPER
 
 static
 int

@@ -34,15 +34,15 @@
 *************************************************/
 
 /* RCS info
- * $Id: AS_BOG_UnitigGraph.hh,v 1.36 2007-11-07 22:07:43 eliv Exp $
- * $Revision: 1.36 $
+ * $Id: AS_BOG_UnitigGraph.hh,v 1.34 2007-10-24 20:55:55 eliv Exp $
+ * $Revision: 1.34 $
 */
 
 
 #ifndef INCLUDE_AS_BOG_UNITIGGRAPH
 #define INCLUDE_AS_BOG_UNITIGGRAPH
 
-static char AS_BOG_UNITIG_GRAPH_HH_CM_ID[] = "$Id: AS_BOG_UnitigGraph.hh,v 1.36 2007-11-07 22:07:43 eliv Exp $";
+static char AS_BOG_UNITIG_GRAPH_HH_CM_ID[] = "$Id: AS_BOG_UnitigGraph.hh,v 1.34 2007-10-24 20:55:55 eliv Exp $";
 
 #include <set>
 #include <iostream>
@@ -134,8 +134,6 @@ namespace AS_BOG{
         static void setNextId(iuid);
 
         void addFrag( DoveTailNode );
-        void addFrag( DoveTailNode, int offset ); // shift by offset before adding
-
         static iuid fragIn(iuid);
         static void resetFragUnitigMap(iuid numFrags);
 
@@ -181,20 +179,6 @@ namespace AS_BOG{
 	///////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////
 
-    struct BestEdgeCounts{
-        int oneWayBest;
-        int dovetail;
-        int neither;
-        int contained;
-
-        BestEdgeCounts() : oneWayBest(0), dovetail(0), neither(0), contained(0) {}
-        BestEdgeCounts operator+=(BestEdgeCounts other){
-            oneWayBest += other.oneWayBest;
-            dovetail   += other.dovetail;
-            neither    += other.neither;
-            contained  += other.contained;
-        } 
-    };
 	typedef std::vector<Unitig*> UnitigVector;
 	typedef UnitigVector::iterator UnitigsIter;
 	typedef UnitigVector::const_iterator UnitigsConstIter;
@@ -232,10 +216,6 @@ namespace AS_BOG{
         UnitigVector* breakUnitigAt( Unitig *, FragmentEnds &);
         // Single call point for breakUnitigAt(), saves new unitigs in last arg
         void accumulateSplitUnitigs( UnitigsIter, FragmentEnds *, UnitigVector *);
-
-        // Counts status of best edges internal to a unitig
-        BestEdgeCounts countInternalBestEdges( const Unitig *);
-        BestEdgeCounts countInternalBestEdges( ); // all unitigs
 
 		///////////////////////////////////////////////////////////////
 		// Member Variables

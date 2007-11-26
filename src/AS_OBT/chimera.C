@@ -223,7 +223,7 @@ readClearRanges(GateKeeperStore *gkp) {
   clear_t          *clear = new clear_t [getLastElemFragStore(gkp) + 1];
 
   while (nextFragStream(fs, &fr)) {
-    AS_IID         iid = getFragRecordIID(&fr);
+    CDS_IID_t      iid = getFragRecordIID(&fr);
     clear[iid].length  = getFragRecordSequenceLength(&fr);
     clear[iid].ovlpL   = getFragRecordClearRegionBegin(&fr, AS_READ_CLEAR_OBT);
     clear[iid].ovlpR   = getFragRecordClearRegionEnd  (&fr, AS_READ_CLEAR_OBT);
@@ -243,8 +243,8 @@ readClearRanges(GateKeeperStore *gkp) {
 void
 printReport(FILE          *reportFile,
             char          *type,
-            AS_UID         uid,
-            AS_IID         iid,
+            uint64         uid,
+            uint32         iid,
             intervalList  &IL,
             uint32         intervalBeg,
             uint32         intervalEnd,
@@ -252,8 +252,8 @@ printReport(FILE          *reportFile,
             overlapList  *overlap) {
 
   if (reportFile) {
-    fprintf(reportFile, "%s,"F_IID" %s!  "F_U32" intervals ("F_U32","F_U32").  "F_U32" potential chimeric overlaps (%5.2f%%).\n",
-            AS_UID_toString(uid), iid, type,
+    fprintf(reportFile, F_U64","F_U32" %s!  "F_U32" intervals ("F_U32","F_U32").  "F_U32" potential chimeric overlaps (%5.2f%%).\n",
+            uid, iid, type,
             IL.numberOfIntervals(), intervalBeg, intervalEnd,
             hasPotentialChimera, (double)hasPotentialChimera / (double)overlap->length() * 100);
 
@@ -266,8 +266,8 @@ printReport(FILE          *reportFile,
 void
 printLogMessage(FILE         *reportFile,
                 fragRecord   *fr,
-                AS_UID        uid,
-                AS_IID        iid,
+                uint64        uid,
+                uint32        iid,
                 uint32        intervalBeg,
                 uint32        intervalEnd,
                 bool          doUpdate,
@@ -275,8 +275,8 @@ printLogMessage(FILE         *reportFile,
                 char         *message) {
 
   if (reportFile)
-    fprintf(reportFile, "%s,"F_IID" %s Trimmed from "F_U32W(4)" "F_U32W(4)" to "F_U32W(4)" "F_U32W(4)".  %s, gatekeeper store %s.\n",
-            AS_UID_toString(uid),
+    fprintf(reportFile, F_U64","F_U32" %s Trimmed from "F_U32W(4)" "F_U32W(4)" to "F_U32W(4)" "F_U32W(4)".  %s, gatekeeper store %s.\n",
+            uid,
             iid,
             type,
             getFragRecordClearRegionBegin(fr, AS_READ_CLEAR_OBT),
@@ -611,6 +611,7 @@ process(uint32           iid,
     }
 
     fragRecord        fr;
+    uint64            uid = 0;
 
     //  We need this to decide if we should get the UID (and the fragRecord)
     //
@@ -620,7 +621,7 @@ process(uint32           iid,
 
     getFrag(gkp, iid, &fr, FRAG_S_INF);
 
-    AS_UID uid = getFragRecordUID(&fr);
+    uid = getFragRecordUID(&fr);
 
     GateKeeperLibraryRecord  *gklr = getGateKeeperLibrary(gkp, getFragRecordLibraryIID(&fr));
     if ((doUpdate) && (gklr) && (gklr->doNotOverlapTrim))
@@ -851,31 +852,10 @@ main(int argc, char **argv) {
     //  Make sure that the overlap at least intersects both of the
     //  final clear ranges.  If it doesn't, discard it.
     //
-    bool   intersectA  = (ola < rightA) && (leftA < ora);
-    bool   intersectBf = (olb < rightB) && (leftB < orb) && (ori == 'f');
-    bool   intersectBr = (orb > rightB) && (leftB > olb) && (ori == 'r');
-    bool   failedTrim  = false;
-    uint32 diffA       = 0;
-    uint32 diffB       = 0;
-
-    //  failedTrim == true can occur frequently on high error
-    //  overlaps.  One case BPW has seen was an overlap with 12.6%
-    //  error:
-    //
-    //  a frag overlap: 247 -> 792 = 545 bp covered
-    //  b frag overlap:  17 -> 502 = 485 bp covered
-    //
-    //  The a frag overlap extended 504bp past the OBT clear range,
-    //  and so we trimmed both overlaps back by 504 bp.  This thus
-    //  resulted in the b frag overlap ending at 502 - 504 = -2, an
-    //  error.
-    //
-    //  failedTrim == true can also occur if we trim both the left and
-    //  the right sides of the overlap.  What happens: fragment A says
-    //  to trim X bases off of the right end, and fragment B says to
-    //  trim Y bases off the left end.  If that's bigger than our
-    //  original overlap, then we have nothing left...and we might be
-    //  negative.
+    bool  intersectA  = (ola < rightA) && (leftA < ora);
+    bool  intersectBf = (olb < rightB) && (leftB < orb) && (ori == 'f');
+    bool  intersectBr = (orb > rightB) && (leftB > olb) && (ori == 'r');
+    bool  failed      = false;
 
     if (intersectA && (intersectBf || intersectBr)) {
 
@@ -897,20 +877,11 @@ main(int argc, char **argv) {
           if ((orb < rightB ) && (rtrim < rightB - orb))
             rtrim = rightB - orb;
 
-          if ((rtrim > rightA) || (rtrim > rightB))
-            failedTrim = true;
-
           leftA  += ltrim;
           rightA -= rtrim;
 
           leftB  += ltrim;
           rightB -= rtrim;
-
-          if ((leftA > rightA) || (leftB > rightB))
-            failedTrim = true;
-
-          diffA = rightA - leftA;
-          diffB = rightB - leftB;
 
           break;
         case 'r':
@@ -924,20 +895,11 @@ main(int argc, char **argv) {
           if ((rightB < olb ) && (rtrim < olb - rightB))
             rtrim = olb - rightB;
 
-          if ((rtrim > rightA) || (ltrim > leftB))
-            failedTrim = true;
-
           leftA  += ltrim;
           rightA -= rtrim;
 
           leftB  -= ltrim;
           rightB += rtrim;
-
-          if ((leftA > rightA) || (rightB > leftB))
-            failedTrim = true;
-
-          diffA = rightA - leftA;
-          diffB = leftB - rightB;
 
           break;
         default:
@@ -946,26 +908,75 @@ main(int argc, char **argv) {
       }
 
 
-      //  Just a simple sanity check.  If we're not a failure already,
-      //  make sure the end points are plausible.
-      //
-      if ((failedTrim == false) &&
-          ((leftA > 2048) || (rightA > 2048) || (leftB > 2048) || (rightB > 2048))) {
-        overflow++;
-        fprintf(stderr, "\n");
-        fprintf(stderr, "Overflow!  YIKES!\n");
-        fprintf(stderr, "A:\torig:\t"F_U32"\t"F_U32"\tovlp:"F_U32"\t"F_U32"\n", cla, cra, ola, ora);
-        fprintf(stderr, "B:\torig:\t"F_U32"\t"F_U32"\tovlp:"F_U32"\t"F_U32"\n", clb, crb, olb, orb);
-        fprintf(stderr, F_U32"\t"F_U32"\t%c\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t%5.3f\n",
-                idA, idB, ori, leftA, rightA, lenA, leftB, rightB, lenB, error);
-        failedTrim = true;
+#ifdef DEBUG
+      if (reportFile) {
+        fprintf(reportFile, "A: orig: "F_U32"\t"F_U32"\tovlp:"F_U32"\t"F_U32"\n", cla, cra, ola, ora);
+        fprintf(reportFile, "B: orig: "F_U32"\t"F_U32"\tovlp:"F_U32"\t"F_U32"\n", clb, crb, olb, orb);
+        //fprintf(reportFile, F_U32"\t"F_U32"\t%c\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t%5.3f\n",
+        //        idA, idB, ori, leftA, rightA, lenA, leftB, rightB, lenB, error);
       }
+#endif
 
 
-      if ( (failedTrim == false) &&
-           (((rightA - leftA > 34) && (error <= 2.0)) ||
-            (rightA - leftA > 69))) {
+      //  We've seen a few cases where the resulting overlap is VERY
+      //  small, and near the start of one fragment.  For reasons that
+      //  may or may not be OK, the clear then becomes negative.  We don't use
+      //  overlaps less than 35 bases long anyway, so just stop thinking now
+      //  if we do get a short overlap.
+      //
+      //  Another case where it would have been useful to not be unsigned.
+      //
+      uint32 diffA = rightA - leftA;
+      if (rightA < leftA)  diffA = leftA - rightA;
 
+      uint32 diffB = rightB - leftB;
+      if (rightB < leftB)  diffB = leftB - rightB;
+
+
+      //  Another simple test -- if the A or B overlap range has
+      //  'flipped' then we don't have any overlap left over after
+      //  applying the new clear range.  What happens: fragment A says
+      //  take X bases off of the right end, and fragment B says take
+      //  Y bases off the left end.  If that's bigger than our
+      //  original overlap, then we have nothing left.  This is
+      //  indicated by the A overlap 'flipping' so that the left is
+      //  bigger than the right.
+      //
+      //  BUT, if it flips AND is near the start of the overlap, we
+      //  can see negative coordinates.  As unsigned, these come out
+      //  huge.  So, we also check that both ranges are above 34 bp
+      //  long.
+      //
+      //  And, so, we have rather complicated set of conditions to
+      //  skip this overlap if it's crap.
+      //
+      //  The comments:
+      //    1 - Both ranges are not small.  If we have a negative, one
+      //        range will be REAL big, the other will be small.
+      //    2 - Not flipped.  If we had signed values, this would be
+      //        all we need.  But we're unsigned, so we also need #1.
+      //    3 - Small overlap, but great quality.
+      //    4 - Normal, large overlap.
+      // 
+      if ( (diffA > 34) && (diffB > 34) &&                //  1
+           (leftA < rightA) &&                            //  2
+           (((rightA - leftA > 34) && (error <= 2.0)) ||  //  3
+            (rightA - leftA > 69))) {                     //  4
+
+        //  Just a simple sanity check.
+        //
+        if ((leftA > 2048) || (rightA > 2048) || (leftB > 2048) || (rightB > 2048)) {
+          overflow++;
+          fprintf(stderr, "\n");
+          fprintf(stderr, "Overflow!  YIKES!\n");
+          fprintf(stderr, "A:\torig:\t"F_U32"\t"F_U32"\tovlp:"F_U32"\t"F_U32"\n", cla, cra, ola, ora);
+          fprintf(stderr, "B:\torig:\t"F_U32"\t"F_U32"\tovlp:"F_U32"\t"F_U32"\n", clb, crb, olb, orb);
+          fprintf(stderr, F_U32"\t"F_U32"\t%c\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t%5.3f\n",
+                  idA, idB, ori, leftA, rightA, lenA, leftB, rightB, lenB, error);
+        }
+
+        //  Do something with the overlap
+        //
         uint32  lhangA=0, rhangA=0, lhangB=0, rhangB=0;
 
         //  Are we in the middle, or on an end?
@@ -1031,7 +1042,7 @@ main(int argc, char **argv) {
   }
 
   if (overflow)
-    fprintf(stderr, "WARNING!  "F_U32" overflows!\n", overflow);
+    fprintf(stderr, "ERROR!  "F_U32" overflows!\n", overflow), exit(1);
 
   exit(0);
 }

@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char CM_ID[] = "$Id: Output_CGW.c,v 1.29 2007-11-08 12:38:11 brianwalenz Exp $";
+static char CM_ID[] = "$Id: Output_CGW.c,v 1.27 2007-09-19 21:54:24 skoren Exp $";
 
 #include <assert.h>
 #include <math.h>
@@ -58,36 +58,26 @@ void OutputMateDists(ScaffoldGraphT *graph){
     //  and the input (except we had already munged the input stddev)
     //  if there were 30 or fewer samples.
 
-    imd.refines     = i;
-    imd.mean        = dptr->mu;
     imd.stddev      = dptr->sigma;
+    imd.mean        = dptr->mu;
+    imd.num_buckets = 0;
     imd.min         = CDS_COORD_MIN;
     imd.max         = CDS_COORD_MAX;      
-    imd.num_buckets = 0;
-    imd.histogram   = NULL;
 
     if (dptr->numSamples > 0) {
+      imd.num_buckets = dptr->bnum;
       imd.min         = dptr->min;
       imd.max         = dptr->max;
-      imd.num_buckets = dptr->bnum;
-      imd.histogram   = dptr->histogram;
-
-      //  If this assert ever triggers, BPW would love to have an
-      //  example.  You can get around it by ignoring this if block --
-      //  in particular, set imd.num_buckets to 0 and imd.histogram to
-      //  NULL.  See also the comment about UNITIG_OPERATIONS in
-      //  Graph_CGW.c.
-      //
-      assert(imd.histogram != NULL);
     }
+
+    imd.refines   = i;
+    imd.histogram = dptr->histogram;
 
     if (GlobalData->cgwfp)
       WriteProtoMesg_AS(GlobalData->cgwfp,&pmesg);
 
     safe_free(dptr->histogram);
-    dptr->histogram  = NULL;
-    dptr->numSamples = 0;
-    dptr->bnum       = 0;
+    dptr->histogram = NULL;
   }
 }
 
@@ -239,7 +229,7 @@ void OutputContigsFromMultiAligns(void){
   InitGraphNodeIterator(&nodes, graph, GRAPH_NODE_DEFAULT);
   /* 1st get min and max values */
   while((ctg = NextGraphNodeIterator(&nodes)) != NULL){
-    AS_IID    i;
+    CDS_IID_t i;
     
     if(ctg->flags.bits.isChaff){
       //      fprintf(GlobalData->stderrc,"* # Contig " F_CID " is CHAFF\n", ctg->id);
@@ -248,8 +238,8 @@ void OutputContigsFromMultiAligns(void){
     
     {
       CIScaffoldT *scaffold = GetGraphNode(ScaffoldGraph->ScaffoldGraph, ctg->scaffoldID);
-      AS_IID    numFrag;
-      AS_IID    numUnitig;
+      CDS_IID_t numFrag;
+      CDS_IID_t numUnitig;
       IntMultiPos *mp;
       IntUnitigPos *up;
 
@@ -694,7 +684,7 @@ void OutputUnitigsFromMultiAligns(void){
 
     {
       MultiAlignT *ma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, ci->id, TRUE);
-      AS_IID    numFrag = GetNumIntMultiPoss(ma->f_list);
+      CDS_IID_t numFrag = GetNumIntMultiPoss(ma->f_list);
       assert (ci->type != CONTIG_CGW);
 
       ci->outputID = cid++;
@@ -909,7 +899,7 @@ void OutputUnitigLinksFromMultiAligns(void){
 
 void OutputScaffolds(ScaffoldGraphT *graph)
 {
-  AS_IID			sid, pairCount;
+  CDS_IID_t			sid, pairCount;
   IntScaffoldMesg		ism;
   int				buffSize=2048;
   GenericMesg			pmesg;
@@ -918,7 +908,7 @@ void OutputScaffolds(ScaffoldGraphT *graph)
   CIScaffoldTIterator		Contigs;
   ChunkInstanceT		*curr, *last;
   GraphNodeIterator             scaffolds;
-  AS_IID    cnt = 0;
+  CDS_IID_t cnt = 0;
 
   pmesg.m = &ism;
   pmesg.t = MESG_ISF;

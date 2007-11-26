@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-/* $Id: AS_GKP_include.h,v 1.35 2007-11-08 12:38:12 brianwalenz Exp $ */
+/* $Id: AS_GKP_include.h,v 1.33 2007-10-16 03:34:18 brianwalenz Exp $ */
 
 #ifndef AS_GKP_INCLUDE_H
 #define AS_GKP_INCLUDE_H
@@ -29,6 +29,7 @@
 #include "AS_PER_gkpStore.h"
 #include "AS_UTL_Var.h"
 #include "AS_MSG_pmesg.h"
+#include "AS_UTL_SequenceBucket.h"
 
 #define GATEKEEPER_MAX_ERROR_RATE        0.025 
 #define GATEKEEPER_QV_WINDOW_WIDTH      50
@@ -68,22 +69,22 @@ dumpGateKeeperInfo(char       *gkpStoreName);
 
 void
 dumpGateKeeperBatches(char       *gkpStoreName,
-                      AS_IID      begIID,
-                      AS_IID      endIID,
+                      CDS_IID_t   begIID,
+                      CDS_IID_t   endIID,
                       char       *iidToDump, 
                       int         asTable);
 
 void
 dumpGateKeeperLibraries(char       *gkpStoreName,
-                        AS_IID      begIID,
-                        AS_IID      endIID,
+                        CDS_IID_t   begIID,
+                        CDS_IID_t   endIID,
                         char       *iidToDump, 
                         int         asTable);
 
 void
 dumpGateKeeperFragments(char       *gkpStoreName,
-                        AS_IID      begIID,
-                        AS_IID      endIID,
+                        CDS_IID_t   begIID,
+                        CDS_IID_t   endIID,
                         char       *iidToDump, 
                         int         dumpWithSequence,
                         int         dumpClear,
@@ -91,8 +92,8 @@ dumpGateKeeperFragments(char       *gkpStoreName,
 
 void
 dumpGateKeeperAsFasta(char       *gkpStoreName,
-                      AS_IID      begIID,
-                      AS_IID      endIID,
+                      CDS_IID_t   begIID,
+                      CDS_IID_t   endIID,
                       char       *iidToDump, 
                       int         dumpFastaAllReads,
                       int         dumpFastaClear,
@@ -101,8 +102,8 @@ dumpGateKeeperAsFasta(char       *gkpStoreName,
 void
 dumpGateKeeperAsFRG(char       *gkpStoreName,
                     int         dumpFormat,
-                    AS_IID      begIID,
-                    AS_IID      endIID,
+                    CDS_IID_t   begIID,
+                    CDS_IID_t   endIID,
                     char       *iidToDump,
                     int         doNotFixMates,
                     int         dumpFRGClear);
@@ -170,7 +171,6 @@ AS_GKP_summarizeErrors(void);
 #define AS_GKP_LKG_SELF_LINK            29
 #define AS_GKP_LKG_UNSUPPORTED_TYPE     30
 #define AS_GKP_LKG_FRG_DOESNT_EXIST     31
-#define AS_GKP_LKG_FRG_DELETED          32
 #define AS_GKP_LKG_ALREADY_MATED        33
 #define AS_GKP_LKG_LIB_DOESNT_EXIST     36
 #define AS_GKP_LKG_DIFFERENT_LIB        37

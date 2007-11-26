@@ -48,14 +48,11 @@ sub bogUnitigger {
         $l ||= 0;
         $cmd .= " -s $l ";
 
-        $l = getGlobal("bogPromiscuous");
+        my $l = getGlobal("bogPromiscuous");
         $cmd .= " -b " if !$l;
 
-        $l = getGlobal("bogEjectUnhappyContain");
+        my $l = getGlobal("bogEjectUnhappyContain");
         $cmd .= " -k " if $l;
-
-        $l = getGlobal("bogBadMateDepth");
-        $cmd .= " -m $l " if $l;
 
         $cmd .= " > unitigger.out ";
         $cmd .= " 2> unitigger.err ";

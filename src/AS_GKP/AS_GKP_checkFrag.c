@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char const *rcsid = "$Id: AS_GKP_checkFrag.c,v 1.34 2007-11-08 12:38:12 brianwalenz Exp $";
+static char const *rcsid = "$Id: AS_GKP_checkFrag.c,v 1.33 2007-10-05 07:42:06 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,7 +56,7 @@ checkSequenceAndQuality(FragMesg *frg_mesg) {
     if ((isspacearray[s[p]]) || (isvalidACGTN[s[p]])) {
     } else {
       AS_GKP_reportError(AS_GKP_FRG_INVALID_CHAR_SEQ,
-                         AS_UID_toString(frg_mesg->eaccession), s[p], p);
+                         frg_mesg->eaccession, s[p], p);
       failed = 1;
     }
   }
@@ -65,7 +65,7 @@ checkSequenceAndQuality(FragMesg *frg_mesg) {
     if ((isspacearray[q[p]]) || ((q[p] >= '0') && (q[p] <= 'l'))) {
     } else {
       AS_GKP_reportError(AS_GKP_FRG_INVALID_CHAR_QLT,
-                         AS_UID_toString(frg_mesg->eaccession), q[p], p);
+                         frg_mesg->eaccession, q[p], p);
       failed = 1;
     }
   }
@@ -96,7 +96,7 @@ checkSequenceAndQuality(FragMesg *frg_mesg) {
   //
   if (sl != ql) {
     AS_GKP_reportError(AS_GKP_FRG_INVALID_LENGTH,
-                       AS_UID_toString(frg_mesg->eaccession), sl, ql);
+                       frg_mesg->eaccession, sl, ql);
     sl = MIN(sl, ql);
     ql = sl;
     s[sl] = 0;
@@ -122,7 +122,7 @@ checkClearRanges(FragMesg *frg_mesg,
   //
   if (sl > AS_FRAG_MAX_LEN) {
     AS_GKP_reportError(AS_GKP_FRG_SEQ_TOO_LONG,
-                       AS_UID_toString(frg_mesg->eaccession), sl, AS_FRAG_MAX_LEN);
+                       frg_mesg->eaccession, sl, AS_FRAG_MAX_LEN);
     sl = AS_FRAG_MAX_LEN;
     frg_mesg->sequence[sl] = 0;
     frg_mesg->quality[sl]  = 0;
@@ -131,7 +131,7 @@ checkClearRanges(FragMesg *frg_mesg,
 
   if (sl < AS_FRAG_MIN_LEN) {
     AS_GKP_reportError(AS_GKP_FRG_SEQ_TOO_SHORT,
-                       AS_UID_toString(frg_mesg->eaccession), sl, AS_FRAG_MIN_LEN);
+                       frg_mesg->eaccession, sl, AS_FRAG_MIN_LEN);
     failed = 1;
   }
 
@@ -140,14 +140,14 @@ checkClearRanges(FragMesg *frg_mesg,
   //
   if (frg_mesg->clear_rng.bgn < 0) {
     AS_GKP_reportError(AS_GKP_FRG_CLR_BGN,
-                       AS_UID_toString(frg_mesg->eaccession), frg_mesg->clear_rng.bgn, frg_mesg->clear_rng.end, sl);
+                       frg_mesg->eaccession, frg_mesg->clear_rng.bgn, frg_mesg->clear_rng.end, sl);
     if (frg_mesg->action == AS_ADD)
       gkpStore->gkp.frgWarnings++;
     frg_mesg->clear_rng.bgn = 0;
   }
   if (sl < frg_mesg->clear_rng.end) {
     AS_GKP_reportError(AS_GKP_FRG_CLR_END,
-                       AS_UID_toString(frg_mesg->eaccession), frg_mesg->clear_rng.bgn, frg_mesg->clear_rng.end, sl);
+                       frg_mesg->eaccession, frg_mesg->clear_rng.bgn, frg_mesg->clear_rng.end, sl);
     if (frg_mesg->action == AS_ADD)
       gkpStore->gkp.frgWarnings++;
     frg_mesg->clear_rng.end = sl;
@@ -159,7 +159,7 @@ checkClearRanges(FragMesg *frg_mesg,
   if (assembler != AS_ASSEMBLER_OBT) {
     if ((frg_mesg->clear_rng.end - frg_mesg->clear_rng.bgn) < AS_FRAG_MIN_LEN) {
       AS_GKP_reportError(AS_GKP_FRG_CLR_TOO_SHORT,
-                         AS_UID_toString(frg_mesg->eaccession), frg_mesg->clear_rng.end - frg_mesg->clear_rng.bgn, AS_FRAG_MIN_LEN);
+                         frg_mesg->eaccession, frg_mesg->clear_rng.end - frg_mesg->clear_rng.bgn, AS_FRAG_MIN_LEN);
       failed = 1;
     }
   }
@@ -184,15 +184,14 @@ setLibrary(GateKeeperFragmentRecord *gkf, FragMesg *frg_mesg) {
   gkf->libraryIID  = 0;
   gkf->orientation = AS_READ_ORIENT_UNKNOWN;
 
-  if (AS_UID_isDefined(frg_mesg->library_uid) == FALSE)
+  if (frg_mesg->library_uid == 0)
     return(0);
 
   gkf->libraryIID = getGatekeeperUIDtoIID(gkpStore, frg_mesg->library_uid, NULL);
 
-  if (AS_IID_isDefined(gkf->libraryIID) == FALSE) {
+  if (gkf->libraryIID == 0) {
     AS_GKP_reportError(AS_GKP_FRG_UNKNOWN_LIB,
-                       AS_UID_toString1(frg_mesg->eaccession),
-                       AS_UID_toString2(frg_mesg->library_uid));
+                       frg_mesg->eaccession, frg_mesg->library_uid);
     return(1);
   }
 
@@ -288,15 +287,6 @@ Check_FragMesg(FragMesg            *frg_mesg,
     checkfraginitialized = 1;
   }
 
-#if 0
-  //  Process all the incoming UIDs.
-  //
-  AS_UID_setGatekeeper(gkpStore);  //  doesn't need to be done all the time
-  frg_mesg->eaccession  = AS_UID_process(frg_mesg->eaccession);
-  frg_mesg->library_uid = AS_UID_process(frg_mesg->library_uid);
-  frg_mesg->plate_uid   = AS_UID_process(frg_mesg->plate_uid);
-#endif
-
   if (frg_mesg->action == AS_ADD) {
     GateKeeperFragmentRecord gkf = {0};
     char                    *s = NULL;
@@ -306,14 +296,14 @@ Check_FragMesg(FragMesg            *frg_mesg,
     //  Make sure we haven't seen this frag record before... if so
     //  it is a fatal error
     //
-    if (AS_UID_isDefined(frg_mesg->eaccession) == FALSE) {
+    if (frg_mesg->eaccession == 0) {
       AS_GKP_reportError(AS_GKP_FRG_ZERO_UID);
       gkpStore->gkp.frgErrors++;
       return(1);
     }
     if (getGatekeeperUIDtoIID(gkpStore, frg_mesg->eaccession, NULL)) {
       AS_GKP_reportError(AS_GKP_FRG_EXISTS,
-                         AS_UID_toString(frg_mesg->eaccession));
+                         frg_mesg->eaccession);
       gkpStore->gkp.frgErrors++;
       return(1);
     }
@@ -333,7 +323,7 @@ Check_FragMesg(FragMesg            *frg_mesg,
     //
     if (failed) {
       AS_GKP_reportError(AS_GKP_FRG_LOADED_DELETED,
-                         AS_UID_toString(frg_mesg->eaccession));
+                         frg_mesg->eaccession);
       gkf.deleted = TRUE;
     }
 
@@ -346,21 +336,32 @@ Check_FragMesg(FragMesg            *frg_mesg,
     gkf.hpsLen = 0;
     gkf.srcLen = strlen(frg_mesg->source);
 
-    gkf.seqOffset = getLastElemStore(gkpStore->seq);
-    gkf.qltOffset = getLastElemStore(gkpStore->qlt);
-    gkf.hpsOffset = getLastElemStore(gkpStore->hps);
-    gkf.srcOffset = getLastElemStore(gkpStore->src);
+    {
+      StoreStat   stats;
+
+      statsStore(gkpStore->seq, &stats);
+      gkf.seqOffset = stats.lastElem;
+
+      statsStore(gkpStore->qlt, &stats);
+      gkf.qltOffset = stats.lastElem;
+
+      statsStore(gkpStore->hps, &stats);
+      gkf.hpsOffset = stats.lastElem;
+
+      statsStore(gkpStore->src, &stats);
+      gkf.srcOffset = stats.lastElem;
+    }
 
     setGatekeeperUIDtoIID(gkpStore, gkf.readUID, gkf.readIID, AS_IID_FRG);
     appendIndexStore(gkpStore->frg, &gkf);
 
-    appendStringStore(gkpStore->seq, frg_mesg->sequence, gkf.seqLen);
+    appendVLRecordStore(gkpStore->seq, frg_mesg->sequence, gkf.seqLen);
 
     encodeSequenceQuality(encodedsequence, frg_mesg->sequence, frg_mesg->quality);
-    appendStringStore(gkpStore->qlt, encodedsequence,    gkf.seqLen);
+    appendVLRecordStore(gkpStore->qlt, encodedsequence,    gkf.seqLen);
 
-    appendStringStore(gkpStore->hps, NULL,               0);
-    appendStringStore(gkpStore->src, frg_mesg->source,   gkf.srcLen);
+    appendVLRecordStore(gkpStore->hps, NULL,               0);
+    appendVLRecordStore(gkpStore->src, frg_mesg->source,   gkf.srcLen);
 
     if (failed)
       gkpStore->gkp.frgErrors++;
@@ -370,11 +371,11 @@ Check_FragMesg(FragMesg            *frg_mesg,
   } else if (frg_mesg->action == AS_DELETE) {
 
     GateKeeperFragmentRecord gkf;
-    AS_IID                   iid = getGatekeeperUIDtoIID(gkpStore, frg_mesg->eaccession, NULL);
+    CDS_IID_t                iid = getGatekeeperUIDtoIID(gkpStore, frg_mesg->eaccession, NULL);
 
     if (iid == 0) {
       AS_GKP_reportError(AS_GKP_FRG_DOESNT_EXIST,
-                         AS_UID_toString(frg_mesg->eaccession));
+                         frg_mesg->eaccession);
       return(1);
     }
 
@@ -382,9 +383,11 @@ Check_FragMesg(FragMesg            *frg_mesg,
 
     if (gkf.mateIID > 0) {
       AS_GKP_reportError(AS_GKP_FRG_HAS_MATE,
-                         AS_UID_toString(frg_mesg->eaccession));
+                         frg_mesg->eaccession);
       return(1);
     }      
+
+    delGatekeeperUIDtoIID(gkpStore, frg_mesg->eaccession);
 
     GateKeeperFragmentRecord dr;
     getIndexStore(gkpStore->frg, iid, &dr);
