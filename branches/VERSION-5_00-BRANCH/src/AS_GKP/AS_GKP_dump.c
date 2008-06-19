@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char const *rcsid = "$Id: AS_GKP_dump.c,v 1.35 2008-05-15 21:42:10 brianwalenz Exp $";
+static char const *rcsid = "$Id: AS_GKP_dump.c,v 1.35.2.1 2008-06-19 18:09:55 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -422,21 +422,14 @@ dumpGateKeeperAsFasta(char       *gkpStoreName,
         seq[clrEnd] = 0;
 
         if (dumpQuality >=2) {
-           fprintf(stdout, ">%s,"F_IID" mate=%s,"F_IID" lib=%s,"F_IID" clr=%s,%d,%d deleted=%d\n",
-               	AS_UID_toString1(getFragRecordUID(&fr)), getFragRecordIID(&fr),
+           AS_UTL_writeQVFastA(stdout, seq, clrEnd-clrBeg,
+		">%s,"F_IID" mate=%s,"F_IID" lib=%s,"F_IID" clr=%s,%d,%d deleted=%d\n",
+                AS_UID_toString1(getFragRecordUID(&fr)), getFragRecordIID(&fr),
                 AS_UID_toString2(mateuid), mateiid,
                 AS_UID_toString3(libuid), libiid,
                 AS_READ_CLEAR_NAMES[dumpClear], clrBeg, clrEnd,
                 getFragRecordIsDeleted(&fr));
 
-           int i = 0;
-           int chars = 0;
-           for (i = clrBeg; i < clrEnd; i++) {
-              fprintf(stdout, "%#2d ", (((int)seq[i])-'0'));
-              chars += 3;
-              if (chars % 60 == 0) { fprintf(stdout, "\n");}
-           }
-           fprintf(stdout, "\n");
         } else {
 	   AS_UTL_writeFastA(stdout, seq, clrEnd-clrBeg,
 		">%s,"F_IID" mate=%s,"F_IID" lib=%s,"F_IID" clr=%s,%d,%d deleted=%d\n",
@@ -792,7 +785,13 @@ dumpGateKeeperAsNewbler(char       *gkpStoreName,
     FragMesg  fmesg;
     LinkMesg  lmesg;
 
-    if (iidToDump[getFragRecordIID(&fr)]) {
+    //  Newbler is not happy at all with clear ranges < 1 base.  We do
+    //  not dump those.
+
+    int  lclr = getFragRecordClearRegionBegin(&fr, dumpFRGClear) + 1;
+    int  rclr = getFragRecordClearRegionEnd  (&fr, dumpFRGClear);
+
+    if ((iidToDump[getFragRecordIID(&fr)]) && (lclr < rclr)) {
       char    defline[1024];
 
       if (getFragRecordMateIID(&fr)) {
@@ -810,15 +809,15 @@ dumpGateKeeperAsNewbler(char       *gkpStoreName,
                 //  library
                 AS_UID_toString2(libUID[getFragRecordLibraryIID(&fr)]),
                 //  trim
-                getFragRecordClearRegionBegin(&fr, dumpFRGClear) + 1,
-                getFragRecordClearRegionEnd  (&fr, dumpFRGClear));
+                lclr,
+                rclr);
       } else {
         sprintf(defline, ">%s trim=%d-%d\n",
                 //  ID
                 AS_UID_toString1(getFragRecordUID(&fr)),
                 //  trim
-                getFragRecordClearRegionBegin(&fr, dumpFRGClear) + 1,
-                getFragRecordClearRegionEnd  (&fr, dumpFRGClear));
+                lclr,
+                rclr);
       }
 
       AS_UTL_writeFastA(f,
@@ -827,7 +826,7 @@ dumpGateKeeperAsNewbler(char       *gkpStoreName,
                         defline, NULL);
 
       AS_UTL_writeQVFastA(q,
-                          getFragRecordSequence(&fr),
+			  getFragRecordQuality(&fr),
                           getFragRecordClearRegionEnd  (&fr, AS_READ_CLEAR_UNTRIM),
                           defline, NULL);
     }
