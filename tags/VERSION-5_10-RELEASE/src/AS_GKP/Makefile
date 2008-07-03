@@ -1,0 +1,50 @@
+#
+###########################################################################
+#
+# This file is part of Celera Assembler, a software program that
+# assembles whole-genome shotgun reads into contigs and scaffolds.
+# Copyright (C) 1999-2004, Applera Corporation. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received (LICENSE.txt) a copy of the GNU General Public
+# License along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+###########################################################################
+#
+
+LOCAL_WORK = $(shell cd ../..; pwd)
+
+GKPSRC    = AS_GKP_buildPartition.c \
+            AS_GKP_checkBatch.c \
+            AS_GKP_checkLibrary.c \
+            AS_GKP_checkFrag.c \
+            AS_GKP_checkLink.c \
+            AS_GKP_dump.c \
+            AS_GKP_edit.c \
+            AS_GKP_errors.c \
+            AS_GKP_rebuildMap.c \
+            AS_GKP_rearrange.c \
+            AS_GKP_sff.c
+
+SOURCES   = AS_GKP_main.c AS_GKP_bench.c $(GKPSRC)
+OBJECTS   = $(SOURCES:.c=.o)
+LIBRARIES =
+PROGS     = gatekeeper gatekeeperbench
+
+include $(LOCAL_WORK)/src/c_make.as
+
+all:    $(OBJECTS) $(LIBRARIES) $(PROGS)
+	@test -n nop
+
+gatekeeper:      AS_GKP_main.o $(GKPSRC:.c=.o) libCA.a
+gatekeeperbench: AS_GKP_bench.o                libCA.a
