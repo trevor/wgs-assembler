@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: GetAlignmentTrace.c,v 1.1 2009-05-29 17:29:19 brianwalenz Exp $";
+static char *rcsid = "$Id: GetAlignmentTrace.c,v 1.1.2.1 2009-06-22 11:28:13 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -777,8 +777,9 @@ GetAlignmentTrace(int32 afid, int32 aoffset,
     Print_Overlap(stderr, NULL, NULL, O);  //  Replace with a,b to print the bases in the align
   }
 
-    *otype = (O->endpos<0)?AS_CONTAINMENT:AS_DOVETAIL;
-    *ahang = O->begpos; // approximate ahang is replaced with found ahang
+  *otype = (O->endpos<0)?AS_CONTAINMENT:AS_DOVETAIL;
+  *ahang = O->begpos;
+  *bhang = O->endpos;
 
   {
     int *tmp = O->trace;
