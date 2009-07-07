@@ -33,15 +33,15 @@
 *************************************************/
 
 /* RCS info
- * $Id: OlapFromSeedsOVL.h,v 1.19 2009-01-16 16:46:36 skoren Exp $
- * $Revision: 1.19 $
+ * $Id: OlapFromSeedsOVL.h,v 1.19.2.1 2009-07-07 23:54:31 adelcher Exp $
+ * $Revision: 1.19.2.1 $
 */
 
 
 #ifndef  __OLAPFROMSEEDS_H_INCLUDED
 #define  __OLAPFROMSEEDS_H_INCLUDED
 
-static const char *rcsid_OLAPFROMSEEDS_H_INCLUDED = "$Id: OlapFromSeedsOVL.h,v 1.19 2009-01-16 16:46:36 skoren Exp $";
+static const char *rcsid_OLAPFROMSEEDS_H_INCLUDED = "$Id: OlapFromSeedsOVL.h,v 1.19.2.1 2009-07-07 23:54:31 adelcher Exp $";
 
 //**ALD determine if use new code to analyze true multialignments
 #define  USE_NEW_STUFF  1
@@ -247,6 +247,8 @@ typedef  struct
    int  rev_id;
    int  ** edit_array;
    Homopoly_Match_Entry_t  ** homopoly_edit_array;
+   HP_LV_Cell_t  ** hp_cell;
+   unsigned  * can_look;
    int  * edit_space;
 #if USE_NEW_STUFF
    Diff_Entry_t  diff_list [AS_READ_MAX_LEN+1];  //  only MAX_ERRORS needed
@@ -320,6 +322,8 @@ static FragStream  *Frag_Stream;
   // Stream to extract fragments from internal store
 static char  * gkpStore_Path;
   // Name of directory containing fragment store from which to get fragments
+static unsigned  X_Arg = 0;
+  // Set to argument of special X option
 static int32  Hi_Frag_IID;
   // Internal ID of last fragment in frag store to process
 static GateKeeperStore  * Internal_gkpStore;
