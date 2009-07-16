@@ -253,6 +253,9 @@ sub readXML () {
     $template =~ s/\s+/_/g;
     $lib      =~ s/\s+/_/g;
 
+    $xid      =~ s/,//g;
+    $lib      =~ s/,//g;
+
     return($xid, $type, $template, $end, $lib, $libsize, $libstddev, $clr, $clv, $clq);
 }
 
@@ -270,6 +273,7 @@ sub readFasta ($) {
 
             if      (m/ti\|(\S+)\s/) {
                 $fhdr = $1;
+                $fhdr =~ s/,//g;
             } else {
                 die "Failed to parse an ID out of the sequence defline '$_'\n";
             }
@@ -309,6 +313,7 @@ sub readQual ($) {
 
             if      (m/ti\|(\S+)\s/) {
                 $qhdr = $1;
+                $qhdr =~ s/,//g;
             } else {
                 die "Failed to parse an ID out of the quality defline '$_'\n";
             }
