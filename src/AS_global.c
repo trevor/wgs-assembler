@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: AS_global.c,v 1.16 2009-05-01 20:22:45 brianwalenz Exp $";
+static const char *rcsid = "$Id: AS_global.c,v 1.16.2.1 2009-07-16 02:21:48 brianwalenz Exp $";
 
 #include "AS_global.h"
 
@@ -48,7 +48,7 @@ double AS_MAX_ERROR_RATE =   0.25;
 
 extern
 const char *mainid;
-const char *releaseid = "CVS TIP";
+const char *releaseid = "5.4";
 
 //  We take argc and argv, so, maybe, eventually, we'll want to parse
 //  something out of there.  We return argc in case what we parse we
