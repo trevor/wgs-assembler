@@ -9,17 +9,11 @@ sub CGW ($$$$$$) {
     my $stoneLevel  = shift @_;
     my $logickp     = shift @_;
     my $finalRun    = shift @_;
-    my $lastckp     = undef;
-    my $ckp         = undef;
 
     return($thisDir) if (-e "$wrk/$thisDir/cgw.success");
 
-    if (defined($lastDir)) {
-        $lastckp = findLastCheckpoint($lastDir);
-    }
-    if (defined($lastckp) && defined($logickp)) {
-        $ckp     = "-R $lastckp -N $logickp"  
-    }
+    my $lastckp = findLastCheckpoint($lastDir)  if (defined($lastDir));
+    my $ckp     = "-R $lastckp -N $logickp"  if (defined($lastckp) && defined($logickp));
 
     #  If there is a timing file here, assume we are restarting.  Not
     #  all restarts are possible, but we try hard to make it so.

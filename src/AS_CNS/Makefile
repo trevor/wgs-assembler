@@ -86,6 +86,7 @@ LOCAL_WORK  = $(shell cd ../..; pwd)
 
 AS_CNS_SRCS = $(LIB_SOURCES) \
               Consensus_CNS.C \
+              AS_CNS_asmReBaseCall.C \
               SeqAn_CNS.C
 
 AS_CNS_OBJS = $(AS_CNS_SRCS:.C=.o)
@@ -95,6 +96,7 @@ OBJECTS   = $(AS_CNS_OBJS)
 LIBRARIES = libAS_CNS.a libCA.a
 
 CXX_PROGS = consensus \
+            asmReBaseCall \
             SeqAn_CNS
 
 SCRIPTS =
@@ -115,6 +117,7 @@ libCA.a:     $(LIB_OBJECTS)
 LIBS =  libCA.a
 
 consensus:                    Consensus_CNS.o                $(LIBS)
+asmReBaseCall:                AS_CNS_asmReBaseCall.o         $(LIBS)
 SeqAn_CNS:                    SeqAn_CNS.o                    $(LIBS)
 graph_consensus: 	      $(SEQ_AN)/demos/graph_consensus
 	@cp $< $(LOCAL_BIN)/$@

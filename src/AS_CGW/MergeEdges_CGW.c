@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: MergeEdges_CGW.c,v 1.22 2009-09-09 08:21:56 brianwalenz Exp $";
+static char *rcsid = "$Id: MergeEdges_CGW.c,v 1.20 2009-07-30 10:42:56 brianwalenz Exp $";
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -165,103 +165,90 @@ static int ConfirmOverlap(GraphCGW_T *graph,
   return(goodOverlapA && goodOverlapB);
 }
 
-
-//  From numerical recipes in C
-//  Produces p-values for Chi-square distributions
+/*
+From numerical recipes in C
+Produces p-values for Chi-square distributions
+*/
 
 #define ITMAX 1000
-#define EPS   3.0e-7
+#define EPS 3.0e-7
 #define FPMIN 1.0e-30
 
-static
-float
-gser(float a, float x) {
-  float gln = lgammaf(a);
-  float ap  = a;
-  float del = 1.0 / a;
-  float sum = del;
-  int32 n   = 1;
+float gser(float a, float x)
+{
+  float sum,del,ap,gln;
+  int n;
 
-  for (n=1; n<=ITMAX; n++) {
-    ++ap;
-    del *= x/ap;
-    sum += del;
-    if (fabs(del) < fabs(sum)*EPS)
-      break;
+  gln = lgammaf(a);
+  if (x <= 0.0) {
+    if (x < 0.0)
+      assert(0);
+    return 0.0;
+  }else{
+    ap = a;
+    del = sum = 1.0/a;
+    for (n=1;n<=ITMAX;n++) {
+      ++ap;
+      del *= x/ap;
+      sum += del;
+      if (fabs(del) < fabs(sum)*EPS) {
+	return sum*exp(-x+a*log(x)-gln);
+      }
+    }
+    assert(0);
   }
-
-  //fprintf(stderr, "gser(%f, %f)-- OK   sum*exp(-x+a*log(x)-gln) = %f * exp(%f + %f * %f - %f) = %f\n",
-  //        a, x, sum, -x, a, log(x), gln, sum * exp( -x + a * log(x) - gln));
-  if (n <= ITMAX)
-    return sum * exp(-x + a * log(x) - gln);
-
-  fprintf(stderr, "gser(%f, %f)-- WARN sum*exp(-x+a*log(x)-gln) = %f * exp(%f + %f * %f - %f) = %f\n",
-          a, x, sum, -x, a, log(x), gln, sum * exp( -x + a * log(x) - gln));
-  return(1.0);
-  assert(0);
 }
 
-static
-float
-gcf(float a, float x) {
-  float gln = lgammaf(a);
-  float b   = x + 1.0 - a;
-  float c   = 1.0 / FPMIN;
-  float d   = 1.0 / b;
-  float h   = d;
-  float an  = 0;
-  float del = 0;
-  int32 i   = 1;
+float gcf(float a, float x)
+{
+  int i;
+  float an,b,c,d,del,h,gln;
 
-  for (i=1; i<=ITMAX; i++) {
-    an = -i * (i-a);
+  gln = lgammaf(a);
+  b = x+1.0-a;
+  c = 1.0/FPMIN;
+  d = 1.0/b;
+  h = d;
+  for (i=1;i<=ITMAX;i++) {
+    an = -i*(i-a);
     b += 2.0;
-    d = an * d + b;
+    d = an*d+b;
     if (fabs(d) < FPMIN) d=FPMIN;
-    c = b + an / c;
+    c = b + an/c;
     if (fabs(c) < FPMIN) c=FPMIN;
-    d = 1.0 / d;
-    del = d * c;
+    d = 1.0/d;
+    del = d*c;
     h *= del;
-    if (fabs(del - 1.0) < EPS)
-      break;
+    if (fabs(del-1.0) < EPS) break;
   }
-
-  //fprintf(stderr, "gcf(%f, %f)-- OK   exp(-x+a*log(x)-gln)*h = %f * exp(%f + %f * %f - %f) = %f\n",
-  //        a, x, -x, a, log(x), h, gln, exp( -x + a * log(x) - gln) * h);
-  if (i <= ITMAX)
-    return exp(-x + a * log(x) - gln) * h;
-
-  fprintf(stderr, "gcf(%f, %f)-- WARN exp(-x+a*log(x)-gln)*h = %f * exp(%f + %f * %f - %f) = %f\n",
-          a, x, -x, a, log(x), h, gln, exp( -x + a * log(x) - gln) * h);
-  return(0.0);
-  assert(0);
+  if (i > ITMAX) assert(0);
+  return exp(-x+a*log(x)-gln)*h;
 }
 
-static
-float
-gammq(float a, float x) {
+float gammq(float a, float x)
+{
+ float gamser,gammcf;
 
- assert(x >= 0.0);
- assert(a >  0.0);
-
- if (x == 0.0)
-   return(0.0);
-
- if (x < (a+1.0))
-   return(1.0 - gser(a,x));
- else
-   return(gcf(a,x));
+ if (x < 0.0 || a <= 0.0) {
+   fprintf(stderr,"gammq assert: a %f x %f\n",a,x);
+   assert(0);
+ }
+ if (x < (a+1.0)) {
+   return 1.0 - gser(a,x);
+ }else{
+   return gcf(a,x);
+ }
 }
 
 
-//  Computes a chi squared test on the distribution of the edge distances around the computed mean.
-//  If skip is >= 0 and < numEdges then the edge corresponding to that index is ignored. Because we
-//  are computing the mean from the edges the number of degrees of freedom is (numEdges - 1) unless
-//  we are skipping an edge then it is (numEdges - 2).
-//
-//  Returns 1 if test SUCCEEDS
-//
+/* ComputeChiSquared:
+ *   Computes a chi squared test on the distribution of the edge distances around the computed mean.
+ *   If skip is >= 0 and < numEdges then the edge corresponding to that index is ignored. Because we
+ *   are computing the mean from the edges the number of degrees of freedom is (numEdges - 1) unless
+ *   we are skipping an edge then it is (numEdges - 2).
+ */
+
+/* Returns 1 if test SUCCEEDS */
 static int ComputeChiSquared(Chi2ComputeT *edges, int numEdges,
                              CDS_CID_t skip,
 			     LengthT *distance, float *score){
@@ -378,7 +365,7 @@ static void InitializeMergedEdge(CIEdgeT *newEdge, CIEdgeT *overlapEdgeAll,
   if((overlapEdge != NULL) && (numEdges == 2) &&
      !ConfirmOverlap(graph, overlapEdge, nonOverlapEdge)){
     if(GlobalData->verbose){
-      fprintf(stderr,"* Marked chimeric edgemate \n");
+      fprintf(GlobalData->stderrc,"* Marked chimeric edgemate \n");
     }
     newEdge->flags.bits.isPossibleChimera = TRUE;
   }
@@ -489,7 +476,7 @@ int MergeGraphEdges(GraphCGW_T *graph,  VA_TYPE(CDS_CID_t) *inputEdges){
   Chi2ComputeT *edgeChi2Compute = (Chi2ComputeT *)safe_malloc(numEdges * sizeof(*edgeChi2Compute));
 
   if(GlobalData->verbose){
-    fprintf(stderr,"* MergeEdges with %d edges\n",
+    fprintf(GlobalData->stderrc,"* MergeEdges with %d edges\n",
 	    numEdges);
   }
 
@@ -870,21 +857,21 @@ int MergeGraphEdges(GraphCGW_T *graph,  VA_TYPE(CDS_CID_t) *inputEdges){
     edge = GetGraphEdge(graph, *GetCDS_CID_t(inputEdges, 0));
     if (GlobalData->verbose)
       {
-        fprintf(stderr,"**** Couldn't merge these \n");
-        fprintf(stderr,"**** MORE THAN ONE (%d)  EDGE BETWEEN "F_CID " and "F_CID "\n",
+        fprintf(GlobalData->stderrc,"**** Couldn't merge these \n");
+        fprintf(GlobalData->stderrc,"**** MORE THAN ONE (%d)  EDGE BETWEEN "F_CID " and "F_CID "\n",
                 numClusters, edge->idA, edge->idB);
         switch(graph->type){
           case CI_GRAPH:
-            DumpChunkInstance(stderr,ScaffoldGraph,GetGraphNode(graph, edge->idA), FALSE, FALSE, FALSE, FALSE);
-            DumpChunkInstance(stderr,ScaffoldGraph,GetGraphNode(graph, edge->idB), FALSE, FALSE, FALSE, FALSE);
+            DumpChunkInstance(GlobalData->stderrc,ScaffoldGraph,GetGraphNode(graph, edge->idA), FALSE, FALSE, FALSE, FALSE);
+            DumpChunkInstance(GlobalData->stderrc,ScaffoldGraph,GetGraphNode(graph, edge->idB), FALSE, FALSE, FALSE, FALSE);
             break;
           case CONTIG_GRAPH:
-            DumpContig(stderr,ScaffoldGraph,GetGraphNode(graph, edge->idA), FALSE);
-            DumpContig(stderr,ScaffoldGraph,GetGraphNode(graph, edge->idB), FALSE);
+            DumpContig(GlobalData->stderrc,ScaffoldGraph,GetGraphNode(graph, edge->idA), FALSE);
+            DumpContig(GlobalData->stderrc,ScaffoldGraph,GetGraphNode(graph, edge->idB), FALSE);
             break;
           case SCAFFOLD_GRAPH:
-            DumpCIScaffold(stderr,ScaffoldGraph,GetGraphNode(graph, edge->idA), FALSE);
-            DumpCIScaffold(stderr,ScaffoldGraph,GetGraphNode(graph, edge->idB), FALSE);
+            DumpCIScaffold(GlobalData->stderrc,ScaffoldGraph,GetGraphNode(graph, edge->idA), FALSE);
+            DumpCIScaffold(GlobalData->stderrc,ScaffoldGraph,GetGraphNode(graph, edge->idB), FALSE);
             break;
           default:
             break;
@@ -892,7 +879,7 @@ int MergeGraphEdges(GraphCGW_T *graph,  VA_TYPE(CDS_CID_t) *inputEdges){
 
         for(edgeIndex = 0; edgeIndex < GetNumCDS_CID_ts(inputEdges); edgeIndex++){
           edge = GetGraphEdge(graph, *GetCDS_CID_t(inputEdges, edgeIndex));
-          PrintGraphEdge(stderr, graph," *  ", edge, edge->idA);
+          PrintGraphEdge(GlobalData->stderrc, graph," *  ", edge, edge->idA);
         }
       }
 
@@ -911,8 +898,8 @@ int MergeGraphEdges(GraphCGW_T *graph,  VA_TYPE(CDS_CID_t) *inputEdges){
   edge = GetGraphEdge(graph, *GetCDS_CID_t(inputEdges, 0));
   if (GlobalData->verbose)
     {
-      fprintf(stderr,"**** Couldn't merge these \n");
-      fprintf(stderr,"**** MORE THAN ONE (%d)  EDGE BETWEEN "F_CID " and "F_CID "\n",
+      fprintf(GlobalData->stderrc,"**** Couldn't merge these \n");
+      fprintf(GlobalData->stderrc,"**** MORE THAN ONE (%d)  EDGE BETWEEN "F_CID " and "F_CID "\n",
               numEdges, edge->idA, edge->idB);
     }
   numEdgesAdded = numEdges;
@@ -922,7 +909,7 @@ int MergeGraphEdges(GraphCGW_T *graph,  VA_TYPE(CDS_CID_t) *inputEdges){
       for(edgeIndex = 0; edgeIndex < numEdges; edgeIndex++)
 	{
 	  edge = GetGraphEdge(graph, *GetCDS_CID_t(inputEdges, edgeIndex));
-	  PrintGraphEdge(stderr, graph," *  ", edge, edge->idA);
+	  PrintGraphEdge(GlobalData->stderrc, graph," *  ", edge, edge->idA);
 	}
     }
 
