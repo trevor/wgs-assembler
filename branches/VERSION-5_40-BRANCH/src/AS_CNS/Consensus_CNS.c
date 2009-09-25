@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: Consensus_CNS.c,v 1.77 2009-05-21 03:50:03 brianwalenz Exp $";
+const char *mainid = "$Id: Consensus_CNS.c,v 1.77.2.1 2009-09-25 15:01:53 skoren Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -98,7 +98,8 @@ main (int argc, char **argv) {
   int    saveUnitigMultiAlign = 0;
 
   CNS_Options options = { CNS_OPTIONS_SPLIT_ALLELES_DEFAULT,
-                          CNS_OPTIONS_MIN_ANCHOR_DEFAULT };
+                          CNS_OPTIONS_MIN_ANCHOR_DEFAULT,
+			  CNS_OPTIONS_DO_PHASING_DEFAULT };
 
   int num_unitig_failures = 0;
   int num_contig_failures = 0;
@@ -158,6 +159,15 @@ main (int argc, char **argv) {
           err++;
           break;
       }
+
+    } else if (strcmp(argv[arg], "-P") == 0) {
+       int what = atoi(argv[++arg]);
+       if (what != 0 && what != 1) {
+          fprintf(stderr, "Unknown phasing option %d\n", what);
+          err++;
+          break;
+       }
+       options.do_phasing = what;
 
     } else if (strcmp(argv[arg], "-o") == 0) {
       outName = argv[++arg];
@@ -241,6 +251,9 @@ main (int argc, char **argv) {
     fprintf(stderr, "    -w win_size  specify the size of the 'smoothing window' that will be used in consensus calling\n");
     fprintf(stderr, "                 If two SNPs are located win_size or less bases apart one from another,\n");
     fprintf(stderr, "                 then they will be treated as one block\n");
+     fprintf(stderr, "    -P [0-1]     Specify if SNP phasing is on\n");
+     fprintf(stderr, "                 Phasing:  0 = Do not phase two SNPs to be consistent\n");
+     fprintf(stderr, "                           1 = If two SNPs are joined by reads, phase them to be consistent\n");
     fprintf(stderr, "    -S partition Use gkpStorePartition partition, loaded into memory\n");
     fprintf(stderr, "    -m           Load gkpStorePartition into memory (default reads from disk)\n");
     fprintf(stderr, "\n");
