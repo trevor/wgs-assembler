@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: RefreshMANode.c,v 1.1 2009-05-29 17:29:19 brianwalenz Exp $";
+static char *rcsid = "$Id: RefreshMANode.c,v 1.1.2.1 2009-09-25 15:01:54 skoren Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1079,11 +1079,12 @@ RefreshMANode(int32 mid, int quality, CNS_Options *opp, int32 *nvars,
           }
 #endif
           if (make_v_list == 2)
-            is_phased = PhaseWithPrevVreg(vreg.nca, vreg.alleles, vreg.reads,
-                                          &allele_map,
-                                          prev_nca, prev_nca_iid, prev_nca_iid_max,
-                                          prev_ncr, prev_ncr_iid, prev_ncr_iid_max);
-
+             is_phased = (opp->do_phasing == 1 ? 
+                            PhaseWithPrevVreg(vreg.nca, vreg.alleles, vreg.reads,
+                                              &allele_map,
+                                              prev_nca, prev_nca_iid, prev_nca_iid_max,
+                                              prev_ncr, prev_ncr_iid, prev_ncr_iid_max)
+                            : 0);
           if (is_phased)
             {
               SortAllelesByMapping(vreg.alleles, vreg.nca, vreg.reads, allele_map);
