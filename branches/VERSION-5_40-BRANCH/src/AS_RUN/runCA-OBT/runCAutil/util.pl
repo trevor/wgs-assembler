@@ -435,7 +435,7 @@ sub setDefaults () {
     $global{"cnsConcurrency"}              = 2;
     $synops{"cnsConcurrency"}              = "If not SGE, number of consensus jobs to run at the same time";
 
-     $global{"cnsPhasing"}                  = 1;
+     $global{"cnsPhasing"}                  = 0;
      $synops{"cnsPhasing"}                  = "Options for consensus phasing of SNPs\n\t0 - Do not phase SNPs to be consistent.\n\t1 - If two SNPs are joined by reads, phase them to be consistent.";
 
     $global{"consensus"}                   = "cns";
