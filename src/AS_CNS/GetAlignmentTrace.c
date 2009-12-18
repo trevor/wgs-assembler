@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: GetAlignmentTrace.c,v 1.8 2009-08-16 06:40:45 brianwalenz Exp $";
+static char *rcsid = "$Id: GetAlignmentTrace.c,v 1.8.2.1 2009-12-18 17:43:12 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -251,6 +251,7 @@ ScoreOverlap(Overlap *O,
     bScore /= 5;
   }
 
+
   //  By design, we don't expect to have negative ahangs, so penalize the score if so (and if this
   //  is unexpected).
   //
@@ -333,6 +334,23 @@ ScoreOverlap(Overlap *O,
       }
       break;
   }
+
+
+  //
+  //  HACK!  If we're merging, we pretty much need to succeed on anything.  Allow most anything that
+  //  is larger than expected.  Things smaller than expected are allowed above.
+  //
+#if 1
+  if ((alignment_context == GETALIGNTRACE_MERGE) &&
+      (O->length >= expected_length)) {
+    fprintf(stderr,"GetAlignmentTrace()-- Overlap ACCEPTED!  accept=%f lScore=%f (%d vs %d) aScore=%f (%d vs %d) bScore=%f (%d vs %d).  (MERGE, bigger overlap)\n",
+            acceptThreshold,
+            lScore, O->length, expected_length,
+            aScore, O->begpos, ahang_input,
+            bScore, O->endpos, bhang_input);
+    return(1);
+  }
+#endif
 
 
   //  BAD!

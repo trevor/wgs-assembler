@@ -240,5 +240,4 @@ SUBDIRS = AS_RUN \
           AS_CGW \
           AS_TER \
 	  AS_ENV \
-	  AS_ARD \
           AS_REF
