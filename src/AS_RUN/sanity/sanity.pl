@@ -3,7 +3,7 @@
 use strict;
 use Config;  #  for @signame
 
-#  The only four globals configurables:
+#  The only three globals configurables:
 #
 my $site    = undef;
 my $wrkdir  = undef;
@@ -175,9 +175,9 @@ sub checkoutAndLogKmer ($$) {
 sub checkoutAndLogCA ($$) {
     my $thisdate = shift @_;
     my $lastdate = shift @_;
-    my $tag      = undef;  #"-r VERSION-5_40-BRANCH";
+    my $tag      = "-r VERSION-5_40-BRANCH";
 
-    print STDERR "Checking out $wrkdir/$thisdate (CA) ", (defined($tag)) ? "TAG=$tag" : "", "\n";
+    print STDERR "Checking out $wrkdir/$thisdate (CA)\n";
 
     if (-d "$wrkdir/$thisdate/wgs/src") {
         print STDERR "$wrkdir/$thisdate/wgs/src already exists.  Please remove to rerun.\n";
@@ -322,15 +322,6 @@ sub buildCA ($) {
     if (-e "$wrkdir/$thisdate/wgs/src/make.err") {
         print STDERR "$wrkdir/$thisdate/wgs/src was already built once (successuflly or not).  Please cleanup first.\n";
     } else {
-        #  Temporary hack to handle the C to C++ renaming.
-        #  This was broken on "2009/06/10 17:34:22".
-        #  This was fixed  on "2009/08/06 11:36:54"
-        #
-        if ((-e "$wrkdir/$thisdate/wgs/src/rename-to-c++.sh") &&
-            (-s "$wrkdir/$thisdate/wgs/src/c_make.gen" == 14877)) {
-            system("cd $wrkdir/$thisdate/wgs/src && sh rename-to-c++.sh");
-        }
-
         system("cd $wrkdir/$thisdate/wgs/src && gmake > make.out.raw 2> make.err.raw");
 
         my %lines;
@@ -441,14 +432,13 @@ sub assemble ($$@) {
         print F "\n";
         print F ". \$SGE_ROOT/\$SGE_CELL/common/settings.sh\n";
         print F "\n";
-        print F "\n";
-        print F "#  Submit runCA to the grid.  Do not set any runCA parameters here; they\n";
-        print F "#  will override ALL specFile parameters.  scriptOnGrid must be set, otherwise\n";
-        print F "#  the assembly will be performed with this call, instead of just launched\n";
-        print F "#  to the grid.\n";
-        print F "\n";
         print F "perl $wrkdir/$thisdate/wgs/$syst-$arch/bin/runCA \\\n";
-        print F "  sgePropagateHold=$jn scriptOnGrid=1 \\\n";
+        print F "  sgePropagateHold=$jn useGrid=1 scriptOnGrid=1\\\n";
+        if      ($site eq "JCVI") {
+            print F "  sge=\"-A CAsanity -P 334007 -l arch=lx*64 -l medium -l memory=1G\"\\\n";
+        } elsif ($site eq "BPWI") {
+            print F "  sge=\"-A CAsanity                                   -l memory=1G\"\\\n";
+        }
         print F "  -p $n -d $wrkdir/$thisdate/$n -s $s\n";
         print F "\n";
         print F "#  Once that runCA finishes, we've updated the hold on $jn, and so can release\n";

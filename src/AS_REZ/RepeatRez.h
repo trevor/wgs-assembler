@@ -22,10 +22,12 @@
 #ifndef REPEAT_REZ_H
 #define REPEAT_REZ_H
 
-static const char *rcsid_REPEAT_REZ_H = "$Id: RepeatRez.h,v 1.7 2009-09-12 22:35:58 brianwalenz Exp $";
+static const char *rcsid_REPEAT_REZ_H = "$Id: RepeatRez.h,v 1.6 2008-10-08 22:03:00 brianwalenz Exp $";
+
+#include "Globals_CGW.h"
 
 int  Fill_Gaps
-    (char *, int, int redo_index);
+    (Global_CGW * data, char *, int, int redo_index);
 
 int  Show_Reads_In_Gaps
     (char * prefix);
@@ -37,7 +39,7 @@ int  Hurl_Contained_Rocks
 #define CONSERVATIVE_WALKING_STD_DEVS 3.0
 
 int  Walk_Gaps
-    (char *, int, int startWalkFrom, double gapSizeStdDevs);
+    (Global_CGW * data, char *, int, int startWalkFrom, double gapSizeStdDevs);
 
 int  Throw_Stones
     (char *, int, int);

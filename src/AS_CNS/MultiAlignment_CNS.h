@@ -21,15 +21,14 @@
 #ifndef MULTIALIGNMENT_CNS_INCLUDE
 #define MULTIALIGNMENT_CNS_INCLUDE
 
-static const char *rcsid_MULTIALIGNMENT_CNS_INCLUDE = "$Id: MultiAlignment_CNS.h,v 1.56 2009-10-05 22:49:42 brianwalenz Exp $";
+static const char *rcsid_MULTIALIGNMENT_CNS_INCLUDE = "$Id: MultiAlignment_CNS.h,v 1.52 2009-07-11 00:20:30 brianwalenz Exp $";
 
 #include "AS_global.h"
 #include "AS_UTL_Var.h"
 #include "AS_MSG_pmesg.h"
+#include "AS_SDB_SequenceDB.h"
+#include "MultiAlignStore_CNS.h"
 #include "AS_ALN_aligners.h"
-
-#include "MultiAlign.h"
-#include "MultiAlignStore.h"
 
 
 //  This is probably broken, or extremely inefficient, as of Nov 4 2007.
@@ -40,12 +39,10 @@ extern int VERBOSE_MULTIALIGN_OUTPUT;
 
 #define CNS_OPTIONS_SPLIT_ALLELES_DEFAULT  1
 #define CNS_OPTIONS_MIN_ANCHOR_DEFAULT    11
-#define CNS_OPTIONS_DO_PHASING_DEFAULT     1
 
 typedef struct {
   int split_alleles;
   int smooth_win;
-  int do_phasing;
 } CNS_Options;
 
 typedef enum {
@@ -67,25 +64,35 @@ typedef enum {
 }  CNS_RefineLevel;
 
 
-MultiAlignT *MergeMultiAlignsFast_new(VA_TYPE(IntElementPos) *,
+MultiAlignT *MergeMultiAlignsFast_new(tSequenceDB *,
+                                      gkStore *,
+                                      VA_TYPE(IntElementPos) *,
+                                      int,
+                                      int,
                                       CNS_Options *opp);
 
-MultiAlignT *ReplaceEndUnitigInContig(uint32,
+MultiAlignT *ReplaceEndUnitigInContig(tSequenceDB *,
+                                      gkStore * ,
+                                      uint32,
                                       uint32,
                                       int,
                                       CNS_Options *opp);
 
-int MultiAlignUnitig(MultiAlignT *,
+
+int MultiAlignUnitig(IntUnitigMesg *,
                      gkStore *,
+                     VA_TYPE(char) *,
+                     VA_TYPE(char) *,
+                     VA_TYPE(int32) *,
                      CNS_PrintKey,
                      CNS_Options *opp);
 
-
-int MultiAlignContig(MultiAlignT *,
-                     gkStore *,
-                     CNS_PrintKey,
+int MultiAlignContig(IntConConMesg *,
+                     VA_TYPE(char) *,
+                     VA_TYPE(char) *,
+                     VA_TYPE(int32) *,
+                     CNS_PrintKey ,
                      CNS_Options *opp);
-
 
 //  Options to things in MultiAligment_CNS.c
 

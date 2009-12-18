@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char const *rcsid = "$Id: AS_GKP_checkFrag.c,v 1.55 2009-11-02 21:15:16 skoren Exp $";
+static char const *rcsid = "$Id: AS_GKP_checkFrag.c,v 1.53 2009-08-11 04:46:57 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,13 +61,13 @@ updateLibraryCache(FragMesg *frg_mesg) {
   if (libMax == 0) {
     libMax = 1024;
     lib    = new gkLibrary * [libMax];
-    memset(lib, 0, sizeof(gkLibrary *) * libMax);
+    memset(lib, NULL, sizeof(gkLibrary *) * libMax);
   }
 
   if (libIID >= libMax) {
     gkLibrary **N = new gkLibrary * [libMax * 2];
     memcpy(N, lib, sizeof(gkLibrary *) * libMax);
-    memset(N + libMax, 0, sizeof(gkLibrary *) * libMax);
+    memset(N + libMax, NULL, sizeof(gkLibrary *) * libMax);
     delete [] lib;
     lib = N;
   }
@@ -123,29 +123,21 @@ checkSequenceAndQuality(FragMesg *frg_mesg, int *seqLen) {
   //  The reader should get rid of white space, but it doesn't hurt
   //  (too much) to do it again.
   //
-  for (p = 0; s[p] != 0; ) {
+  for (p = 0; s[p]; ) {
     if (isspacearray[s[p]])
       p++;
-    else {
-      if (sl < AS_READ_MAX_NORMAL_LEN)
-         S[sl] = isValidACGTN[s[p]];
-      sl++;
-      p++;
-    }
+    else
+      S[sl++] = isValidACGTN[s[p++]];
   }
-  S[MIN(sl, AS_READ_MAX_NORMAL_LEN)] = 0;
+  S[sl] = 0;
 
-  for (p = 0; q[p] != 0; ) {
+  for (p = 0; q[p]; ) {
     if (isspacearray[q[p]])
       p++;
-    else {
-      if (ql < AS_READ_MAX_NORMAL_LEN)
-         Q[ql] = q[p];
-      ql++;
-      p++;
-    }
+    else
+      Q[ql++] = q[p++];
   }
-  Q[MIN(ql, AS_READ_MAX_NORMAL_LEN)] = 0;
+  Q[ql] = 0;
 
 
   //  Check that the two sequence lengths are the same.  If not,
@@ -166,19 +158,44 @@ checkSequenceAndQuality(FragMesg *frg_mesg, int *seqLen) {
                        AS_UID_toString(frg_mesg->eaccession), sl, AS_READ_MIN_LEN);
     failed = 1;
 
-  } else if (sl <= AS_READ_MAX_NORMAL_LEN) {
-    //  Do nothing.
+#if 0
+  //  Until someone fixes the IID problems, don't allow longs.
+  } else if ((sl < AS_READ_MAX_SHORT_LEN) &&
+             (lib[libIID]->useShortFragments)) {
+    gkFrag1->gkFragment_setType(GKFRAGMENT_SHORT);
+#endif
+
+  } else if (sl < AS_READ_MAX_MEDIUM_LEN) {
+    gkFrag1->gkFragment_setType(GKFRAGMENT_MEDIUM);
+
+#if 0
+  //  Until someone fixes the IID problems, don't allow longs.
+  } else if (sl < AS_READ_MAX_LONG_LEN) {
+    gkFrag1->gkFragment_setType(GKFRAGMENT_LONG);
+#endif
 
   } else {
-    AS_GKP_reportError(AS_GKP_FRG_SEQ_TOO_LONG,
-                       AS_UID_toString(frg_mesg->eaccession), sl, AS_READ_MAX_NORMAL_LEN);
+#if 0
+    gkFrag1->gkFragment_setType(GKFRAGMENT_LONG);
+#else
+    gkFrag1->gkFragment_setType(GKFRAGMENT_MEDIUM);
+#endif
 
-    sl = AS_READ_MAX_NORMAL_LEN;
-    
+    AS_GKP_reportError(AS_GKP_FRG_SEQ_TOO_LONG,
+                       AS_UID_toString(frg_mesg->eaccession), sl, AS_READ_MAX_LONG_LEN);
+
+#if 0
+    sl = AS_READ_MAX_LONG_LEN - 1;
+#else
+    sl = AS_READ_MAX_MEDIUM_LEN - 1;
+#endif
+
+    S[sl] = 0;
+    Q[sl] = 0;
+
     failed = 1;
   }
 
-  gkFrag1->gkFragment_setType(GKFRAGMENT_NORMAL);
   gkFrag1->gkFragment_setLength(sl);
 
   *seqLen = sl;

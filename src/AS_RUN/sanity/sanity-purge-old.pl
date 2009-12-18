@@ -149,11 +149,8 @@ foreach my $asm (@assemblies) {
                     if (! -d "DEL")    { system("mkdir DEL");    }
                     if (! -d "DEL/$n") { system("mkdir DEL/$n"); }
 
-                    #  Save some juicy bits
-                    rename "$n/$asm/9-terminator/$asm.qc",   "$n/$asm.qc";
-                    rename "$n/$asm/4-unitigger/$asm.cga.0", "$n/$asm.cga.0";
-
-                    rename "$n/$asm", "DEL/$n/$asm";
+                    rename "$n/$asm/$asm.qc", "$n/$asm.qc";
+                    rename "$n/$asm",         "DEL/$n/$asm";
                 }
             } else {
                 print STDERR "SAVE\t$n/$asm\n";
@@ -184,3 +181,4 @@ foreach my $dir (@nightlies) {
         print STDERR "$dir has $asmExist saved assemblies.\n";
     }
 }
+

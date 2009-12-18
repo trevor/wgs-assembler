@@ -22,57 +22,74 @@
 #ifndef GLOBALS_CGW_H
 #define GLOBALS_CGW_H
 
-static const char *rcsid_GLOBALS_CGW_H = "$Id: Globals_CGW.h,v 1.34 2009-10-27 12:26:40 skoren Exp $";
+static const char *rcsid_GLOBALS_CGW_H = "$Id: Globals_CGW.h,v 1.28 2009-08-14 13:37:06 skoren Exp $";
 
-#include "AS_global.h"
+#include "AS_CGW_dataTypes.h"
+#include "AS_MSG_pmesg.h"
+#include "AS_ALN_aligners.h"
+#include "AS_UTL_Hash.h"
 
 //  These are the global data structures for the CGW Module
 
-class Globals_CGW {
-public:
-  Globals_CGW();
-  ~Globals_CGW();
+typedef struct Global_CGW_tag {
+  int verbose;
 
-  //  Returns last ckp number for this runCA directory.
-  int    setPrefix(char *runCAroot);
+  uint64 maxSequencedbSize; // maximum size of a sequencedb between checkpoints
+  int repeatRezLevel;
+  int stoneLevel;  // a variable that contains different alternatives of stone throwing //
+  int ignoreChaffUnitigs;
+  int performCleanupScaffolds;
+  int debugLevel;
+  int cgbUniqueCutoff;
+  int cgbDefinitelyUniqueCutoff;
+  int cgbApplyMicrohetCutoff;
+  float cgbMicrohetProb;
+  int  doInterleavedScaffoldMerging;
+  int  allowDemoteMarkedUnitigs;
 
-  int    verbose;
-  int    debugLevel;
+  FILE *cgwfp;    // .cgw            frags, unitigs
+  FILE *ctgfp;    // .cgw_contigs    all contigs (input for post-cgw consensus)
+  FILE *scffp;    // .cgw_scaffolds  all scaffolds
+  FILE *stderrc;  // current - initially set to stderr
 
-  int    repeatRezLevel;
-  int    stoneLevel;
+  char File_Name_Prefix[FILENAME_MAX];
+  char Output_File_Name[FILENAME_MAX];
+  char Gatekeeper_Store_Name[FILENAME_MAX];
+  char OVL_Store_Name[FILENAME_MAX];
 
-  int    minSamplesForOverride;
+  char unitigOverlaps[FILENAME_MAX];
+  int closurePlacement;
+}Global_CGW;
 
-  int    outputOverlapOnlyContigEdges;
-  int    demoteSingletonScaffolds;
-  int    checkRepeatBranchPattern;
 
-  int    ignoreChaffUnitigs;
-  int    performCleanupScaffolds;
+extern Global_CGW *GlobalData;
 
-  int    cgbUniqueCutoff;
-  int    cgbDefinitelyUniqueCutoff;
-  int    cgbApplyMicrohetCutoff;
-  float  cgbMicrohetProb;
+extern Global_CGW *CreateGlobal_CGW(void);
+extern void        DeleteGlobal_CGW(Global_CGW *);
 
-  int    doInterleavedScaffoldMerging;
-  int    allowDemoteMarkedUnitigs;
+extern int         SetFileNamePrefix_CGW(Global_CGW *data, char *name);
 
-  int    closurePlacement;
-  
-  int    removeNonOverlapingContigsFromScaffold;
-  int    doUnjiggleWhenMerging;
+/****************************************************************************/
+static FILE *  File_Open
+(const char * Filename, const char * Mode, int exitOnFailure)
 
-  char   outputPrefix[FILENAME_MAX];
+     /* Open  Filename  in  Mode  and return a pointer to its control
+      *  block.  If fail, print a message and exit. */
 
-  char   gkpStoreName[FILENAME_MAX];
-  char   ovlStoreName[FILENAME_MAX];
-  char   tigStoreName[FILENAME_MAX];
+{
+  FILE  *  fp;
 
-  char   unitigOverlaps[FILENAME_MAX];
-};
+  fp = fopen (Filename, Mode);
+  if  (fp == NULL && exitOnFailure)
+    {
+      fprintf (stderr, "ERROR:  Could not open file  %s \n", Filename);
+      exit (1);
+    }
 
-extern Globals_CGW  *GlobalData;
+  return  fp;
+}
 
+#ifdef NEVER
+void ResetHistograms_CGW(struct Global_CGW_tag *);
+#endif
 #endif

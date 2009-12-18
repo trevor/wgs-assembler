@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-//static char *rcsid = "$Id: AS_UTL_fileIO.c,v 1.22 2009-12-03 01:19:27 brianwalenz Exp $";
+//static char *rcsid = "$Id: AS_UTL_fileIO.c,v 1.20 2009-06-10 18:05:14 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -163,26 +163,6 @@ AS_UTL_mkdir(const char *dirname) {
   return(1);
 }
 
-//  Remove a file, or do nothing if the file doesn't exist.  Returns true if the file
-//  was deleted, false if the file never existsed.
-int
-AS_UTL_unlink(const char *filename) {
-
-  if (AS_UTL_fileExists(filename, FALSE, FALSE) == 0)
-    return(0);
-
-  errno = 0;
-  unlink(filename);
-  if (errno) {
-    fprintf(stderr, "AS_UTL_unlink()--  Failed to remove file '%s': %s\n", filename, strerror(errno));
-    exit(1);
-  }
-
-  return(1);
-}
-
-
-
 
 //  Returns true if the named file/directory exists, and permissions
 //  allow us to read and/or write.
@@ -228,49 +208,6 @@ AS_UTL_fileExists(const char *path,
   return(0);
 }
 
-
-
-
-
-off_t
-AS_UTL_sizeOfFile(const char *path) {
-  struct stat  s;
-  int          r;
-  off_t        size = 0;
-
-  errno = 0;
-  r = stat(path, &s);
-  if (errno) {
-    fprintf(stderr, "Failed to stat() file '%s': %s\n", path, strerror(errno));
-    exit(1);
-  }
-
-  //  gzipped files contain a file contents list, which we can
-  //  use to get the uncompressed size.
-  //
-  //  gzip -l <file>
-  //  compressed        uncompressed  ratio uncompressed_name
-  //       14444               71680  79.9% up.tar
-  //
-  //  bzipped files have no contents and we just guess.
-
-  if        (strcasecmp(path+strlen(path)-3, ".gz") == 0) {
-    char   cmd[256];
-    FILE  *F;
-
-    sprintf(cmd, "gzip -l %s", path);
-    F = popen(cmd, "r");
-    fscanf(F, " %*s %*s %*s %*s ");
-    fscanf(F, " %*d %lld %*s %*s ", &size);
-    pclose(F);
-  } else if (strcasecmp(path+strlen(path)-4, ".bz2") == 0) {
-    size = s.st_size * 14 / 10;
-  } else {
-    size = s.st_size;
-  }
-
-  return(size);
-}
 
 
 

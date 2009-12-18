@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: AS_UTL_Var.c,v 1.31 2009-10-09 01:07:46 brianwalenz Exp $";
+static char *rcsid = "$Id: AS_UTL_Var.c,v 1.27 2009-08-04 11:03:02 brianwalenz Exp $";
 
 /********************************************************************/
 /* Variable Length C Array Package
@@ -336,11 +336,11 @@ ReadVA(FILE *fp, VarArrayType *va, FileVarArrayType *vat) {
     assert(va->Elements != NULL);
     assert(vat->sizeofElement == va->sizeofElement);
 
-    size_t numRead = AS_UTL_safeRead(fp, va->Elements, "LoadFromFile_VA", va->sizeofElement, va->numElements);
+    //  Unless we read elements from disk, it is overly paranoid to
+    //  check the size of the on-disk and in-core elements agree.  Yes,
+    //  it masks a problem that should be fixed.
 
-    if (va->numElements != numRead)
-      fprintf(stderr, "ReadVA()-- Short read from va <%s>; expected "F_S64" elements, read "F_S64" elements.\n",
-              va->typeofElement, va->numElements, numRead), exit(1);
+    AS_UTL_safeRead(fp, va->Elements, "LoadFromFile_VA", va->sizeofElement, va->numElements);
   }
 }
 
@@ -350,14 +350,15 @@ LoadFromFile_VA(FILE *fp,
 
   FileVarArrayType    vat = {0};
 
-  if (1 != AS_UTL_safeRead(fp, &vat, "LoadFromFile_VA (vat)", sizeof(FileVarArrayType), 1))
-    fprintf(stderr, "LoadFromFile_VA()-- Failed to read vat\n"), exit(1);
+  AS_UTL_safeRead(fp, &vat, "LoadFromFile_VA (vat)", sizeof(FileVarArrayType), 1);
 
   assert(vat.numElements <= vat.allocatedElements);
 
-  if(strncmp(va->typeofElement, vat.typeofElement, VA_TYPENAMELEN))
+  if(strncmp(va->typeofElement, vat.typeofElement, VA_TYPENAMELEN)){
     fprintf(stderr,"* Expecting array of type <%s> but read array of type <%s>\n",
-            va->typeofElement, vat.typeofElement), exit(1);
+            va->typeofElement, vat.typeofElement);
+    assert(0);
+  }
 
   ReadVA(fp, va, &vat);
 }
@@ -370,14 +371,15 @@ CreateFromFile_VA(FILE *fp,
   FileVarArrayType    vat = {0};
   VarArrayType       *va  = (VarArrayType *)safe_calloc(1, sizeof(VarArrayType));
 
-  if (1 != AS_UTL_safeRead(fp, &vat, "CreateFromFile_VA (vat)", sizeof(FileVarArrayType), 1))
-    fprintf(stderr, "LoadFromFile_VA()-- Failed to read vat\n"), exit(1);
+  AS_UTL_safeRead(fp, &vat, "CreateFromFile_VA (vat)", sizeof(FileVarArrayType), 1);
 
   assert(vat.numElements <= vat.allocatedElements);
 
-  if(strncmp(vat.typeofElement,thetype,VA_TYPENAMELEN))
+  if(strncmp(vat.typeofElement,thetype,VA_TYPENAMELEN)){
     fprintf(stderr,"* Expecting array of type <%s> but read array of type <%s>\n",
-	    thetype, vat.typeofElement), exit(1);
+	    thetype, vat.typeofElement);
+    assert(0);
+  }
 
   // We construct a VA just big enough to hold all the elements on disk.
 
@@ -413,120 +415,6 @@ size_t CopyToFile_VA(VarArrayType *va,FILE *fp){
 
   AS_UTL_safeWrite(fp, &vat,         "CopyToFile_VA (vat)", sizeof(FileVarArrayType), 1);
   AS_UTL_safeWrite(fp, va->Elements, "CopyToFile_VA (dat)", va->sizeofElement,        va->numElements);
-
-  return(sizeof(FileVarArrayType) + va->sizeofElement * va->numElements);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-void
-LoadFromMemory_VA(char *&memory,
-                  VarArrayType *va) {
-
-  assert(memory != NULL);
-
-  FileVarArrayType    vat = {0};
-
-  memcpy(&vat, memory, sizeof(FileVarArrayType));
-  memory += sizeof(FileVarArrayType);
-
-  assert(vat.numElements <= vat.allocatedElements);
-
-  if(strncmp(va->typeofElement, vat.typeofElement, VA_TYPENAMELEN))
-    fprintf(stderr,"* Expecting array of type <%s> but read array of type <%s>\n",
-            va->typeofElement, vat.typeofElement), exit(1);
-
-  MakeRoom_VA(va, vat.numElements);
-  EnableRange_VA(va, vat.numElements);
-
-  if (vat.numElements > 0) {
-    assert(va->Elements != NULL);
-    assert(vat.sizeofElement == va->sizeofElement);
-
-    memcpy(va->Elements, memory, va->sizeofElement * va->numElements);
-    memory += va->sizeofElement * va->numElements;
-  }
-}
-
-
-VarArrayType *
-CreateFromMemory_VA(char *&memory,
-                    const char  *thetype) {
-
-  assert(memory != NULL);
-
-  FileVarArrayType    vat = {0};
-  VarArrayType       *va  = (VarArrayType *)safe_calloc(1, sizeof(VarArrayType));
-
-  memcpy(&vat, memory, sizeof(FileVarArrayType));
-  memory += sizeof(FileVarArrayType);
-
-  assert(vat.numElements <= vat.allocatedElements);
-
-  if(strncmp(vat.typeofElement,thetype,VA_TYPENAMELEN))
-    fprintf(stderr,"* Expecting array of type <%s> but read array of type <%s>\n",
-	    thetype, vat.typeofElement), exit(1);
-
-  // We construct a VA just big enough to hold all the elements on disk.
-
-  va->Elements          = NULL;
-  va->sizeofElement     = vat.sizeofElement;
-  va->numElements       = 0;
-  va->allocatedElements = 0;
-
-  strncpy(va->typeofElement, vat.typeofElement, VA_TYPENAMELEN);
-  va->typeofElement[VA_TYPENAMELEN-1] = 0;
-
-  MakeRoom_VA(va, vat.numElements);
-  EnableRange_VA(va, vat.numElements);
-
-  if (vat.numElements > 0) {
-    assert(va->Elements != NULL);
-    assert(vat.sizeofElement == va->sizeofElement);
-
-    memcpy(va->Elements, memory, va->sizeofElement * va->numElements);
-    memory += va->sizeofElement * va->numElements;
-  }
-
-  return(va);
-}
-
-
-size_t
-CopyToMemory_VA(VarArrayType *va,
-                char         *&memory) {
-
-  if (memory == NULL)
-    return(sizeof(FileVarArrayType) + va->sizeofElement * va->numElements);
-
-  assert(va != NULL);
-  assert(va->numElements == 0 || va->Elements != NULL);
-  assert(va->sizeofElement > 0);
-
-  FileVarArrayType vat = {0};
-
-  vat.Elements           = 0;
-  vat.sizeofElement      = va->sizeofElement;
-  vat.numElements        = va->numElements;
-  vat.allocatedElements  = va->allocatedElements;
-
-  strncpy(vat.typeofElement, va->typeofElement, VA_TYPENAMELEN);
-
-  memcpy(memory, &vat, sizeof(FileVarArrayType));
-  memory += sizeof(FileVarArrayType);
-
-  memcpy(memory,  va->Elements, va->numElements * va->sizeofElement);
-  memory += va->numElements * va->sizeofElement;
 
   return(sizeof(FileVarArrayType) + va->sizeofElement * va->numElements);
 }

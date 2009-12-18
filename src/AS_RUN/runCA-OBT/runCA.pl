@@ -4,6 +4,10 @@ my $specFile = undef;
 my @specOpts;
 my @fragFiles;
 
+my @cgbFiles;
+my $cgiFile;
+my $scaffoldDir;
+
 setDefaults();
 
 #  At some pain, we stash the original options for later use.  We need
@@ -64,13 +68,7 @@ while (scalar(@ARGV)) {
 setGlobal("help", getGlobal("help") . "Assembly name prefix not supplied with -p.\n") if (!defined($asm));
 setGlobal("help", getGlobal("help") . "Directory not supplied with -d.\n")            if (!defined($wrk));
 
-{
-    my $bin = getBinDirectory();
-
-    @fragFiles = setParametersFromFile("$bin/runCA.default.spec", @fragFiles) if (-e "$bin/runCA.default.spec");
-    @fragFiles = setParametersFromFile("$ENV{'HOME'}/.runCA",     @fragFiles) if (-e "$ENV{'HOME'}/.runCA");
-    @fragFiles = setParametersFromFile($specFile,                 @fragFiles);
-}
+@fragFiles = setParametersFromFile($specFile, @fragFiles);
 
 setParametersFromCommandLine(@specOpts);
 
@@ -103,11 +101,11 @@ createOverlapJobs("normal");
 checkOverlap("normal");
 createOverlapStore();
 overlapCorrection();
-unitigger();
-postUnitiggerConsensus();
-scaffolder();
-postScaffolderConsensus();
-terminate();
+@cgbFiles = unitigger(@cgbFiles);
+postUnitiggerConsensus(@cgbFiles);
+scaffolder($cgiFile);
+postScaffolderConsensus($scaffoldDir);
+terminate($scaffoldDir);
 cleaner();
 toggler();
 

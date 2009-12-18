@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: MergeRefine.c,v 1.2 2009-10-05 22:49:42 brianwalenz Exp $";
+static char *rcsid = "$Id: MergeRefine.c,v 1.1 2009-05-29 17:29:19 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -170,7 +170,7 @@ MergeCompatible(int32 cid) {
 //*********************************************************************************
 
 void
-MergeRefine(int32 mid, VA_TYPE(IntMultiVar) *v_list,
+MergeRefine(int32 mid, IntMultiVar **v_list, int32 *num_vars,
             int32 utg_alleles, CNS_Options *opp, int get_scores) {
   int32   cid = 0;
   MANode *ma  = GetMANode(manodeStore,mid);
@@ -190,21 +190,23 @@ MergeRefine(int32 mid, VA_TYPE(IntMultiVar) *v_list,
   {
     IntMultiVar *vl=NULL;
     int32 nv=0;
-    int make_v_list=0;
+    int i, make_v_list=0;
 
     if (utg_alleles)
       make_v_list = 1;
-    else if (v_list)
+    else if (v_list && num_vars)
       make_v_list = 2;
 
     RefreshMANode(mid, 1, opp, &nv, &vl, make_v_list, get_scores);
-
-    if (make_v_list && v_list) {
-      ResetVA_IntMultiVar(v_list);
-        
+    if (make_v_list && num_vars) {
       if (nv > 0) {
-        ResetVA_IntMultiPos(v_list);
-        SetRangeVA_IntMultiVar(v_list, 0, nv, vl);
+        *v_list = (IntMultiVar *)safe_realloc(*v_list, nv * sizeof(IntMultiVar));
+        *num_vars = nv;
+        for (i=0; i<nv; i++)
+          (*v_list)[i] = vl[i];
+      } else {
+        safe_free(*v_list);
+        *num_vars = 0;
       }
     }
 

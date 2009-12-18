@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: exploreGapStructure.c,v 1.21 2009-10-05 22:49:42 brianwalenz Exp $";
+const char *mainid = "$Id: exploreGapStructure.c,v 1.18 2009-05-12 17:25:31 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +37,7 @@ main (int argc , char * argv[] ) {
 
   int            sid = 0;
 
-  GlobalData = new Globals_CGW();
+  GlobalData = CreateGlobal_CGW();
 
   argc = AS_configure(argc, argv);
 
@@ -45,7 +45,7 @@ main (int argc , char * argv[] ) {
   int err = 0;
   while (arg < argc) {
     if        (strcmp(argv[arg], "-c") == 0) {
-      strcpy(GlobalData->outputPrefix, argv[++arg]);
+      strcpy(GlobalData->File_Name_Prefix, argv[++arg]);
     } else if (strcmp(argv[arg], "-d") == 0) {
       DistFromGap = atoi(argv[++arg]);
       if (DistFromGap > 9999) {
@@ -53,7 +53,7 @@ main (int argc , char * argv[] ) {
         exit(1);
       }
     } else if (strcmp(argv[arg], "-g") == 0) {
-      strcpy(GlobalData->gkpStoreName, argv[++arg]);
+      strcpy(GlobalData->Gatekeeper_Store_Name, argv[++arg]);
     } else if (strcmp(argv[arg], "-n") == 0) {
       ckptNum = atoi(argv[++arg]);
     } else {
@@ -63,14 +63,14 @@ main (int argc , char * argv[] ) {
     arg++;
   }
   if ((err > 0) ||
-      (GlobalData->outputPrefix[0] == 0) ||
-      (GlobalData->gkpStoreName[0] == 0)) {
+      (GlobalData->File_Name_Prefix[0] == 0) ||
+      (GlobalData->Gatekeeper_Store_Name[0] == 0)) {
     fprintf(stderr, "usage: %s -g <gkpStore> -c <ckptName> -n <ckptNum> -d distance_from_end\n",
             argv[0]);
     exit(1);
   }
 
-  LoadScaffoldGraphFromCheckpoint(GlobalData->outputPrefix, ckptNum, FALSE);
+  LoadScaffoldGraphFromCheckpoint(GlobalData->File_Name_Prefix, ckptNum, FALSE);
 
   ma            = CreateEmptyMultiAlignT();
 
@@ -109,7 +109,7 @@ main (int argc , char * argv[] ) {
       MultiAlignT  *newma = NULL;
 
       VA_TYPE(IntElementPos) *positions = CreateVA_IntElementPos(5000);
-      MultiAlignT *ma =  ScaffoldGraph->tigStore->loadMultiAlign(contig->id, FALSE);
+      MultiAlignT *ma =  loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, contig->id, FALSE);
       int num_tigs = GetNumIntUnitigPoss(ma->u_list);
       int i;
       for (i=0;i<num_tigs;i++) {
@@ -122,7 +122,7 @@ main (int argc , char * argv[] ) {
         SetVA_IntElementPos(positions,i,&pos);
       }
 
-      newma = MergeMultiAlignsFast_new(positions, NULL);
+      newma = MergeMultiAlignsFast_new(ScaffoldGraph->sequenceDB, NULL, positions, 0, 1, NULL);
 
       int nfr = GetNumIntMultiPoss(newma->f_list);
       int len = GetMultiAlignLength(newma);
@@ -162,8 +162,6 @@ main (int argc , char * argv[] ) {
       }
     }
   }
-
-  delete GlobalData;
 
   exit(0);
 }

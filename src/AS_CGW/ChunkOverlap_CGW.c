@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: ChunkOverlap_CGW.c,v 1.46 2009-10-27 12:26:40 skoren Exp $";
+static char *rcsid = "$Id: ChunkOverlap_CGW.c,v 1.41 2009-07-30 10:42:55 brianwalenz Exp $";
 
 #include <assert.h>
 #include <stdio.h>
@@ -40,8 +40,6 @@ static char *rcsid = "$Id: ChunkOverlap_CGW.c,v 1.46 2009-10-27 12:26:40 skoren 
 #include "CommonREZ.h"
 #include "UtilsREZ.h"
 
-#undef DEBUG_OVERLAP_SEQUENCES
-
 // this is the initial range we use to compute
 // overlaps with a different min/max range
 #define BEGENDSLOP 10
@@ -59,6 +57,7 @@ static char *rcsid = "$Id: ChunkOverlap_CGW.c,v 1.46 2009-10-27 12:26:40 skoren 
 //   3352 tries
 //
 #undef USE_LOCAL_OVERLAP_AS_FALLBACK
+
 
 
 /* ChunkOverlap_CGW provides tools for invoking Gene's dpalign tool to compute
@@ -156,7 +155,6 @@ ChunkOverlapperT *CreateChunkOverlapper(void){
 void DestroyChunkOverlapper(ChunkOverlapperT *chunkOverlapper){
   DeleteHashTable_AS(chunkOverlapper->hashTable);
   FreeHeap_AS(chunkOverlapper->ChunkOverlaps);
-  safe_free(chunkOverlapper);
 }
 
 
@@ -342,6 +340,7 @@ void FillChunkOverlapWithOVL(GraphCGW_T   *graph,
 
   ChunkOverlapCheckT  olap = {0};
 
+  InfoByIID          *ciinfoa, *ciinfob;
   CIFragT            *cifraga, *cifragb;
 
   CDS_CID_t           cia;
@@ -354,12 +353,14 @@ void FillChunkOverlapWithOVL(GraphCGW_T   *graph,
 
   //  Find the chunks with the two fragments
 
-  cifraga = GetCIFragT(ScaffoldGraph->CIFrags, ovl->aifrag);
+  ciinfoa = GetInfoByIID(ScaffoldGraph->iidToFragIndex, ovl->aifrag);
+  cifraga = GetCIFragT(ScaffoldGraph->CIFrags, ciinfoa->fragIndex);
   cia     = cifraga->cid; // cifrag.CIid;
   bega    = MIN(cifraga->offset5p.mean, cifraga->offset3p.mean);
   enda    = MAX(cifraga->offset5p.mean, cifraga->offset3p.mean);
 
-  cifragb = GetCIFragT(ScaffoldGraph->CIFrags, ovl->bifrag);
+  ciinfob = GetInfoByIID(ScaffoldGraph->iidToFragIndex, ovl->bifrag);
+  cifragb = GetCIFragT(ScaffoldGraph->CIFrags, ciinfob->fragIndex);
   cib     = cifragb->cid; // cifrag.CIid;
   begb    = MIN(cifragb->offset5p.mean, cifragb->offset3p.mean);
   endb    = MAX(cifragb->offset5p.mean, cifragb->offset3p.mean);
@@ -710,14 +711,12 @@ void CollectChunkOverlap(GraphCGW_T *graph,
 Overlap* OverlapSequences( char *seq1, char *seq2,
                            ChunkOrientationType orientation,
                            int32 min_ahang, int32 max_ahang,
-                           double erate, double thresh, int32 minlen,
-                           uint32 tryLocal)
+                           double erate, double thresh, int32 minlen)
 {
   Overlap *dp_omesg = NULL;
   Overlap *lo_omesg = NULL;
   int      flip = 0;
-  int      len1 = strlen(seq1);
-  int      len2 = strlen(seq2);
+  int      len1 = 0;
 
   //  This function takes two sequences, their orientation and an
   //  assumed minimum and maximum ahang for which it checks.
@@ -725,7 +724,7 @@ Overlap* OverlapSequences( char *seq1, char *seq2,
   // if the orientation is BA_AB or BA_BA, we need to reverse
   // complement the first contig
   if (orientation == BA_AB || orientation == BA_BA)
-    reverseComplementSequence( seq1, len1 );
+    reverseComplementSequence( seq1, len1=strlen(seq1) );
 
   // if the orientation is AB_BA or BA_BA, we need to set the flip
   // variable for the second contig
@@ -736,70 +735,39 @@ Overlap* OverlapSequences( char *seq1, char *seq2,
 
   dp_omesg = DP_Compare(seq1, seq2,
                         min_ahang, max_ahang,
-                        len1, len2,
+                        strlen(seq1), strlen(seq2),
                         flip,
                         erate, thresh, minlen,
                         AS_FIND_ALIGN);
 
-  if ((dp_omesg != NULL) && (dp_omesg->length <= minlen)) {
-#ifdef DEBUG_OVERLAP_SEQUENCES
-    fprintf(stderr, "OverlapSequences()-- Found overlap with DP_Compare   begpos=%d endpos=%d length=%d diffs=%d comp=%d/%d ISSHORT\n",
-            dp_omesg->begpos, dp_omesg->endpos, dp_omesg->length, dp_omesg->diffs, dp_omesg->comp, flip);
-#endif
+  if ((dp_omesg != NULL) && (dp_omesg->length <= minlen))
     dp_omesg = NULL;
-  }
 
-  if ((dp_omesg != NULL) && ((double)dp_omesg->diffs / dp_omesg->length > erate)) {
-#ifdef DEBUG_OVERLAP_SEQUENCES
-    fprintf(stderr, "OverlapSequences()-- Found overlap with DP_Compare   begpos=%d endpos=%d length=%d diffs=%d comp=%d/%d ISCRAP\n",
-            dp_omesg->begpos, dp_omesg->endpos, dp_omesg->length, dp_omesg->diffs, dp_omesg->comp, flip);
-#endif
-    dp_omesg = NULL;
-  }
-
-#ifdef DEBUG_OVERLAP_SEQUENCES
-  if (dp_omesg != NULL)
-    fprintf(stderr, "OverlapSequences()-- Found overlap with DP_Compare   begpos=%d endpos=%d length=%d diffs=%d comp=%d/%d\n",
-            dp_omesg->begpos, dp_omesg->endpos, dp_omesg->length, dp_omesg->diffs, dp_omesg->comp, flip);
-#endif
-
+  //if (dp_omesg != NULL)
+  //  fprintf(stderr, "OverlapSequences()-- Found overlap with DP_Compare   begpos=%d endpos=%d length=%d diffs=%d comp=%d/%d\n",
+  //          dp_omesg->begpos, dp_omesg->endpos, dp_omesg->length, dp_omesg->diffs, dp_omesg->comp, flip);
 
 #ifdef USE_LOCAL_OVERLAP_AS_FALLBACK
   if (!dp_omesg)
     lo_omesg = Local_Overlap_AS_forCNS(seq1, seq2,
                                        min_ahang, max_ahang,
-                                       len1, len2,
+                                       strlen(seq1), strlen(seq2),
                                        flip,
                                        erate, thresh, minlen,
                                        AS_FIND_LOCAL_OVERLAP);
-#else
-if (tryLocal == TRUE && !dp_omesg) {
-    lo_omesg = Local_Overlap_AS_forCNS(seq1, seq2,
-                                       min_ahang, max_ahang,
-                                       len1, len2,
-                                       flip,
-                                       erate, thresh, minlen,
-                                       AS_FIND_LOCAL_OVERLAP);
-}
+
+  if ((lo_omesg != NULL) && (lo_omesg->length <= minlen))
+    lo_omesg = NULL;
+
+  //if (lo_omesg != NULL)
+  //  fprintf(stderr, "OverlapSequences()-- Found overlap with Local_Overlap   begpos=%d endpos=%d length=%d diffs=%d comp=%d/%d\n",
+  //          lo_omesg->begpos, lo_omesg->endpos, lo_omesg->length, lo_omesg->diffs, lo_omesg->comp, flip);
 #endif
 
-  if (lo_omesg != NULL) {
-    if ((lo_omesg != NULL) && (lo_omesg->length <= minlen)) {
-      lo_omesg = NULL;
-    }
-    if ((lo_omesg != NULL) && ((double)lo_omesg->diffs / lo_omesg->length > erate)) {
-      lo_omesg = NULL;
-    }
-
-#ifdef DEBUG_OVERLAP_SEQUENCES
-    if (lo_omesg != NULL)
-      fprintf(stderr, "OverlapSequences()-- Found overlap with Local_Overlap   begpos=%d endpos=%d length=%d diffs=%d comp=%d/%d\n",
-              lo_omesg->begpos, lo_omesg->endpos, lo_omesg->length, lo_omesg->diffs, lo_omesg->comp, flip);
-#endif
-  }
-  
   if (orientation == BA_AB || orientation == BA_BA)
     reverseComplementSequence( seq1, len1 );
+
+  // omesg->begpos is the a-hang, omesg->endpos is the b-hang
 
   return((dp_omesg) ? dp_omesg : lo_omesg);
 }
@@ -867,7 +835,7 @@ void ComputeCanonicalOverlap_new(GraphCGW_T *graph,
       else if( tempOlap1->begpos > 0 && tempOlap1->endpos < 0) // ahang is pos and bhang is neg
         canOlap->AContainsB = TRUE;
 
-      //	    Print_Overlap_AS(stderr,&AFR,&BFR,O);
+      //	    Print_Overlap_AS(GlobalData->stderrc,&AFR,&BFR,O);
       canOlap->computed = TRUE;
       canOlap->ahg = tempOlap1->begpos;
       canOlap->bhg = tempOlap1->endpos;
@@ -929,12 +897,12 @@ void ComputeCanonicalOverlap_new(GraphCGW_T *graph,
               break;
 
             default :
-              fprintf (stderr, "Non_canonical orientation = %c\n",
+              fprintf (GlobalData->stderrc, "Non_canonical orientation = %c\n",
                        canOlap -> spec . orientation);
               assert (FALSE);
           }
 
-        fprintf(stderr,">>> Fixing up suspicious overlap ("F_CID ","F_CID ",%c) (ahg:"F_S32" bhg:"F_S32") to ("F_CID ","F_CID ",%c) (ahg:"F_S32" bhg:"F_S32") len: "F_S32"\n",
+        fprintf(GlobalData->stderrc,">>> Fixing up suspicious overlap ("F_CID ","F_CID ",%c) (ahg:"F_S32" bhg:"F_S32") to ("F_CID ","F_CID ",%c) (ahg:"F_S32" bhg:"F_S32") len: "F_S32"\n",
                 inSpec.cidA, inSpec.cidB,
                 inSpec.orientation,
                 tempOlap1->begpos, tempOlap1->endpos,
@@ -1099,8 +1067,7 @@ ChunkOverlapCheckT OverlapChunks( GraphCGW_T *graph,
 Overlap* OverlapContigs(NodeCGW_T *contig1, NodeCGW_T *contig2,
                         ChunkOrientationType *overlapOrientation,
                         int32 minAhang, int32 maxAhang,
-                        int computeAhang,
-                        uint32 tryLocal, uint32 tryRev)
+                        int computeAhang)
 {
   Overlap *tempOlap1;
   char *seq1, *seq2;
@@ -1138,29 +1105,17 @@ static VA_TYPE(char) *quality2 = NULL;
       ResetVA_char(quality2);
     }
   // Get the consensus sequences for both chunks from the Store
-  int len1 = GetConsensus(ScaffoldGraph->ContigGraph, contig1->id, consensus1, quality1) - 1;
-  int len2 = GetConsensus(ScaffoldGraph->ContigGraph, contig2->id, consensus2, quality2) - 1;
+  GetConsensus(ScaffoldGraph->RezGraph, contig1->id, consensus1, quality1);
+  GetConsensus(ScaffoldGraph->RezGraph, contig2->id, consensus2, quality2);
 
   seq1 = Getchar(consensus1, 0);
   seq2 = Getchar(consensus2, 0);
-  
+
   // tempOlap1 is a static down inside of DP_Compare
   tempOlap1 =
     OverlapSequences( seq1, seq2,
                       *overlapOrientation, minAhang, maxAhang,
-                      erate, thresh, minlen, tryLocal);
-
-  if (tryRev && tempOlap1 == NULL) {
-     reverseComplementSequence(seq1, len1);
-     reverseComplementSequence(seq2, len2);
-     tempOlap1 =
-       OverlapSequences( seq1, seq2,
-                         *overlapOrientation, 
-                         MIN(len1-minAhang-len2, len1-maxAhang-len2), MAX(len1-minAhang-len2, len1-maxAhang-len2),
-                         erate, thresh, minlen, tryLocal);
-     reverseComplementSequence(seq1, len1);
-     reverseComplementSequence(seq2, len2);
-  }
+                      erate, thresh, minlen);
 
   return(tempOlap1);
 }
@@ -1203,7 +1158,7 @@ void ComputeOverlaps(GraphCGW_T *graph, int addEdgeMates,
 	  sectionInnerMin = sectionInner * (GetNumGraphNodes(graph)) / NUM_SECTIONS;
 	  sectionInnerMax = (sectionInner + 1) * (GetNumGraphNodes(graph)) / NUM_SECTIONS;
 
-	  fprintf(stderr,"ComputeOverlaps section (o %d,i %d) outer:[%d,%d) inner:[%d,%d)\n",
+	  fprintf(GlobalData->stderrc,"ComputeOverlaps section (o %d,i %d) outer:[%d,%d) inner:[%d,%d)\n",
                   sectionOuter,  sectionInner,
                   sectionOuterMin, sectionOuterMax,
                   sectionInnerMin, sectionInnerMax);
@@ -1249,7 +1204,7 @@ void ComputeOverlaps(GraphCGW_T *graph, int addEdgeMates,
                   continue;
                 }
                 if((++i % 100000) == 0){
-                  fprintf(stderr,
+                  fprintf(GlobalData->stderrc,
                           "* ComputeOverlaps %d  ("F_CID ","F_CID ",%c)\n",
                           i, olap->spec.cidA, olap->spec.cidB,
                           olap->spec.orientation);
@@ -1267,7 +1222,7 @@ void ComputeOverlaps(GraphCGW_T *graph, int addEdgeMates,
                       lengthA = GetConsensus(graph, olap->spec.cidA, consensusA, qualityA);
                       lengthB = GetConsensus(graph, olap->spec.cidB, consensusB, qualityB);
 
-                      fprintf(stderr,"* CO: SUSPICIOUS Overlap found! Looked for ("F_CID ","F_CID ",%c)["F_S32","F_S32"]"
+                      fprintf(GlobalData->stderrc,"* CO: SUSPICIOUS Overlap found! Looked for ("F_CID ","F_CID ",%c)["F_S32","F_S32"]"
                               "found ("F_CID ","F_CID ",%c) "F_S32"; contig lengths as found (%d,%d)\n",
                               inSpec.cidA, inSpec.cidB, orientation, olap->minOverlap, olap->maxOverlap,
                               olap->spec.cidA, olap->spec.cidB, olap->spec.orientation, olap->overlap,

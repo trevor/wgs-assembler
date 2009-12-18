@@ -18,10 +18,9 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: ContigT_CGW.c,v 1.28 2009-10-27 12:44:33 skoren Exp $";
+static char *rcsid = "$Id: ContigT_CGW.c,v 1.23 2009-06-10 18:05:13 brianwalenz Exp $";
 
-#undef DEBUG_CONTIG
-
+//#define DEBUG 1
 //#define TRY_IANS_EDGES
 
 #include <stdio.h>
@@ -62,7 +61,7 @@ void CheckContigs()
          varianceDelta + .5 < contig->bpLength.variance ||
          varianceDelta - .5 > contig->bpLength.variance)
         {
-          fprintf(stderr,
+          fprintf(GlobalData->stderrc,
                   "Contig " F_CID " length (%f,%f) doesn't match offset difference (%f,%f)\n",
                   contig->id, contig->bpLength.mean, contig->bpLength.variance,
                   meanDelta, varianceDelta);
@@ -95,7 +94,7 @@ dumpContigInfo(ChunkInstanceT *contig) {
           (int)contig->offsetAEnd.mean,
           (int)contig->offsetBEnd.mean);
 
-  ma = ScaffoldGraph->tigStore->loadMultiAlign(contig->id, ScaffoldGraph->ContigGraph->type == CI_GRAPH);
+  ma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, contig->id, ScaffoldGraph->RezGraph->type == CI_GRAPH);
 
   // Get the consensus sequences for the contig from the Store
   GetConsensus(ScaffoldGraph->ContigGraph, contig->id, consensus, quality);
@@ -130,7 +129,7 @@ dumpContigInfo(ChunkInstanceT *contig) {
   for (i = 0; i < numUnitigs; i++) {
     IntUnitigPos *upos = GetIntUnitigPos( ma->u_list, i);
     ChunkInstanceT *unitig = GetGraphNode( ScaffoldGraph->CIGraph, upos->ident);
-    MultiAlignT *uma = ScaffoldGraph->tigStore->loadMultiAlign(unitig->id, ScaffoldGraph->CIGraph->type == CI_GRAPH);
+    MultiAlignT *uma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, unitig->id, ScaffoldGraph->CIGraph->type == CI_GRAPH);
     IntMultiPos *ump;
     int icntfrag;
 
@@ -143,17 +142,20 @@ dumpContigInfo(ChunkInstanceT *contig) {
 
       unitig = GetGraphNode( ScaffoldGraph->CIGraph, unitig->info.CI.baseID);
       fprintf ( stderr, "  using original unitig: %d\n", unitig->id);
-      uma = ScaffoldGraph->tigStore->loadMultiAlign(unitig->id,
+      uma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, unitig->id,
                                           ScaffoldGraph->CIGraph->type == CI_GRAPH);
     }
 
     // now print out info on the frags in the unitig
     for (icntfrag = 0; icntfrag < GetNumIntMultiPoss(uma->f_list); icntfrag++) {
       IntMultiPos *imp = GetIntMultiPos(uma->f_list, icntfrag);
-      CIFragT     *frag = GetCIFragT(ScaffoldGraph->CIFrags, imp->ident);
+      InfoByIID   *info = GetInfoByIID(ScaffoldGraph->iidToFragIndex, imp->ident);
+      CIFragT     *frag = GetCIFragT(ScaffoldGraph->CIFrags, info->fragIndex);
 
-      fprintf(stderr, "    frag: %6d\t contig pos (5p, 3p): %6d, %6d\n",
-              imp->ident, (int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean);
+      //assert(info->set);
+
+      fprintf(stderr, "    frag: %6d\t contig pos (5p, 3p): %6d, %6d  type: %c\n",
+              imp->ident, (int) frag->contigOffset5p.mean, (int) frag->contigOffset3p.mean, frag->type);
     }
   }
 #endif
@@ -165,9 +167,9 @@ dumpContigInfo(ChunkInstanceT *contig) {
 
   //  FALSE == ITERATOR_VERBOSE
 
-  InitGraphEdgeIterator(ScaffoldGraph->ContigGraph, contig->id, ALL_END, ALL_EDGES, FALSE, &edges);
+  InitGraphEdgeIterator(ScaffoldGraph->RezGraph, contig->id, ALL_END, ALL_EDGES, FALSE, &edges);
   while((e = NextGraphEdgeIterator(&edges)) != NULL)
-    PrintGraphEdge( stderr, ScaffoldGraph->ContigGraph, "Analyzing edge", e, 0);
+    PrintGraphEdge( stderr, ScaffoldGraph->RezGraph, "Analyzing edge", e, 0);
 #endif
 
   DeleteVA_char(consensus);
@@ -279,7 +281,7 @@ void DumpContig(FILE *stream, ScaffoldGraphT *graph, ContigT *contig, int raw){
     fprintf(stream,"\t%c:" F_CID " cov:%d aoff:%d boff:%d anxt:" F_CID " bnxt:" F_CID " ctg:" F_CID " scf:" F_CID "\n",
             (isSurrogate?'s':'u'),
             CI->id,
-            ScaffoldGraph->tigStore->getUnitigCoverageStat(CI->id),
+            CI->info.CI.coverageStat,
             (int)CI->offsetAEnd.mean,
             (int)CI->offsetBEnd.mean,
             CI->AEndNext,
@@ -290,7 +292,7 @@ void DumpContig(FILE *stream, ScaffoldGraphT *graph, ContigT *contig, int raw){
     fprintf(stderr,"\t%c:" F_CID " cov:%d aoff:%d boff:%d anxt:" F_CID " bnxt:" F_CID " ctg:" F_CID " scf:" F_CID "\n",
             (isSurrogate?'s':'u'),
             CI->id,
-            ScaffoldGraph->tigStore->getUnitigCoverageStat(CI->id),
+            CI->info.CI.coverageStat,
             (int)CI->offsetAEnd.mean,
             (int)CI->offsetBEnd.mean,
             CI->AEndNext,
@@ -358,7 +360,7 @@ void DumpContigInScfContext(FILE *stream, ScaffoldGraphT *graph,
     fprintf(stream,"\t%c:" F_CID " cov:%d aoff:(%d,%e) boff:(%d,%e) anxt:" F_CID " bnxt:" F_CID " ctg:" F_CID " scf:" F_CID "\n",
             (isSurrogate?'s':'u'),
             CI->id,
-            ScaffoldGraph->tigStore->getUnitigCoverageStat(CI->id),
+            CI->info.CI.coverageStat,
             (int)CI->offsetAEnd.mean,
             CI->offsetAEnd.variance,
             (int)CI->offsetBEnd.mean,
@@ -371,7 +373,7 @@ void DumpContigInScfContext(FILE *stream, ScaffoldGraphT *graph,
     fprintf(stderr,"\t%c:" F_CID " cov:%d aoff:%d boff:%d anxt:" F_CID " bnxt:" F_CID " ctg:" F_CID " scf:" F_CID "\n",
             (isSurrogate?'s':'u'),
             CI->id,
-            ScaffoldGraph->tigStore->getUnitigCoverageStat(CI->id),
+            CI->info.CI.coverageStat,
             (int)CI->offsetAEnd.mean,
             (int)CI->offsetBEnd.mean,
             CI->AEndNext,
@@ -738,8 +740,8 @@ int BuildContigEdges(ScaffoldGraphT *graph){
             fprintf(stderr,"* (" F_CID "," F_CID ") %c ciedge:" F_CID " cifrag:" F_CID " otherFrag:" F_CID " mciOffset = %g mciOrient = %c  ciOffset = %g ciOrient = %c\n",
                     thisCI->contigID, otherCI->contigID, contigEdgeOrient,
                     (CDS_CID_t)GetVAIndex_CIEdgeT(graph->CIEdges, edge),
-                    (frag?frag->read_iid:NULLINDEX),
-                    (otherFrag?otherFrag->read_iid:NULLINDEX),
+                    (frag?frag->iid:NULLINDEX),
+                    (otherFrag?otherFrag->iid:NULLINDEX),
                     mciOffset.mean, mciOrient, ciOffset.mean, ciOrient);
 #endif
 	    distance.mean = edge->distance.mean - ciOffset.mean - mciOffset.mean;
@@ -902,8 +904,8 @@ void CreateInitialContigEdges(ScaffoldGraphT *graph){
 	fprintf(stderr,"* !!!!! Skipping raw edge that is not topLevel (" F_CID "," F_CID ") edgeID " F_CID " \n",
 		edge->idA, edge->idB,
 		(CDS_CID_t) GetVAIndex_CIEdgeT(graph->CIGraph->edges, edge));
-        PrintGraphEdge(stderr,graph->CIGraph,"raw edge ",edge, edge->idA);
-        PrintGraphEdge(stderr,graph->CIGraph,"top edge ",tle, tle->idA);
+        PrintGraphEdge(stream,graph->CIGraph,"raw edge ",edge, edge->idA);
+        PrintGraphEdge(stream,graph->CIGraph,"top edge ",tle, tle->idA);
 #endif
 	shouldHaveSkipped++;
 	continue;
@@ -979,10 +981,10 @@ int GetConsensus(GraphCGW_T *graph, CDS_CID_t CIindex,
   ResetVA_char(qualityVA);
   if(CI->flags.bits.isCI){
     // Get it from the store of Unitig multi alignments
-    MA = ScaffoldGraph->tigStore->loadMultiAlign(CIindex, TRUE);
+    MA = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, CIindex, TRUE);
   }else if(CI->flags.bits.isContig){// Get it from the store of Contig multi alignments
     assert(graph->type == CONTIG_GRAPH);
-    MA = ScaffoldGraph->tigStore->loadMultiAlign(CIindex, FALSE);
+    MA = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, CIindex, FALSE);
   }else assert(0);
 
   GetMultiAlignUngappedConsensus(MA, consensusVA, qualityVA);
@@ -995,14 +997,14 @@ void SetCIScaffoldIds(ChunkInstanceT *CI, CDS_CID_t scaffoldID){
   // Set the scaffold ID of this CI
   CI->scaffoldID = scaffoldID;
   if(CI->flags.bits.isChaff){ // This can only happen once
-    MultiAlignT *ma = ScaffoldGraph->tigStore->loadMultiAlign(CI->id, TRUE);
-    CIFragT *frag = GetCIFragT(ScaffoldGraph->CIFrags, GetIntMultiPos(ma->f_list,0)->ident);
+    MultiAlignT *ma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, CI->id, TRUE);
+    CIFragT *frag = GetCIFragT(ScaffoldGraph->CIFrags,  (int)GetIntMultiPos(ma->f_list,0)->sourceInt);
     assert(frag->flags.bits.isSingleton);
     frag->flags.bits.isChaff = FALSE;
     CI->flags.bits.isChaff = FALSE;
     if(GlobalData->debugLevel > 0)
       fprintf(stderr,"* SetCIScaffoldIDs ci " F_CID " and frag " F_CID " are NOT chaff\n",
-	      CI->id, frag->read_iid);
+	      CI->id, frag->iid);
   }
 }
 
@@ -1041,7 +1043,7 @@ void CheckAllContigFragments(void){
 
   InitGraphNodeIterator(&contigs, ScaffoldGraph->ContigGraph, GRAPH_NODE_DEFAULT);
   while((contig = NextGraphNodeIterator(&contigs)) != NULL){
-    MultiAlignT *ma  = ScaffoldGraph->tigStore->loadMultiAlign(contig->id, FALSE);
+    MultiAlignT *ma  = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, contig->id, FALSE);
     int i;
     if(!ma){
       fprintf(stderr,"*CheckAllContigFragments -- Contig " F_CID " is missing\n", contig->id);
@@ -1049,7 +1051,8 @@ void CheckAllContigFragments(void){
     }
     for(i = 0; i < GetNumIntMultiPoss(ma->f_list); i++){
       IntMultiPos *mp = GetIntMultiPos(ma->f_list,i);
-      CIFragT *frag = GetCIFragT(ScaffoldGraph->CIFrags, mp->ident);
+      CDS_CID_t fragID = (CDS_CID_t)mp->sourceInt;
+      CIFragT *frag = GetCIFragT(ScaffoldGraph->CIFrags,fragID);
       assert(frag->contigID == contig->id);
     }
   }
@@ -1093,22 +1096,22 @@ int IsDefinitelyUniqueContig(ContigT *contig){
   ci = GetGraphNode(ScaffoldGraph->CIGraph, contig->info.Contig.AEndCI);
   /*
     fprintf(stderr,"* type = %d  coverage = %d  (%d)\n",
-    ci->type, ScaffoldGraph->tigStore->getUnitigCoverageStat(CI->id),
+    ci->type, ci->info.CI.coverageStat,
     GlobalData->cgbDefinitelyUniqueCutoff);
   */
 
   // when the flag says we are unique, we always return true
-  if (ScaffoldGraph->tigStore->getUnitigFUR(ci->id) == AS_FORCED_UNIQUE) {
+  if (ci->info.CI.forceUniqueRepeat == AS_FORCED_UNIQUE) {
     return TRUE;
   }
 
   // when the flag says we are repeat, we always return false
-  if (ScaffoldGraph->tigStore->getUnitigFUR(ci->id) == AS_FORCED_REPEAT) {
+  if (ci->info.CI.forceUniqueRepeat == AS_FORCED_REPEAT) {
     return FALSE;
   }
 
   // If this is not a surrogate, we're done
-  return( ScaffoldGraph->tigStore->getUnitigCoverageStat(ci->id) > GlobalData->cgbDefinitelyUniqueCutoff);
+  return( ci->info.CI.coverageStat > GlobalData->cgbDefinitelyUniqueCutoff);
 
 }
 

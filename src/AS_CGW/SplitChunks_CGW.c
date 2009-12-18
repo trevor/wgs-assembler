@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: SplitChunks_CGW.c,v 1.53 2009-10-05 22:49:42 brianwalenz Exp $";
+static char *rcsid = "$Id: SplitChunks_CGW.c,v 1.48 2009-08-16 06:43:14 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,19 +44,13 @@ VA_DEF(uint16);
 VA_DEF(SeqInterval);
 
 typedef struct {
-  IntMultiPos     *f_list;
-  int32            n_frags;
-
+  IntUnitigMesg    ium;
   int32            isGood;
   int32            intbgn;
   int32            intend;
   int32            utgbgn;
   int32            utgend;
 } IUMStruct;
-
-
-void
-ProcessInputUnitig(MultiAlignT *uma);
 
 
 
@@ -104,7 +98,7 @@ AddLinkToMaps(ScaffoldGraphT *graph,
   if((isUnitig && frag->cid == mfrag->cid) ||
      (!isUnitig && frag->contigID == mfrag->contigID)) {
     // for pairs in the same unitig, just process the lesser
-    if(frag->read_iid < mfrag->read_iid) {
+    if(frag->iid < mfrag->iid) {
       // if orientation is the same, the pair is bad
       if((isUnitig && getCIFragOrient(frag) == getCIFragOrient(mfrag)) ||
          (!isUnitig && GetContigFragOrient(frag) == GetContigFragOrient(mfrag))) {
@@ -259,7 +253,8 @@ CreateReadCoverageMap(ScaffoldGraphT *graph,
     if (!AS_FA_READ(imp->type))
       continue;
 
-    CIFragT   *frag = GetCIFragT(graph->CIFrags, imp->ident);
+    InfoByIID *info = GetInfoByIID(graph->iidToFragIndex, imp->ident);
+    CIFragT   *frag = GetCIFragT(graph->CIFrags, info->fragIndex);
 
     int32 minPos = ((isUnitig) ?
                     (MIN(frag->offset5p.mean, frag->offset3p.mean) + READ_TRIM_BASES) :
@@ -302,15 +297,16 @@ CreateCloneCoverageMaps(ScaffoldGraphT *graph,
 
   for (uint32 i=0; i<GetNumIntMultiPoss(ma->f_list); i++) {
     IntMultiPos *imp  = GetIntMultiPos(ma->f_list, i);
-    CIFragT     *frag = GetCIFragT(graph->CIFrags, imp->ident);
+    InfoByIID   *info = GetInfoByIID(graph->iidToFragIndex, imp->ident);
+    CIFragT     *frag = GetCIFragT(graph->CIFrags, info->fragIndex);
 
     // this is unlike ComputeMatePairStatistics, since we're interested
     // even in pairs that are in different unitigs/contigs
 
     if ((frag->flags.bits.hasMate > 0) &&
-        (frag->mate_iid           > 0))
+        (frag->mateOf != NULLINDEX))
       AddLinkToMaps(graph, gcc, bcc, frag,
-                    GetCIFragT(graph->CIFrags, frag->mate_iid),
+                    GetCIFragT(graph->CIFrags, frag->mateOf),
                     ((frag->flags.bits.innieMate) ? AS_INNIE : AS_OUTTIE),
                     frag->dist,
                     GetMultiAlignLength(ma),
@@ -330,40 +326,36 @@ StoreIUMStruct(ScaffoldGraphT *graph,
                float egfar) {
   int32 rho = 0;
 
-  MultiAlignT *uma = CreateEmptyMultiAlignT();
-  MultiAlignT *cma = NULL;
+  is->ium.iaccession = ((isUnitig) ? GetNumGraphNodes(graph->CIGraph) : GetNumGraphNodes(graph->ContigGraph));
 
-  //  Massage the Unitig into a MultiAlignT (also used in AS_BOG_UnitigGraph.cc)
-
-  uma->maID = ((isUnitig) ? GetNumGraphNodes(graph->CIGraph) : GetNumGraphNodes(graph->ContigGraph));
-
-  uma->data.unitig_coverage_stat = 0.0;
-  uma->data.unitig_microhet_prob = 1.0;
-
-  uma->data.unitig_status        = AS_UNASSIGNED;
-  uma->data.unitig_unique_rept   = AS_FORCED_NONE;
-
-  uma->data.contig_status        = AS_UNPLACED;
+  is->ium.status      = AS_UNASSIGNED;
+  is->ium.forced      = 0;
+  is->ium.length      = 0;
+  is->ium.unique_rept = AS_FORCED_NONE;
 
   int32 minPos  = INT32_MAX;
   int32 numRand = 0;
 
-  for (int i=0; i<is->n_frags; i++) {
-    minPos = MIN(minPos, is->f_list[i].position.bgn);
-    minPos = MIN(minPos, is->f_list[i].position.end);
+  for (int i=0; i<is->ium.num_frags; i++) {
+    minPos = MIN(minPos, is->ium.f_list[i].position.bgn);
+    minPos = MIN(minPos, is->ium.f_list[i].position.end);
 
-    numRand += (AS_FA_RANDOM(is->f_list[i].type)) ? 1 : 0;
+    numRand += (AS_FA_RANDOM(is->ium.f_list[i].type)) ? 1 : 0;
   }
 
-  for (int i=0; i<is->n_frags; i++) {
-    is->f_list[i].position.bgn -= minPos;
-    is->f_list[i].position.end -= minPos;
+  for (int i=0; i<is->ium.num_frags; i++) {
+    is->ium.f_list[i].position.bgn -= minPos;
+    is->ium.f_list[i].position.end -= minPos;
 
-    if (is->f_list[i].position.end > is->f_list[i].position.bgn)
-      rho    = MAX(rho, is->f_list[i].position.bgn);
-    else
-      rho    = MAX(rho, is->f_list[i].position.end);
+    if (is->ium.f_list[i].position.end > is->ium.f_list[i].position.bgn) {
+      rho            = MAX(rho,            is->ium.f_list[i].position.bgn);
+      is->ium.length = MAX(is->ium.length, is->ium.f_list[i].position.end);
+    } else {
+      rho            = MAX(rho,            is->ium.f_list[i].position.end);
+      is->ium.length = MAX(is->ium.length, is->ium.f_list[i].position.bgn);
+    }
   }
+
 
   // egfar is the estimated global fragment arrival rate based on the original chunk.
   //
@@ -371,22 +363,33 @@ StoreIUMStruct(ScaffoldGraphT *graph,
   //
   // Based on compute_coverage_statistic() in AS_CGB_cgb.h
   //
+  is->ium.coverage_stat = 0.0;
   if ((egfar > 0.0) &&
       (numRand > 0))
-    uma->data.unitig_coverage_stat = rho * egfar - LN_2 * (numRand - 1);
+    is->ium.coverage_stat = rho * egfar - LN_2 * (numRand - 1);
 
-  //  Add fragments
+  // get the multi-alignment - this fills in some unitig fields
 
-  ResetVA_IntMultiPos(uma->f_list);
-  SetRangeVA_IntMultiPos(uma->f_list, 0, is->n_frags, is->f_list);
+  VA_TYPE(int32)   *deltas     = CreateVA_int32(1);
+  VA_TYPE(char)    *sequence   = CreateVA_char(200000);
+  VA_TYPE(char)    *quality    = CreateVA_char(200000);
 
-  //  Build the unitig
-
-  int unitigSuccess = MultiAlignUnitig(uma, ScaffoldGraph->gkpStore, CNS_STATS_ONLY, NULL);
+  int unitigSuccess = MultiAlignUnitig(&is->ium,
+                                       ScaffoldGraph->gkpStore,
+                                       sequence,
+                                       quality,
+                                       deltas,
+                                       CNS_STATS_ONLY,
+                                       NULL);
 
   if (unitigSuccess == 0) {
+    GenericMesg pmesg;
+
+    pmesg.t = MESG_IUM;
+    pmesg.m = &is->ium;
+
     fprintf(stderr, "================================================================================\n");
-    //WriteProtoMesg_AS(stderr, &pmesg);
+    WriteProtoMesg_AS(stderr, &pmesg);
     fprintf(stderr, "================================================================================\n");
     fprintf(stderr, "FATAL ERROR: MultiAlignUnitig call failed in unitig splitting.\n");
     assert(FALSE);
@@ -394,16 +397,38 @@ StoreIUMStruct(ScaffoldGraphT *graph,
 
   //  Add ium to the system
 
-  if (1 != GetNumIntUnitigPoss(uma->u_list))
-    fprintf(stderr, "ERROR:  Unitig %d has no placement; probably not run through consensus.\n", uma->maID);
-  assert(1 == GetNumIntUnitigPoss(uma->u_list));
+  MultiAlignT    *ma = CreateMultiAlignTFromIUM(&is->ium, GetNumCIFragTs(graph->CIFrags), FALSE);
 
-  cma = CopyMultiAlignT(NULL, uma);
+  //  Point fragments to their new unitig/contig
 
-  ScaffoldGraph->tigStore->insertMultiAlign(uma, TRUE,  TRUE);
-  ScaffoldGraph->tigStore->insertMultiAlign(cma, FALSE, TRUE);
+  for (uint32 i=0; i<GetNumIntMultiPoss(ma->f_list); i++) {
+    IntMultiPos *imp  = GetIntMultiPos(ma->f_list, i);
+    InfoByIID   *info = GetInfoByIID(graph->iidToFragIndex, imp->ident);
 
-  ProcessInputUnitig(uma);
+    imp->sourceInt = info->fragIndex;
+  }
+
+  //  Insert both a unitig and a contig
+
+  insertMultiAlignTInSequenceDB(graph->sequenceDB, is->ium.iaccession, TRUE,
+                                ma,
+                                TRUE);
+  insertMultiAlignTInSequenceDB(graph->sequenceDB, is->ium.iaccession, FALSE,
+                                CopyMultiAlignT(NULL, ma),
+                                FALSE);
+
+  ProcessIUM_ScaffoldGraph(&is->ium, GetMultiAlignUngappedLength(ma), TRUE);
+
+  ChunkInstanceT *ci = GetGraphNode((isUnitig ? graph->CIGraph : graph->ContigGraph), is->ium.iaccession);
+
+  UpdateNodeFragments((isUnitig ? graph->CIGraph : graph->ContigGraph),
+                      is->ium.iaccession,
+                      ci->type == DISCRIMINATORUNIQUECHUNK_CGW,
+                      TRUE);
+
+  DeleteVA_int32(deltas);
+  DeleteVA_char(sequence);
+  DeleteVA_char(quality);
 }
 
 
@@ -428,7 +453,7 @@ EstimateGlobalFragmentArrivalRate(ChunkInstanceT *ci, MultiAlignT *ma) {
     }
   }
 
-  return((ScaffoldGraph->tigStore->getUnitigCoverageStat(ci->id) + LN_2 * (numRF - 1)) / rho);
+  return((ci->info.CI.coverageStat + LN_2 * (numRF - 1)) / rho);
 }
 
 
@@ -468,17 +493,17 @@ SplitChunkByIntervals(ScaffoldGraphT *graph,
 
   float egfar = EstimateGlobalFragmentArrivalRate(ci, ma);
 
-  fprintf(stderr, "Splitting %s "F_CID " into as many as %d %s at intervals:",
+  fprintf(GlobalData->stderrc, "Splitting %s "F_CID " into as many as %d %s at intervals:",
           (isUnitig ? "unitig" : "contig"), ma->maID,
           (int) (2 * GetNumVA_SeqInterval(csis) + 1),
           (isUnitig ? "unitigs" : "contigs"));
 
   for (uint32 i=0; i<GetNumVA_SeqInterval(csis); i++) {
     SeqInterval *I = GetVA_SeqInterval(csis, i);
-    fprintf(stderr, "\t"F_S32","F_S32, I->bgn, I->end);
+    fprintf(GlobalData->stderrc, "\t"F_S32","F_S32, I->bgn, I->end);
   }
 
-  fprintf(stderr, "\n");
+  fprintf(GlobalData->stderrc, "\n");
 
   
   //  If a fragment even touches a bad interval, it gets placed in that bad interval.
@@ -502,9 +527,7 @@ SplitChunkByIntervals(ScaffoldGraphT *graph,
   IUMStruct       *utg    = (IUMStruct *)safe_calloc(utgNum, sizeof(IUMStruct));
 
   for (int i=0; i<utgNum; i++) {
-    utg[i].f_list  = (IntMultiPos *)safe_calloc(GetNumIntMultiPoss(ma->f_list), sizeof(IntMultiPos));
-    utg[i].n_frags = 0;
-
+    utg[i].ium.f_list = (IntMultiPos *)safe_calloc(GetNumIntMultiPoss(ma->f_list), sizeof(IntMultiPos));
     utg[i].isGood = 1;
 
     utg[i].intbgn = INT32_MIN;
@@ -534,7 +557,8 @@ SplitChunkByIntervals(ScaffoldGraphT *graph,
 
   for (uint32 i=0; i<GetNumIntMultiPoss(ma->f_list); i++) {
     IntMultiPos *imp  = GetIntMultiPos(ma->f_list, i);
-    CIFragT     *frag = GetCIFragT(graph->CIFrags, imp->ident);
+    InfoByIID   *info = GetInfoByIID(graph->iidToFragIndex, imp->ident);
+    CIFragT     *frag = GetCIFragT(graph->CIFrags, info->fragIndex);
 
     //  Determine the position of the fragment in the unitig or contig
 
@@ -641,14 +665,16 @@ SplitChunkByIntervals(ScaffoldGraphT *graph,
     //  Place it.
 
     {
-      CIFragT        *frag = GetCIFragT(ScaffoldGraph->CIFrags, imp->ident);
+      InfoByIID      *info = GetInfoByIID(ScaffoldGraph->iidToFragIndex, imp->ident);
+      CIFragT        *frag = GetCIFragT(ScaffoldGraph->CIFrags, info->fragIndex);
+      IntUnitigMesg  *ium  = &utg[interval].ium;
 
-      utg[interval].f_list[utg[interval].n_frags] = *imp;
+      ium->f_list[ium->num_frags] = *imp;
 
-      utg[interval].f_list[utg[interval].n_frags].position.bgn = ((isUnitig) ? frag->offset5p.mean : frag->contigOffset5p.mean);
-      utg[interval].f_list[utg[interval].n_frags].position.end = ((isUnitig) ? frag->offset3p.mean : frag->contigOffset3p.mean);
+      ium->f_list[ium->num_frags].position.bgn = ((isUnitig) ? frag->offset5p.mean : frag->contigOffset5p.mean);
+      ium->f_list[ium->num_frags].position.end = ((isUnitig) ? frag->offset3p.mean : frag->contigOffset3p.mean);
 
-      utg[interval].n_frags++;
+      ium->num_frags++;
     }
 
     utg[interval].utgbgn = MIN(utg[interval].utgbgn, minPos);
@@ -667,15 +693,15 @@ SplitChunkByIntervals(ScaffoldGraphT *graph,
 
   for (int i=0; i<utgNum; i++) {
 #ifdef DEBUG
-    if (utg[i].n_frags == 0)
+    if (utg[i].ium.num_frags == 0)
       fprintf(stderr, "EMPTY UNITIG\n");
-    if (utg[i].n_frags > 0)
-      fprintf(stderr, "NEW UNITIG with %d fragments\n", utg[i].n_frags);
+    if (utg[i].ium.num_frags > 0)
+      fprintf(stderr, "NEW UNITIG with %d fragments\n", utg[i].ium.num_frags);
 #endif
-    if (utg[i].n_frags > 0)
+    if (utg[i].ium.num_frags > 0)
       StoreIUMStruct(graph, utg + i, isUnitig, egfar);
 
-    safe_free(utg[i].f_list);
+    safe_free(utg[i].ium.f_list);
   }
 
   safe_free(utg);
@@ -727,7 +753,7 @@ SplitInputUnitigs(ScaffoldGraphT *graph) {
 
   for (int32 i=0; i<numUnitigsBefore; i++) {
     ChunkInstanceT *ci = GetGraphNode(graph->CIGraph, i);
-    MultiAlignT *ma = ScaffoldGraph->tigStore->loadMultiAlign(ci->id, TRUE);
+    MultiAlignT *ma = loadMultiAlignTFromSequenceDB(graph->sequenceDB, ci->id, TRUE);
 
     // NOTE: add discriminator statistic checks?
 

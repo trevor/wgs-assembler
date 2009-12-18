@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: eCR-partition.C,v 1.3 2009-10-05 22:49:42 brianwalenz Exp $";
+const char *mainid = "$Id: eCR-partition.C,v 1.1 2009-08-26 09:07:27 brianwalenz Exp $";
 
 #include "eCR.h"
 #include "ScaffoldGraph_CGW.h"
@@ -33,19 +33,16 @@ main(int argc, char **argv) {
 
   argc = AS_configure(argc, argv);
 
-  GlobalData = new Globals_CGW();
+  GlobalData = CreateGlobal_CGW();
 
   int arg = 1;
   int err = 0;
   while (arg < argc) {
     if        (strcmp(argv[arg], "-c") == 0) {
-      strcpy(GlobalData->outputPrefix, argv[++arg]);
+      strcpy(GlobalData->File_Name_Prefix, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-g") == 0) {
-      strcpy(GlobalData->gkpStoreName, argv[++arg]);
-
-    } else if (strcmp(argv[arg], "-t") == 0) {
-      strcpy(GlobalData->tigStoreName, argv[++arg]);
+      strcpy(GlobalData->Gatekeeper_Store_Name, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-n") == 0) {
       ckptNum = atoi(argv[++arg]);
@@ -68,9 +65,8 @@ main(int argc, char **argv) {
   if (partInfoName == NULL)
     err++;
 
-  if ((GlobalData->outputPrefix[0] == 0) ||
-      (GlobalData->gkpStoreName[0] == 0) ||
-      (GlobalData->tigStoreName[0] == 0) ||
+  if ((GlobalData->File_Name_Prefix[0] == 0) ||
+      (GlobalData->Gatekeeper_Store_Name[0] == 0) ||
       (err)) {
     fprintf(stderr, "usage: %s [opts] -g gkpStore -n ckpNumber -c ckpName -N numPart -M maxFrag\n", argv[0]);
     fprintf(stderr, "\n");
@@ -98,13 +94,13 @@ main(int argc, char **argv) {
     fprintf(stderr, "%s: Failed to open partition information output file '%s': %s\n",
             argv[0], partInfoName, strerror(errno)), exit(1);
 
-  LoadScaffoldGraphFromCheckpoint(GlobalData->outputPrefix, ckptNum, TRUE);
+  LoadScaffoldGraphFromCheckpoint(GlobalData->File_Name_Prefix, ckptNum, TRUE);
 
   //
   //  Scan all the scaffolds, build the partition mapping.
   //
 
-  gkStore  *gkp       = new gkStore(GlobalData->gkpStoreName, FALSE, FALSE);
+  gkStore  *gkp       = new gkStore(GlobalData->Gatekeeper_Store_Name, FALSE, FALSE);
   short    *partition = new short [gkp->gkStore_getNumFragments() + 1];
 
   for (uint32 i=0; i<gkp->gkStore_getNumFragments() + 1; i++)
@@ -128,7 +124,7 @@ main(int argc, char **argv) {
     for (ctg = GetGraphNode(ScaffoldGraph->ContigGraph, scf->info.Scaffold.AEndCI);
          ctg;
          ctg = (ctg->BEndNext == -1) ? NULL : GetGraphNode(ScaffoldGraph->ContigGraph, ctg->BEndNext)) {
-      MultiAlignT  *ma = ScaffoldGraph->tigStore->loadMultiAlign(ctg->id, FALSE);
+      MultiAlignT  *ma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, ctg->id, FALSE);
 
       nf += GetNumIntMultiPoss(ma->f_list);
     }
@@ -186,7 +182,7 @@ main(int argc, char **argv) {
     for (ctg = GetGraphNode(ScaffoldGraph->ContigGraph, scf->info.Scaffold.AEndCI);
          ctg;
          ctg = (ctg->BEndNext == -1) ? NULL : GetGraphNode(ScaffoldGraph->ContigGraph, ctg->BEndNext)) {
-      MultiAlignT  *ma = ScaffoldGraph->tigStore->loadMultiAlign(ctg->id, FALSE);
+      MultiAlignT  *ma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, ctg->id, FALSE);
 
       for (uint32 i=0; i<GetNumIntMultiPoss(ma->f_list); i++)
         partition[GetIntMultiPos(ma->f_list, i)->ident] = curPart;
@@ -214,7 +210,7 @@ main(int argc, char **argv) {
   delete gkp;
 
   DestroyScaffoldGraph(ScaffoldGraph);
-  delete GlobalData;
+  DeleteGlobal_CGW(GlobalData);
 
   fclose(partInfoFile);
 

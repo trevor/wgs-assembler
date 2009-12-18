@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: AS_PER_gkLibrary.C,v 1.5 2009-10-26 13:20:26 brianwalenz Exp $";
+static const char *rcsid = "$Id: AS_PER_gkLibrary.C,v 1.3 2009-07-06 19:58:29 brianwalenz Exp $";
 
 #include "AS_PER_gkpStore.h"
 
@@ -89,15 +89,9 @@ gkLibrary::gkLibrary_decodeFeatures(LibraryMesg *lmesg) {
       doNotOverlapTrim = decodeBoolean("doNotOverlapTrim", val);
 
     //  Gatekeeper options
-    else if (strcasecmp(fea, "usePackedFragments") == 0)
-      usePackedFragments = decodeBoolean("usePackedFragments", val);
+    else if (strcasecmp(fea, "useShortFragments") == 0)
+      useShortFragments = decodeBoolean("useShortFragments", val);
 
-    //  Illumina options, just to make it not complain about unknown features
-
-    else if (strcasecmp(fea, "illuminaQSequence") == 0)
-      ;
-    else if (strcasecmp(fea, "illunimaSequence") == 0)
-      ;
     //  Library options (orientation is not a feature, it's part of the library)
 
     else
@@ -205,11 +199,11 @@ gkLibrary::gkLibrary_encodeFeatures(LibraryMesg *lmesg) {
   }
 
   //  Gatekeeper options
-  if (usePackedFragments || alwaysEncode) {
+  if (useShortFragments || alwaysEncode) {
     fea[nf] = (char *)safe_malloc(32 * sizeof(char));
     val[nf] = (char *)safe_malloc(32 * sizeof(char));
-    sprintf(fea[nf], "usePackedFragments");
-    sprintf(val[nf], "%d", usePackedFragments);
+    sprintf(fea[nf], "useShortFragments");
+    sprintf(val[nf], "%d", useShortFragments);
     nf++;
   }
 

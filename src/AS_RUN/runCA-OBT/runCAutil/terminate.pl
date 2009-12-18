@@ -57,32 +57,30 @@ sub summarizeConsensusStatistics ($) {
 
 
 
-sub terminate () {
+sub terminate ($) {
+    my $cgwDir = shift @_;
+    $cgwDir = "$wrk/7-CGW" if (!defined($cgwDir));
+
     my $bin  = getBinDirectory();
     my $perl = "/usr/bin/env perl";
 
     my $termDir = "$wrk/9-terminator";
     system("mkdir $termDir") if (! -e "$termDir");
 
-    stopBefore("terminator", undef);
-
     if (! -e "$termDir/$asm.asm") {
         my $uidServer = getGlobal("uidServer");
         my $fakeUIDs  = getGlobal("fakeUIDs");
 
         my $cmd;
-
-        my $ckpVersion = findLastCheckpoint("$wrk/7-CGW");
-        my $tigVersion = $ckpVersion + 1;
-
-        caFailure("contig consensus didn't find any checkpoints in '$wrk/7-CGW'", undef) if (!defined($tigVersion));
-
-        $cmd  = "$bin/terminator ";
+        $cmd  = "cat $cgwDir/$asm.cgw ";
+        $cmd .= " $wrk/8-consensus/$asm.cns_contigs.*[0-9] ";
+        $cmd .= " $cgwDir/$asm.cgw_scaffolds | ";
+        $cmd .= "$bin/terminator ";
+        $cmd .= " -s $fakeUIDs "                if ($fakeUIDs != 0);
+        $cmd .= " $uidServer "                  if (defined($uidServer));
         $cmd .= " -g $wrk/$asm.gkpStore ";
-        $cmd .= " -t $wrk/$asm.tigStore $tigVersion ";
-        $cmd .= " -c $wrk/7-CGW/$asm $ckpVersion ";
-        $cmd .= " -o $wrk/9-terminator/$asm";
-
+        $cmd .= " -o $termDir/$asm ";
+        $cmd .= " > $termDir/terminator.err 2>&1 ";
         if (runCommand("$termDir", $cmd)) {
             rename "$termDir/$asm.asm", "$termDir/$asm.asm.FAILED";
             rename "$termDir/$asm.map", "$termDir/$asm.map.FAILED";
@@ -105,14 +103,12 @@ sub terminate () {
 
 
     if (! -e "$termDir/$asm.singleton.fasta") {
-        my $ckpVersion = findLastCheckpoint("$wrk/7-CGW");
-        my $tigVersion = $ckpVersion + 1;
+        my $lastckp = findLastCheckpoint("$wrk/7-CGW");
 
         my $cmd;
         $cmd  = "$bin/dumpSingletons ";
         $cmd .= " -g $wrk/$asm.gkpStore ";
-        $cmd .= " -t $wrk/$asm.tigStore ";
-        $cmd .= " -c $wrk/7-CGW/$asm -n $ckpVersion -S ";
+        $cmd .= " -c $cgwDir/$asm -n $lastckp -S ";
         $cmd .= "> $termDir/$asm.singleton.fasta ";
         $cmd .= "2> $termDir/dumpSingletons.err ";
         if (runCommand("$termDir", $cmd)) {

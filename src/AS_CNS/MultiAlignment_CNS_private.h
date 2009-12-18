@@ -22,7 +22,7 @@
 #ifndef MULTIALIGNMENT_CNS_PRIVATE_H
 #define MULTIALIGNMENT_CNS_PRIVATE_H
 
-static const char *rcsid_MULTIALIGNMENT_CNS_PRIVATE_H = "$Id: MultiAlignment_CNS_private.h,v 1.15 2009-10-26 13:20:26 brianwalenz Exp $";
+static const char *rcsid_MULTIALIGNMENT_CNS_PRIVATE_H = "$Id: MultiAlignment_CNS_private.h,v 1.11 2009-08-04 11:05:19 brianwalenz Exp $";
 
 #include "AS_OVS_overlap.h"
 #include "AS_OVS_overlapStore.h"
@@ -122,11 +122,14 @@ typedef struct {
   IntFragment_ID       frgIdent;
   IntFragment_ID       frgContained;
   IntUnitig_ID         frgInUnitig;
+  int32		         frgSource;
 } CNS_FragmentContigElement;
 
 typedef struct {
   UnitigType           utgType;
   IntUnitig_ID         utgIdent;
+  int32                utgFirst; // index of this unitig's first fragment in fragment_positions
+  int32                utgLast; // index of this unitig's last fragment in fragment_positions
 } CNS_UnitigContigElement;
 
 
@@ -198,7 +201,7 @@ typedef struct {
   int32 next;
   int32 prev; // navigation in columnStore;
   int32 ma_id;     // MANode membership;
-  int32 ma_index;  // index in MANode; // refreshed only periodically // seems to also be gapped position in the align
+  int32 ma_index;  // index in MANode; // refreshed only periodically
   BaseCount base_count;
 } Column;
 
@@ -271,11 +274,11 @@ VA_DEF(ScaffoldData)
 
 
 
-extern gkStore               *gkpStore;
+extern gkStore       *gkpStore;
 extern OverlapStore          *ovlStore;
-extern MultiAlignStore       *tigStore;
-
+extern tSequenceDB           *sequenceDB;
 extern HashTable_AS          *fragmentMap;
+extern MultiAlignStoreT      *unitigStore;
 
 extern VA_TYPE(char) *sequenceStore;
 extern VA_TYPE(char) *qualityStore;
@@ -298,6 +301,8 @@ extern char   RALPHABET[CNS_NP];
 extern char   RALPHABETC[CNS_NP];
 extern double TAU_MISMATCH;
 extern uint32 AMASK[5];
+
+extern int USE_SDB;
 
 extern int thisIsConsensus;
 
@@ -354,7 +359,7 @@ SeedMAWithFragment(int32 mid,
 int
 GetMANodeConsensus(int32 mid, VA_TYPE(char) *sequence, VA_TYPE(char) *quality);
 int
-GetMANodePositions(int32 mid, MultiAlignT *ma);
+GetMANodePositions(int32 mid, int mesg_n_frags, IntMultiPos *imps, int mesg_n_unitigs, IntUnitigPos *iups, VA_TYPE(int32) *deltas);
 
 void
 CreateColumnBeadIterator(int32 cid,ColumnBeadIterator *bi);
@@ -398,13 +403,14 @@ void
 ShowColumn(int32 cid);
 
 void
-ResetStores(int32 num_bases, int32 num_frags, int32 num_columns);
+ResetStores(int32 num_frags, int32 num_columns);
 int32
 AppendFragToLocalStore(FragType          type,
                        int               iid,
                        int               complement,
                        int               contained,
-                       UnitigType        utype);
+                       UnitigType        utype,
+                       MultiAlignStoreT *multialignStore);
 
 void
 AllocateDistMatrix(VarRegion  *vreg, int init);
@@ -449,11 +455,28 @@ ApplyAlignment(int32 afid,
                int32 ahang,
                int32 *trace);
 
+int
+MultiAlignContig(IntConConMesg *contig,
+                 VA_TYPE(char) *sequence,
+                 VA_TYPE(char) *quality,
+                 VA_TYPE(int32) *deltas,
+                 CNS_PrintKey printwhat,
+                 CNS_Options *opp);
+
+int
+MultiAlignUnitig(IntUnitigMesg   *unitig,
+                 gkStore *fragStore,
+                 VA_TYPE(char)   *sequence,
+                 VA_TYPE(char)   *quality,
+                 VA_TYPE(int32)  *deltas,
+                 CNS_PrintKey     printwhat,
+                 CNS_Options     *opp);
+
 void
 PrintAlignment(FILE *print, int32 mid, int32 from, int32 to, CNS_PrintKey what);
 
 void
-MergeRefine(int32 mid, VA_TYPE(IntMultiVar) *v_list,
+MergeRefine(int32 mid, IntMultiVar **v_list, int32 *num_vars,
             int32 utg_alleles, CNS_Options *opp, int get_scores);
 
 
@@ -484,9 +507,28 @@ GetAlignmentTraceDriver(Fragment                    *afrag,
                         GetAlignmentTraceContext     alignment_context,
                         int                          max_gap);
 
+MultiAlignT *
+ReplaceEndUnitigInContig(tSequenceDB *sequenceDBp,
+                         gkStore *frag_store,
+                         uint32 contig_iid, uint32 unitig_iid, int extendingLeft,
+                         CNS_Options *opp);
+
+
 int
 BaseCall(int32 cid, int quality, double *var, VarRegion  *vreg,
          int target_allele, char *cons_base, int verbose, int get_scores,
          CNS_Options *opp);
+
+
+
+MultiAlignT *
+MergeMultiAlignsFast_new(tSequenceDB *sequenceDBp,
+                         gkStore *frag_store,
+                         VA_TYPE(IntElementPos) *positions,
+                         int quality,
+                         int verbose,
+                         CNS_Options *opp);
+
+
 
 #endif

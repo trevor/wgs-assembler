@@ -22,7 +22,7 @@
 #ifndef GRAPH_CGW_H
 #define GRAPH_CGW_H
 
-static const char *rcsid_GRAPH_CGW_H = "$Id: GraphCGW_T.h,v 1.42 2009-10-27 12:26:40 skoren Exp $";
+static const char *rcsid_GRAPH_CGW_H = "$Id: GraphCGW_T.h,v 1.39 2009-08-28 17:35:11 skoren Exp $";
 
 #include "AS_UTL_Var.h"
 #include "AS_ALN_aligners.h"
@@ -215,6 +215,7 @@ typedef struct{
   ChunkInstanceType type; //
 
   CDS_CID_t id;        // Instance ID
+  CDS_CID_t outputID;  // InstanceID (dense encoding over LIVE instances)
   CDS_CID_t scaffoldID; // scaffold ID
   CDS_CID_t prevScaffoldID; // previous scaffold ID from last iteration
   int32     indexInScaffold; // Relative position from A end of Scaffold (not kept current)
@@ -235,11 +236,26 @@ typedef struct{
   LengthT  bpLength;
   LengthT  offsetAEnd;     // Offset of A end of CI relative to A end of Contig/CIScaffold
   LengthT  offsetBEnd;     // Offset of B end of CI relative to A end of Contig/CIScaffold
+
+#ifdef TRY_UNDO_JIGGLE_POSITIONS
   LengthT  offsetDelta;
+#endif
 
   union{  // ChunkInstanceType discriminates
     struct CIINFO_TAG {
-      CDS_CID_t    contigID;   // contigID -- if -1, this chunkInstance not merged into a contig
+      CDS_CID_t contigID;   // contigID -- if -1, this chunkInstance not merged into a contig
+      //vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv*/
+      // Both of these are redundant, since we can get
+      // to the same info by looking in the multiAlignT for this CI
+      // at some point we should nuke them
+      CDS_CID_t headOfFragments; /* Index of first FragInfoT record belonging to this  chunkInstance
+                                    These will be linked together.  */
+      int32 numFragments;
+      /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^*/
+
+      int32        coverageStat;
+      float        microhetProb;
+      ChunkFUR     forceUniqueRepeat;
       CDS_CID_t    baseID;    /* If this is a  RESOLVEDREPEAT, the id of the original
                                  CI from which it was spawned */
       int32 numInstances; /* Number of actual or surrogate instances in scaffolds
@@ -316,7 +332,9 @@ typedef struct{
        * Initialized to match the closure input status of the read or contig
        */
        unsigned int isClosure:1;
+#ifdef TRY_UNDO_JIGGLE_POSITIONS
        unsigned int isJiggled:1;
+#endif
     }bits;
     int32 all;
   }flags;
@@ -471,6 +489,9 @@ static NodeCGW_T *CreateNewGraphNode(GraphCGW_T *graph){
       node.type = UNRESOLVEDCHUNK_CGW;
       node.flags.bits.isCI = TRUE;
       node.info.CI.contigID = NULLINDEX;
+      node.info.CI.headOfFragments = NULLINDEX;
+      node.info.CI.numFragments = 0;
+      node.info.CI.coverageStat = 0;
       node.info.CI.numInstances = 0;
       node.info.CI.instances.va = NULL;
       break;
@@ -1514,8 +1535,7 @@ void CollectChunkOverlap(GraphCGW_T *graph,
 Overlap* OverlapSequences(char *seq1, char *seq2,
                           ChunkOrientationType orientation,
                           int32 min_ahang, int32 max_ahang,
-                          double erate, double thresh, int32 minlen,
-                          uint32 tryLocal = FALSE);
+                          double erate, double thresh, int32 minlen);
 
 ChunkOverlapCheckT OverlapChunks(GraphCGW_T *graph,
                                  CDS_CID_t cidA, CDS_CID_t cidB,
@@ -1528,9 +1548,7 @@ ChunkOverlapCheckT OverlapChunks(GraphCGW_T *graph,
 Overlap* OverlapContigs(NodeCGW_T *contig1, NodeCGW_T *contig2,
                         ChunkOrientationType *overlapOrientation,
                         int32 minAhang, int32 maxAhang,
-                        int computeAhang,
-                        uint32 tryLocal = FALSE,
-                        uint32 tryRev   = FALSE);
+                        int computeAhang);
 
 void ComputeOverlaps(GraphCGW_T *graph, int addEdgeMates,
                      int recomputeCGBOverlaps);

@@ -19,7 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: AS_CGW_main.c,v 1.82 2009-12-01 00:20:29 brianwalenz Exp $";
+const char *mainid = "$Id: AS_CGW_main.c,v 1.74 2009-08-16 06:42:02 brianwalenz Exp $";
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,7 +83,6 @@ const char *mainid = "$Id: AS_CGW_main.c,v 1.82 2009-12-01 00:20:29 brianwalenz 
 #define CHECKPOINT_AFTER_FINAL_CONTAINED_STONES     "ckp11-FCS"
 #define CHECKPOINT_AFTER_FINAL_CLEANUP              "ckp12-FC"
 #define CHECKPOINT_AFTER_RESOLVE_SURROGATES         "ckp13-RS"
-#define CHECKPOINT_AFTER_OUTPUT                     "ckp14-FIN"
 
 
 
@@ -101,6 +101,12 @@ main(int argc, char **argv) {
   int    preMergeRezLevel = -1;
   int    repeatRezLevel   = 0;
 
+  int    minSamplesForOverride = 100;
+
+  int    outputOverlapOnlyContigEdges = 0;
+  int    demoteSingletonScaffolds = TRUE;
+  int    checkRepeatBranchPattern = FALSE;
+
   int    restartFromCheckpoint = -1;
   char  *restartFromLogical    = "ckp00";
 
@@ -110,7 +116,7 @@ main(int argc, char **argv) {
 
   int    firstFileArg = 0;
 
-  int32  outputFragsPerPartition = 0;
+  char  filepath[2048];
 
 #if defined(CHECK_CONTIG_ORDERS) || defined(CHECK_CONTIG_ORDERS_INCREMENTAL)
   ContigOrientChecker * coc;
@@ -118,7 +124,20 @@ main(int argc, char **argv) {
   assert(coc != NULL);
 #endif
 
-  GlobalData = new Globals_CGW();
+  GlobalData = CreateGlobal_CGW();  
+
+  GlobalData->maxSequencedbSize            = MAX_SEQUENCEDB_SIZE;
+  GlobalData->repeatRezLevel               = repeatRezLevel;
+  GlobalData->stoneLevel                   = 0;
+  GlobalData->ignoreChaffUnitigs           = 0;
+  GlobalData->performCleanupScaffolds      = 1;
+  GlobalData->debugLevel                   = 0;
+  GlobalData->cgbUniqueCutoff              = CGB_UNIQUE_CUTOFF;
+  GlobalData->cgbDefinitelyUniqueCutoff    = CGB_UNIQUE_CUTOFF;
+  GlobalData->cgbApplyMicrohetCutoff       = -1;         // This basically turns it off, unless enabled
+  GlobalData->cgbMicrohetProb              = 1.e-05;     // scores less than this are considered repeats
+  GlobalData->doInterleavedScaffoldMerging = 1;
+  GlobalData->allowDemoteMarkedUnitigs     = TRUE;       // allow toggled unitigs to be demoted to be repeat if they were marked unique
 
   argc = AS_configure(argc, argv);
 
@@ -131,11 +150,14 @@ main(int argc, char **argv) {
     if        (strcmp(argv[arg], "-C") == 0) {
       GlobalData->performCleanupScaffolds = 0;
 
+    } else if (strcmp(argv[arg], "-p") == 0) {
+      GlobalData->closurePlacement = atoi(argv[++arg]);
+
     } else if (strcmp(argv[arg], "-D") == 0) {
       GlobalData->debugLevel = atoi(argv[++arg]);
 
     } else if (strcmp(argv[arg], "-E") == 0) {
-      GlobalData->outputOverlapOnlyContigEdges = 1;
+      outputOverlapOnlyContigEdges = 1;
 
     } else if (strcmp(argv[arg], "-e") == 0) {
       GlobalData->cgbMicrohetProb = atof(argv[++arg]);
@@ -147,10 +169,7 @@ main(int argc, char **argv) {
       generateOutput = 0;
 
     } else if (strcmp(argv[arg], "-g") == 0) {
-      strcpy(GlobalData->gkpStoreName, argv[++arg]);
-
-    } else if (strcmp(argv[arg], "-t") == 0) {
-      strcpy(GlobalData->tigStoreName, argv[++arg]);
+      strcpy(GlobalData->Gatekeeper_Store_Name, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-I") == 0) {
       GlobalData->ignoreChaffUnitigs = 1;
@@ -161,9 +180,6 @@ main(int argc, char **argv) {
     } else if (strcmp(argv[arg], "-j") == 0) {
       GlobalData->cgbUniqueCutoff = atof(argv[++arg]);
 
-    } else if (strcmp(argv[arg], "-K") == 0) {
-      GlobalData->removeNonOverlapingContigsFromScaffold = 1;
-
     } else if (strcmp(argv[arg], "-k") == 0) {
       GlobalData->cgbDefinitelyUniqueCutoff = atof(argv[++arg]);
 
@@ -171,19 +187,13 @@ main(int argc, char **argv) {
       GlobalData->doInterleavedScaffoldMerging = 0;
 
     } else if (strcmp(argv[arg], "-m") == 0) {
-      GlobalData->minSamplesForOverride = atoi(argv[++arg]);
+      minSamplesForOverride = atoi(argv[++arg]);
 
     } else if (strcmp(argv[arg], "-N") == 0) {
       restartFromLogical = argv[++arg];
 
     } else if (strcmp(argv[arg], "-o") == 0) {
-      strcpy(GlobalData->outputPrefix, argv[++arg]);
-
-    } else if (strcmp(argv[arg], "-B") == 0) {
-      outputFragsPerPartition = atoi(argv[++arg]);
-
-    } else if (strcmp(argv[arg], "-P") == 0) {
-      GlobalData->closurePlacement = atoi(argv[++arg]);
+      strcpy(GlobalData->File_Name_Prefix, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-p") == 0) {
       preMergeRezLevel = atoi(argv[++arg]);
@@ -210,17 +220,14 @@ main(int argc, char **argv) {
     } else if (strcmp(argv[arg], "-s") == 0) {
       GlobalData->stoneLevel = atoi(argv[++arg]);
 
-    } else if (strcmp(argv[arg], "-U") == 0) {
-      GlobalData->doUnjiggleWhenMerging = 1;
-
     } else if (strcmp(argv[arg], "-u") == 0) {
       strcpy(GlobalData->unitigOverlaps, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-Z") == 0) {
-      GlobalData->demoteSingletonScaffolds = FALSE;
+      demoteSingletonScaffolds = FALSE;
 
     } else if (strcmp(argv[arg], "-z") == 0) {
-      GlobalData->checkRepeatBranchPattern = TRUE;
+      checkRepeatBranchPattern = TRUE;
 
     } else if ((argv[arg][0] != '-') && (firstFileArg == 0)) {
       firstFileArg = arg;
@@ -234,10 +241,10 @@ main(int argc, char **argv) {
     arg++;
   }
 
-  if (GlobalData->gkpStoreName[0] == 0)
+  if (GlobalData->Gatekeeper_Store_Name[0] == 0)
     err++;
 
-  if (GlobalData->outputPrefix[0] == 0)
+  if (GlobalData->File_Name_Prefix[0] == 0)
     err++;
 
   if (cutoffToInferSingleCopyStatus > 1.0)
@@ -245,7 +252,8 @@ main(int argc, char **argv) {
 
   if (err) {
     fprintf(stderr, "usage: %s [options] -g <GatekeeperStoreName> -o <OutputPath> <unitigs*.cgb>\n", argv[0]);
-    fprintf(stderr, "   -C           Don't cleanup scaffolds\n");    
+    fprintf(stderr, "   -C           Don't cleanup scaffolds\n");
+    fprintf(stderr, "   -p <int>     how to place closure reads. 0 - place at first location found, 1 - place at best gap, 2 - allow to be placed in multiple gaps\n");
     fprintf(stderr, "   -D <lvl>     Debug\n");
     fprintf(stderr, "   -E           output overlap only contig edges\n");
     fprintf(stderr, "   -e <thresh>  Microhet score probability cutoff\n");
@@ -257,13 +265,11 @@ main(int argc, char **argv) {
     fprintf(stderr, "   -I           ignore chaff unitigs\n");
     fprintf(stderr, "   -i <thresh>  Set max coverage stat for microhet determination of non-uniqueness (default -1)\n");
     fprintf(stderr, "   -j <thresh>  Set min coverage stat for definite uniqueness\n");
-    fprintf(stderr, "   -K           Allow kicking out a contig placed in a scaffold by mate pairs that has no overlaps to both its left and right neighbor contigs.\n");
     fprintf(stderr, "   -k <thresh>  Set max coverage stat for possible uniqueness\n");
     fprintf(stderr, "   -M           don't do interleaved scaffold merging\n");
     fprintf(stderr, "   -m <min>     Number of mate samples to recompute an insert size, default is 100\n");
     fprintf(stderr, "   -N <ckp>     restart from checkpoint location 'ckp' (see the timing file)\n");
     fprintf(stderr, "   -o           Output Name (required)\n");
-    fprintf(stderr, "   -P <int>     how to place closure reads. 0 - place at first location found, 1 - place at best gap, 2 - allow to be placed in multiple gaps\n");
     fprintf(stderr, "   -R <ckp>     restart from checkpoint file number 'ckp'\n");
     fprintf(stderr, "   -r <lvl>     repeat resolution level\n");
     fprintf(stderr, "   -S <t>       place all frags in singly-placed surrogates if at least fraction <x> can be placed\n");
@@ -272,7 +278,6 @@ main(int argc, char **argv) {
     fprintf(stderr, "                                 (which really mean t = 0.0, but triggers a better algorithm)\n");
     fprintf(stderr, "                    if <t> =  0, do not resolve surrogate fragments\n");
     fprintf(stderr, "   -s <lvl>     stone throwing level\n");
-    fprintf(stderr, "   -U           after inserting rocks/stones try shifting contig positions back to their original location when computing overlaps to see if they overlap with the rock/stone and allow them to merge if they do\n");
     fprintf(stderr, "   -u <file>    load these overlaps (from BOG) into the scaffold graph\n");
     fprintf(stderr, "   -v           verbose\n");
     fprintf(stderr, "   -Z           Don't demote singleton scaffolds\n");
@@ -280,10 +285,10 @@ main(int argc, char **argv) {
 
     fprintf(stderr, "\n");
 
-    if (GlobalData->gkpStoreName[0] == 0)
+    if (GlobalData->Gatekeeper_Store_Name[0] == 0)
       fprintf(stderr, "ERROR:  No gatekeeper (-g) supplied.\n");
 
-    if (GlobalData->outputPrefix[0] == 0)
+    if (GlobalData->File_Name_Prefix[0] == 0)
       fprintf(stderr, "ERROR:  No output prefix (-o) supplied.\n");
 
     if (cutoffToInferSingleCopyStatus > 1.0)
@@ -308,21 +313,33 @@ main(int argc, char **argv) {
     GlobalData->repeatRezLevel = repeatRezLevel;
 
 
+  if (generateOutput) {
+    sprintf(filepath, "%s.cgw", GlobalData->File_Name_Prefix);
+    GlobalData->cgwfp = File_Open(filepath, "w", TRUE);
+
+    sprintf(filepath, "%s.cgw_contigs", GlobalData->File_Name_Prefix);
+    GlobalData->ctgfp = File_Open(filepath, "w", TRUE);
+
+    sprintf(filepath, "%s.cgw_scaffolds", GlobalData->File_Name_Prefix);
+    GlobalData->scffp = File_Open(filepath, "w", TRUE);
+  }
+
   if (strcasecmp(restartFromLogical, CHECKPOINT_AFTER_BUILDING_SCAFFOLDS) < 0) {
     fprintf(stderr, "Beginning CHECKPOINT_AFTER_BUILDING_SCAFFOLDS\n");
 
     //  Create the checkpoint from scratch
-    ScaffoldGraph = CreateScaffoldGraph(GlobalData->outputPrefix);
+    //  TRUE -- doRezOnContigs
+    ScaffoldGraph = CreateScaffoldGraph(TRUE, GlobalData->File_Name_Prefix);
 
-    ProcessInput(firstFileArg, argc, argv);    // Handle the rest of the first file
+    ProcessInput(GlobalData, firstFileArg, argc, argv);    // Handle the rest of the first file
 
     LoadDistData();
 
-    fprintf(stderr,"* Splitting chimeric input unitigs\n");
+    fprintf(GlobalData->stderrc,"* Splitting chimeric input unitigs\n");
 
-    ComputeMatePairStatisticsRestricted(UNITIG_OPERATIONS, GlobalData->minSamplesForOverride, "unitig_preinitial");
+    ComputeMatePairStatisticsRestricted(UNITIG_OPERATIONS, minSamplesForOverride, "unitig_preinitial");
     SplitInputUnitigs(ScaffoldGraph);
-    ComputeMatePairStatisticsRestricted(UNITIG_OPERATIONS, GlobalData->minSamplesForOverride, "unitig_initial");
+    ComputeMatePairStatisticsRestricted(UNITIG_OPERATIONS, minSamplesForOverride, "unitig_initial");
 
     BuildGraphEdgesDirectly(ScaffoldGraph->CIGraph);
 
@@ -342,8 +359,8 @@ main(int argc, char **argv) {
 
     //  Mark some Unitigs/Chunks/CIs as repeats based on overlaps GRANGER 2/2/07
     //
-    if (GlobalData->checkRepeatBranchPattern)
-      DemoteUnitigsWithRBP(stderr, ScaffoldGraph->CIGraph);
+    if (checkRepeatBranchPattern)
+      DemoteUnitigsWithRBP(GlobalData->stderrc, ScaffoldGraph->CIGraph);
 
     //  At this Point we've constructed the CIGraph
 
@@ -352,6 +369,8 @@ main(int argc, char **argv) {
       ChunkOverlapperT *tmp = ScaffoldGraph->ContigGraph->overlapper;
       ScaffoldGraph->ContigGraph->overlapper = ScaffoldGraph->CIGraph->overlapper;
       ScaffoldGraph->CIGraph->overlapper = tmp;
+
+      ScaffoldGraph->RezGraph = ScaffoldGraph->ContigGraph;
     }
 
     BuildInitialContigs(ScaffoldGraph);
@@ -359,13 +378,13 @@ main(int argc, char **argv) {
     CheckCIScaffoldTs(ScaffoldGraph);
 
     if(GlobalData->debugLevel > 0){
-      CheckEdgesAgainstOverlapper(ScaffoldGraph->ContigGraph);
+      CheckEdgesAgainstOverlapper(ScaffoldGraph->RezGraph);
       CheckSurrogateUnitigs();
     }
 
     CheckpointScaffoldGraph(CHECKPOINT_AFTER_BUILDING_SCAFFOLDS, "after building scaffolds");
   } else {
-    LoadScaffoldGraphFromCheckpoint(GlobalData->outputPrefix,restartFromCheckpoint, TRUE);
+    LoadScaffoldGraphFromCheckpoint(GlobalData->File_Name_Prefix,restartFromCheckpoint, TRUE);
 
     //  Dump stats on the loaded checkpoint
     //GeneratePlacedContigGraphStats(tmpBuffer,0);
@@ -373,7 +392,7 @@ main(int argc, char **argv) {
   }
 
 
-  ScaffoldGraph->tigStore->flushCache();
+  clearCacheSequenceDB(ScaffoldGraph->sequenceDB);
 
 
 
@@ -382,11 +401,11 @@ main(int argc, char **argv) {
     fprintf(stderr, "Beginning CHECKPOINT_AFTER_CLEANING_SCAFFOLDS\n");
 
     if(GlobalData->debugLevel > 0)
-      DumpContigs(stderr,ScaffoldGraph, FALSE);
+      DumpContigs(GlobalData->stderrc,ScaffoldGraph, FALSE);
 
     ValidateAllContigEdges(ScaffoldGraph, FIX_CONTIG_EDGES);
 
-    // Transitive reduction of ContigGraph followed by construction of SEdges
+    // Transitive reduction of RezGraph followed by construction of SEdges
     RebuildScaffolds(ScaffoldGraph, TRUE);
 
     //  rocks is called inside of here
@@ -397,13 +416,13 @@ main(int argc, char **argv) {
     int ctme     = time(0);
     int changed  = TRUE;
 
-    fprintf(stderr,"** Running Level 1 Repeat Rez **\n");
+    fprintf(GlobalData->stderrc,"** Running Level 1 Repeat Rez **\n");
 
     while ((changed) && (iter < iterMax)) {
-      CheckEdgesAgainstOverlapper(ScaffoldGraph->ContigGraph);
+      CheckEdgesAgainstOverlapper(ScaffoldGraph->RezGraph);
       CheckCITypes(ScaffoldGraph);
 
-      changed = RepeatRez(GlobalData->repeatRezLevel, GlobalData->outputPrefix);
+      changed = RepeatRez(GlobalData->repeatRezLevel, GlobalData->File_Name_Prefix);
 
       if (changed){
         CheckCIScaffoldTs(ScaffoldGraph);
@@ -411,7 +430,7 @@ main(int argc, char **argv) {
         // merge in stuff placed by rocks, assuming its position is correct!
         CleanupScaffolds(ScaffoldGraph, FALSE, NULLINDEX, FALSE);
 
-        // Transitive reduction of ContigGraph followed by construction of SEdges
+        // Transitive reduction of RezGraph followed by construction of SEdges
         RebuildScaffolds(ScaffoldGraph, FALSE);
 
         //  If we've been running for 2 hours, AND we've not just
@@ -432,7 +451,7 @@ main(int argc, char **argv) {
 #endif
 
     if(GlobalData->debugLevel > 0)
-      DumpCIScaffolds(stderr,ScaffoldGraph, FALSE);
+      DumpCIScaffolds(GlobalData->stderrc,ScaffoldGraph, FALSE);
 
     CheckpointScaffoldGraph(CHECKPOINT_AFTER_CLEANING_SCAFFOLDS, "after scaffold cleaning");
   }
@@ -466,7 +485,7 @@ main(int argc, char **argv) {
   }
 
 
-  ScaffoldGraph->tigStore->flushCache();
+  clearCacheSequenceDB(ScaffoldGraph->sequenceDB);
 
 
   /*
@@ -480,7 +499,7 @@ main(int argc, char **argv) {
   // Convert single-contig scaffolds that are marginally unique back
   // to unplaced contigs so they might be placed as stones
   //
-  if (GlobalData->demoteSingletonScaffolds)
+  if (demoteSingletonScaffolds)
     DemoteSmallSingletonScaffolds();
 
 
@@ -490,7 +509,7 @@ main(int argc, char **argv) {
     fprintf(stderr, "Beginning CHECKPOINT_AFTER_STONES\n");
 
     CheckCIScaffoldTs(ScaffoldGraph);
-    Throw_Stones(GlobalData->outputPrefix, GlobalData->stoneLevel, FALSE);
+    Throw_Stones(GlobalData->File_Name_Prefix, GlobalData->stoneLevel, FALSE);
     CheckCIScaffoldTs(ScaffoldGraph);
 
     ValidateAllContigEdges(ScaffoldGraph, FIX_CONTIG_EDGES);
@@ -539,7 +558,7 @@ main(int argc, char **argv) {
   }
 
 
-  ScaffoldGraph->tigStore->flushCache();
+  clearCacheSequenceDB(ScaffoldGraph->sequenceDB);
 
   if ((strcasecmp(restartFromLogical, CHECKPOINT_AFTER_FINAL_ROCKS) < 0) &&
       (GlobalData->repeatRezLevel > 0)) {
@@ -549,10 +568,10 @@ main(int argc, char **argv) {
     fprintf(stderr, "Beginning CHECKPOINT_AFTER_FINAL_ROCKS\n");
 
     do {
-      extra_rocks = Fill_Gaps(GlobalData->outputPrefix, GlobalData->repeatRezLevel, iter);
-      fprintf(stderr, "Threw additional %d rocks on iter %d\n", extra_rocks, iter);
+      extra_rocks = Fill_Gaps(GlobalData, GlobalData->File_Name_Prefix, GlobalData->repeatRezLevel, iter);
+      fprintf(GlobalData->stderrc, "Threw additional %d rocks on iter %d\n", extra_rocks, iter);
 
-      ScaffoldGraph->tigStore->flushCache();
+      clearCacheSequenceDB(ScaffoldGraph->sequenceDB);
     } while (extra_rocks > 1 && iter < MAX_EXTRA_ROCKS_ITERS);
 
     CheckpointScaffoldGraph(CHECKPOINT_AFTER_FINAL_ROCKS, "after final rocks");
@@ -564,12 +583,12 @@ main(int argc, char **argv) {
 
     CheckCIScaffoldTs (ScaffoldGraph);
 
-    int partial_stones = Throw_Stones(GlobalData->outputPrefix, GlobalData->stoneLevel, TRUE);
+    int partial_stones = Throw_Stones(GlobalData->File_Name_Prefix, GlobalData->stoneLevel, TRUE);
 
     CheckCIScaffoldTs (ScaffoldGraph);
     ValidateAllContigEdges(ScaffoldGraph, FIX_CONTIG_EDGES);
 
-    ScaffoldGraph->tigStore->flushCache();
+    clearCacheSequenceDB(ScaffoldGraph->sequenceDB);
 
     fprintf (stderr, "Threw %d partial stones\n", partial_stones);
 #if defined(CHECK_CONTIG_ORDERS) || defined(CHECK_CONTIG_ORDERS_INCREMENTAL)
@@ -595,13 +614,13 @@ main(int argc, char **argv) {
     fprintf(stderr, "Beginning CHECKPOINT_AFTER_FINAL_CONTAINED_STONES\n");
 
     CheckCIScaffoldTs (ScaffoldGraph);
-    int contained_stones = Toss_Contained_Stones (GlobalData->outputPrefix, GlobalData->stoneLevel, 0);
+    int contained_stones = Toss_Contained_Stones (GlobalData->File_Name_Prefix, GlobalData->stoneLevel, 0);
     ValidateAllContigEdges(ScaffoldGraph, FIX_CONTIG_EDGES);
     CheckCIScaffoldTs (ScaffoldGraph);
-    fprintf (stderr, "**** Finished Final Contained Stones level %d ****\n", GlobalData->stoneLevel);
+    fprintf (GlobalData->stderrc, "**** Finished Final Contained Stones level %d ****\n", GlobalData->stoneLevel);
 
     CleanupScaffolds (ScaffoldGraph, FALSE, NULLINDEX, FALSE);
-    ScaffoldGraph->tigStore->flushCache();
+    clearCacheSequenceDB(ScaffoldGraph->sequenceDB);
 
     fprintf(stderr, "Threw %d contained stones\n", contained_stones);
 
@@ -653,15 +672,7 @@ main(int argc, char **argv) {
     fprintf(stderr, "Beginning CHECKPOINT_AFTER_RESOLVE_SURROGATES\n");
 
     resolveSurrogates(placeAllFragsInSinglePlacedSurros, cutoffToInferSingleCopyStatus);
-    // Call resolve surrogate twice, this is necessary for finishing (closure) reads.
-    // Consider a closure read and its two bounding reads, named left and right:
-    //    If one (right) is placed in a unique region while the other (left) is in a surrogate itself, the closure read cannot be placed
-    //    However, once the surrogate bounding read is placed (and fully incorporated which happens at the very end of resolveSurrogates)
-    //    the closure read can be placed. 
-    //    Therefore, we run resolve surrogates twice. 
-    // Note that is closure reads are themselves mated, it may be necessary to do a third round of placement.  
-    resolveSurrogates(placeAllFragsInSinglePlacedSurros, cutoffToInferSingleCopyStatus);
-    
+
     CheckpointScaffoldGraph(CHECKPOINT_AFTER_RESOLVE_SURROGATES, "after resolve surrogates");
   }
 
@@ -669,10 +680,10 @@ main(int argc, char **argv) {
   //  expensive, usually dies on a negative variance assert, and as
   //  far as BPW knows, unused.
   //
-  //Show_Reads_In_Gaps (GlobalData->outputPrefix);
+  //Show_Reads_In_Gaps (GlobalData->File_Name_Prefix);
 
-  ComputeMatePairStatisticsRestricted(SCAFFOLD_OPERATIONS, GlobalData->minSamplesForOverride, "scaffold_final");
-  ComputeMatePairStatisticsRestricted(CONTIG_OPERATIONS, GlobalData->minSamplesForOverride, "contig_final");
+  ComputeMatePairStatisticsRestricted(SCAFFOLD_OPERATIONS, minSamplesForOverride, "scaffold_final");
+  ComputeMatePairStatisticsRestricted(CONTIG_OPERATIONS, minSamplesForOverride, "contig_final");
 
   GenerateCIGraph_U_Stats();
   GenerateLinkStats(ScaffoldGraph->CIGraph,"final",0);
@@ -686,38 +697,48 @@ main(int argc, char **argv) {
   for (j = 0; j < GetNumVA_CIFragT(ScaffoldGraph->CIFrags); j++) {
     CIFragT * frag = GetCIFragT(ScaffoldGraph->CIFrags, j);
          
-    if (ScaffoldGraph->gkpStore->gkStore_getFRGtoPLC(frag->read_iid) != 0) {
-      AS_UID uid = getGatekeeperIIDtoUID(ScaffoldGraph->gkpStore, frag->read_iid, AS_IID_FRG);
+    if (ScaffoldGraph->gkpStore->gkStore_getFRGtoPLC(frag->iid) != 0) {
+      AS_UID uid = getGatekeeperIIDtoUID(ScaffoldGraph->gkpStore, frag->iid, AS_IID_FRG);
       if (frag->contigID != -1) {
-        ChunkInstanceT * ctg = GetGraphNode(ScaffoldGraph->ContigGraph, frag->contigID);            
+        ChunkInstanceT * ctg = GetGraphNode(ScaffoldGraph->RezGraph, frag->contigID);            
         fprintf(stderr, "CLOSURE_READS: CLOSURE READ %s PLACED=%d CHAFF=%d SINGLETON=%d IN ASM type %c in SCF %d\n", AS_UID_toString(uid), frag->flags.bits.isPlaced, frag->flags.bits.isChaff, frag->flags.bits.isSingleton, frag->type, ctg->scaffoldID);
       }
     }
   }
 #endif
 
-  ScaffoldGraph->tigStore->flushCache();
+  clearCacheSequenceDB(ScaffoldGraph->sequenceDB);
 
   FixupLengthsScaffoldTs(ScaffoldGraph);
 
   if(generateOutput){
-    CelamyAssembly(GlobalData->outputPrefix);
+    CelamyAssembly(GlobalData->File_Name_Prefix);
 
     MarkContigEdges();
+    OutputMateDists(ScaffoldGraph);
+
     ComputeMatePairDetailedStatus();
+    OutputFrags(ScaffoldGraph);
 
-    //  Note that OutputContigs partitions the tigStore, and closes ScaffoldGraph->tigStore.  The
-    //  only operation valid after this function is CheckpointScaffoldGraph().
-
+    // We always have multiAlignments for Unitigs
     OutputUnitigsFromMultiAligns();
-    OutputContigsFromMultiAligns(outputFragsPerPartition);
+    OutputUnitigLinksFromMultiAligns();
 
-    CheckpointScaffoldGraph(CHECKPOINT_AFTER_OUTPUT, "after output");
+    if(GlobalData->debugLevel > 0){
+      DumpContigs(GlobalData->stderrc,ScaffoldGraph, FALSE);
+      DumpCIScaffolds(GlobalData->stderrc,ScaffoldGraph, FALSE);
+    }
+
+    OutputContigsFromMultiAligns();
+    OutputContigLinks(ScaffoldGraph, outputOverlapOnlyContigEdges);
+
+    OutputScaffolds(ScaffoldGraph);
+    OutputScaffoldLinks(ScaffoldGraph);
   }
 
   DestroyScaffoldGraph(ScaffoldGraph);
 
-  delete GlobalData;
+  DeleteGlobal_CGW(GlobalData);
 
   fprintf(stderr,"* Bye *\n");
 

@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char const *rcsid = "$Id: AS_GKP_dump.c,v 1.53 2009-12-02 12:52:22 skoren Exp $";
+static char const *rcsid = "$Id: AS_GKP_dump.c,v 1.50 2009-08-14 13:37:06 skoren Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,10 +31,9 @@ static char const *rcsid = "$Id: AS_GKP_dump.c,v 1.53 2009-12-02 12:52:22 skoren
 
 void
 dumpGateKeeperInfo(char       *gkpStoreName,
-                   int         asTable,
-                   int         withoutUIDs) {
+                   int         asTable) {
 
-  gkStore   *gkp = new gkStore(gkpStoreName, FALSE, FALSE, withoutUIDs);
+  gkStore   *gkp = new gkStore(gkpStoreName, FALSE, FALSE);
   if (gkp == NULL) {
     fprintf(stderr, "Failed to open %s\n", gkpStoreName);
     exit(1);
@@ -71,9 +70,9 @@ dumpGateKeeperInfo(char       *gkpStoreName,
     fprintf(stdout, F_U32"\tplcWarnings\n", gkp->inf.plcWarnings);
     fprintf(stdout, "\n");
     fprintf(stdout, F_U32"\tnumRandom\n",   gkp->inf.numRandom);
-    fprintf(stdout, F_U32"\tnumPacked\n",   gkp->inf.numPacked);
-    fprintf(stdout, F_U32"\tnumNormal\n",   gkp->inf.numNormal);
-    fprintf(stdout, F_U32"\tnumStrobe\n",    gkp->inf.numStrobe);
+    fprintf(stdout, F_U32"\tnumShort\n",    gkp->inf.numShort);
+    fprintf(stdout, F_U32"\tnumMedium\n",   gkp->inf.numMedium);
+    fprintf(stdout, F_U32"\tnumLong\n",     gkp->inf.numLong);
   }
 
   gkFragment    fr;
@@ -137,12 +136,8 @@ dumpGateKeeperInfo(char       *gkpStoreName,
   //  Per Library
 
   for (j=0; j<gkp->gkStore_getNumLibraries() + 1; j++) {
-   if (withoutUIDs == TRUE && j != 0) 
-      fprintf(stdout, "%d\t", j);
-   else
-      fprintf(stdout, "%s\t", (j == 0 ? "LegacyUnmatedReads" : AS_UID_toString(gkp->gkStore_getLibrary(j)->libraryUID)));
-
-    fprintf(stdout, F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\n",
+    fprintf(stdout, "%s\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\t"F_U32"\n",
+            (j == 0) ? "LegacyUnmatedReads" : AS_UID_toString(gkp->gkStore_getLibrary(j)->libraryUID),
             numActivePerLib[j], numDeletedPerLib[j], numMatedPerLib[j], readLengthPerLib[j], clearLengthPerLib[j]);
   }
 
@@ -162,9 +157,8 @@ dumpGateKeeperLibraries(char       *gkpStoreName,
                         AS_IID      begIID,
                         AS_IID      endIID,
                         char       *iidToDump,
-                        int         asTable,
-                        int         withoutUIDs) {
-  gkStore   *gkp = new gkStore(gkpStoreName, FALSE, FALSE, withoutUIDs);
+                        int         asTable) {
+  gkStore   *gkp = new gkStore(gkpStoreName, FALSE, FALSE);
 
   int       i;
 
@@ -186,7 +180,7 @@ dumpGateKeeperLibraries(char       *gkpStoreName,
 
       if (asTable) {
         fprintf(stdout, "%s\t"F_IID"\t%s\t%.3f\t%.3f\t%d\n",
-                (withoutUIDs == TRUE ? "NA" : AS_UID_toString(gkpl->libraryUID)), i,
+                AS_UID_toString(gkpl->libraryUID), i,
                 AS_READ_ORIENT_NAMES[gkpl->orientation],
                 gkpl->mean,
                 gkpl->stddev,
@@ -220,9 +214,8 @@ dumpGateKeeperFragments(char       *gkpStoreName,
                         char       *iidToDump,
                         int         dumpWithSequence,
                         int         dumpClear,
-                        int         asTable,
-                        int         withoutUIDs) {
-  gkStore   *gkp = new gkStore(gkpStoreName, FALSE, FALSE, withoutUIDs);
+                        int         asTable) {
+  gkStore   *gkp = new gkStore(gkpStoreName, FALSE, FALSE);
 
   if (begIID < 1)
     begIID = 1;
@@ -257,9 +250,9 @@ dumpGateKeeperFragments(char       *gkpStoreName,
 
       if (asTable) {
         fprintf(stdout, "%s\t"F_IID"\t%s\t"F_IID"\t%s\t"F_IID"\t%d\t%d\t%s\t%d\t%d\t%d\n",
-                (withoutUIDs == TRUE ? "NA" : AS_UID_toString(fr.gkFragment_getReadUID())), fr.gkFragment_getReadIID(),
-                (withoutUIDs == TRUE ? "NA" : AS_UID_toString(mateuid)), mateiid,
-                (withoutUIDs == TRUE ? "NA" : AS_UID_toString(libuid)), libiid,
+                AS_UID_toString(fr.gkFragment_getReadUID()), fr.gkFragment_getReadIID(),
+                AS_UID_toString(mateuid), mateiid,
+                AS_UID_toString(libuid), libiid,
                 fr.gkFragment_getIsDeleted(),
                 fr.gkFragment_getIsNonRandom(),
                 AS_READ_ORIENT_NAMES[fr.gkFragment_getOrientation()],
@@ -1012,39 +1005,4 @@ dumpGateKeeperAsVelvet(char       *gkpStoreName,
 
   delete fs;
   delete gkp;
-}
-
-int
-dumpGateKeeperIsFeatureSet(char      *gkpStoreName,
-                           AS_IID     libIID,
-                           char      *featureName)
-{
-   assert(featureName != NULL);
-  
-   gkStore *gkp = new gkStore(gkpStoreName, FALSE, FALSE, TRUE);
-   int isSet = 0;
-   uint32 i;
-   
-   uint32 begIID, endIID;
-   begIID = endIID = libIID;
-   if (libIID <= 0 || libIID > gkp->gkStore_getNumLibraries()) {   
-      begIID = 1;
-      endIID = gkp->gkStore_getNumLibraries();
-   }
-
-   for (i=begIID; i<=endIID; i++) {
-      gkLibrary      *gkpl = gkp->gkStore_getLibrary(i);
-      LibraryMesg     lmesg;
-      uint32          f;
-      gkpl->gkLibrary_encodeFeatures(&lmesg);
-
-      for (f=0; f<lmesg.num_features; f++)
-         if (strcasecmp(lmesg.features[f], featureName) == 0)
-            isSet |= atoi(lmesg.values[f]);
-
-      gkpl->gkLibrary_encodeFeaturesCleanup(&lmesg);
-   }
-   
-   delete gkp;
-   return isSet;
 }

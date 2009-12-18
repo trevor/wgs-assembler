@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: overmerry.C,v 1.39 2009-12-18 04:29:34 brianwalenz Exp $";
+const char *mainid = "$Id: overmerry.C,v 1.37 2009-07-31 15:11:23 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,14 +38,19 @@ const char *mainid = "$Id: overmerry.C,v 1.39 2009-12-18 04:29:34 brianwalenz Ex
 #include "libmeryl.H"
 
 
-#define MAX_COUNT_GLOBAL     0x01
-#define MAX_COUNT_FRAG_MEAN  0x02
-#define MAX_COUNT_FRAG_MODE  0x03
-
-
-
-//  Instead of using the internal overlap, which has enough extra stuff in it that we cannot store a
-//  sequence iid for the table sequence and have it be small, we make our own overlap structure.
+//  Instead of using the internal overlap, which has enough extra
+//  stuff in it that we cannot store a sequence iid for the table
+//  sequence and have it be small, we make our own overlap structure.
+//
+//  The order of bit fields is compiler dependent.  To avoid the messy
+//  and somewhat expensive comparsion operator below, we need to
+//  handle to bits ourself.  This is only needed for sorting, plus,
+//  everywhere else, we want to use bit fields.  So, we use the
+//  setInteger() method to store the info initially, sort, then
+//  unpackInteger() to set the bit fields.
+//
+//  For the sort to work, the high order bits must be tseq, then cnt,
+//  then qpos, then tpos.  The sort doesn't care about pal or fwd.
 
 class kmerhit {
 public:
@@ -69,28 +74,30 @@ public:
     if (cnt > 255)
       cnt = 255;
 
-    dat.val.tseq = tseq;
-    dat.val.cnt  = cnt;
-    dat.val.qpos = qpos;
-    dat.val.tpos = tpos;
-    dat.val.pal  = pal;
-    dat.val.fwd  = fwd;
+    dat.num  = 0;
+    dat.num |= (tseq & u64bitMASK(30)) << 32;
+    dat.num |= (cnt  & u64bitMASK(8) ) << 24;
+    dat.num |= (qpos & u64bitMASK(11)) << 13;
+    dat.num |= (tpos & u64bitMASK(11)) << 2;
+    dat.num |= (pal  & u64bitMASK(1) ) << 1;
+    dat.num |= (fwd  & u64bitMASK(1) );
   };
 
   void  unpackInteger(void) {
+    u64bit  integer = dat.num;
+
+    dat.num      = u64bitZERO;
+    dat.val.tseq = (integer >> 32) & u64bitMASK(30);
+    dat.val.cnt  = (integer >> 24) & u64bitMASK(8);
+    dat.val.qpos = (integer >> 13) & u64bitMASK(11);
+    dat.val.tpos = (integer >>  2) & u64bitMASK(11);
+    dat.val.pal  = (integer >>  1) & u64bitMASK(1);
+    dat.val.fwd  = (integer      ) & u64bitMASK(1);
   };
 
 
   bool  operator<(kmerhit const that) const {
-    if (dat.val.tseq != that.dat.val.tseq)
-      return(dat.val.tseq < that.dat.val.tseq);
-    if (dat.val.cnt  != that.dat.val.cnt)
-      return(dat.val.cnt  < that.dat.val.cnt);
-    if (dat.val.qpos != that.dat.val.qpos)
-      return(dat.val.qpos < that.dat.val.qpos);
-    if (dat.val.tpos != that.dat.val.tpos)
-      return(dat.val.tpos < that.dat.val.tpos);
-    return(false);
+    return (dat.num < that.dat.num);
   };
 };
 
@@ -99,14 +106,13 @@ public:
 class ovmGlobalData {
 public:
   ovmGlobalData() {
-    gkpPath        = 0L;
-    merCountsFile  = 0L;
-    merSize        = 23;
-    compression    = 1;
-    maxCountGlobal = 1024 * 1024 * 1024;
-    maxCountType   = MAX_COUNT_GLOBAL;
-    numThreads     = 4;
-    beVerbose      = false;
+    gkpPath       = 0L;
+    merCountsFile = 0L;
+    merSize       = 23;
+    compression   = 1;
+    maxCount      = 1024 * 1024 * 1024;
+    numThreads    = 4;
+    beVerbose     = false;
 
     qGK  = 0L;
     qFS  = 0L;
@@ -240,7 +246,7 @@ public:
     //  their reverse-complement mer.
     //
     if (MF)
-      tPS->filter(2, maxCountGlobal);
+      tPS->filter(2, maxCount);
 
     delete MF;
   };
@@ -262,8 +268,7 @@ public:
   char    *merCountsFile;
   uint32   merSize;
   uint32   compression;
-  uint32   maxCountGlobal;
-  uint32   maxCountType;
+  uint32   maxCount;
   uint32   numThreads;
   bool     beVerbose;
 
@@ -395,7 +400,7 @@ public:
     iid = fr->gkFragment_getReadIID();
     uid = fr->gkFragment_getReadUID();
 
-    memset(seq, 0, AS_READ_MAX_NORMAL_LEN);
+    memset(seq, 0, AS_READ_MAX_LEN);
     strcpy(seq, fr->gkFragment_getSequence());
 
     ovsLen = 0;
@@ -430,7 +435,7 @@ public:
   AS_IID      iid;
   AS_UID      uid;
 
-  char        seq[AS_READ_MAX_NORMAL_LEN+1];
+  char        seq[AS_READ_MAX_LEN+1];
 
   uint32      ovsLen;  //  Overlap Storage, waiting for output
   uint32      ovsMax;
@@ -440,86 +445,6 @@ public:
 
 
 
-u32bit
-ovmWorker_analyzeReadForThreshold(ovmGlobalData    *g,
-                                  ovmThreadData    *t,
-                                  ovmComputation   *s,
-                                  merStream        *sMSTR,
-                                  uint32           *sSPAN) {
-
-  u32bit  maxCount = 0;
-  u32bit  cnt = 0;
-  u32bit  ave = 0;
-
-  while (sMSTR->nextMer()) {
-    u32bit  c = (u32bit)g->tPS->countExact(sMSTR->theFMer());
-
-    if (c > 1) {
-      sSPAN[cnt]  = c;
-      ave        += c;
-      cnt++;
-    }
-  }
-
-  u32bit  minc = 0;  //  Min count observed
-  u32bit  maxc = 0;  //  Max count observed
-
-  u32bit  medi = 0;  //  Median count
-  u32bit  mean = 0;  //  Mean count;
-
-  u32bit  mode = 0;  //  Modal count
-  u32bit  mcnt = 0;  //  Times we saw the modal count
-
-  u32bit  mtmp = 0;  //  A temporary for counting the mode
-
-  if (cnt > 0) {
-    std::sort(sSPAN, sSPAN + cnt);
-
-    minc = sSPAN[0];
-    medi = sSPAN[cnt/2];
-    maxc = sSPAN[cnt-1];
-    mean = sSPAN[0];
-
-    mode  = sSPAN[0];
-    mcnt  = 1;
-
-    mtmp = 1;
-
-    for (u32bit i=1; i<cnt; i++) {
-      mean += sSPAN[i];
-
-      if (sSPAN[i] == sSPAN[i-1])
-        mtmp++;
-      else
-        mtmp = 1;
-
-      if (mcnt < mtmp) {
-        mode = sSPAN[i-1];
-        mcnt = mtmp;
-      }
-    }
-
-    mean /= cnt;
-  }
-
-  fprintf(stderr, "FRAG %u MIN %u MED %u MAX %u MEAN %u MODE %u (%u) NEWMAX %u\n",
-          s->iid, minc, medi, maxc, mean, mode, mcnt, maxCount);
-
-  sMSTR->rewind();
-
-  switch (g->maxCountType) {
-    case MAX_COUNT_FRAG_MEAN:
-      maxCount = mean;
-      break;
-    case MAX_COUNT_FRAG_MODE:
-      maxCount = mode;
-    default:
-      maxCount = 0;
-  }
-
-  return(maxCount);
-}
-
 
 
 void
@@ -528,34 +453,15 @@ ovmWorker(void *G, void *T, void *S) {
   ovmThreadData    *t = (ovmThreadData  *)T;
   ovmComputation   *s = (ovmComputation *)S;
 
-  OVSoverlap        overlap = {0};
+  OVSoverlap        overlap;
 
-  merStream        *sMSTR  = new merStream(t->qKB,
-                                           new seqStream(s->seq + s->beg, s->end - s->beg),
-                                           false, true);
-  uint32           *sSPAN  = new uint32 [s->end - s->beg];
+  t->hitsLen = 0;
 
-  u32bit            maxCountForFrag = g->maxCountGlobal;
+  merStream *sMSTR  = new merStream(t->qKB,
+                                    new seqStream(s->seq + s->beg, s->end - s->beg),
+                                    false, true);
+  uint32    *sSPAN  = new uint32 [s->end - s->beg];
 
-  switch (g->maxCountType) {
-    case MAX_COUNT_GLOBAL:
-      maxCountForFrag = g->maxCountGlobal;
-      break;
-
-    case MAX_COUNT_FRAG_MEAN:
-      maxCountForFrag = ovmWorker_analyzeReadForThreshold(g, t, s, sMSTR, sSPAN);
-      break;
-
-    case MAX_COUNT_FRAG_MODE:
-      maxCountForFrag = ovmWorker_analyzeReadForThreshold(g, t, s, sMSTR, sSPAN);
-      break;
-
-    default:
-      assert(0);
-      break;
-  }
-
-  t->hitsLen  = 0;
   t->posnFLen = 0;
   t->posnRLen = 0;
 
@@ -571,7 +477,7 @@ ovmWorker(void *G, void *T, void *S) {
     if (sMSTR->theFMer() == sMSTR->theRMer()) {
       g->tPS->getExact(sMSTR->theFMer(), t->posnF, t->posnFMax, t->posnFLen, fcount);
 
-      if (fcount < maxCountForFrag) {
+      if (fcount < g->maxCount) {
         for (u32bit i=0; i<t->posnFLen; i++)
           t->addHit(g->tSS, s->iid, qpos, t->posnF[i], fcount, 1, 0);
       }
@@ -605,7 +511,7 @@ ovmWorker(void *G, void *T, void *S) {
       }
 
 
-      if (tcount < maxCountForFrag) {
+      if (tcount < g->maxCount) {
         for (u32bit i=0; i<t->posnFLen; i++)
           t->addHit(g->tSS, s->iid, qpos, t->posnF[i], tcount, 0, 1);
         for (u32bit i=0; i<t->posnRLen; i++)
@@ -681,13 +587,7 @@ ovmWorker(void *G, void *T, void *S) {
     //
     overlap.a_iid                      = t->hits[i].dat.val.tseq;
     overlap.b_iid                      = s->iid;
-
-    overlap.dat.dat[0] = 0;
-    overlap.dat.dat[1] = 0;
-#if AS_OVS_NWORDS > 2
-    overlap.dat.dat[2] = 0;
-#endif
-
+    overlap.dat.mer.datpad             = 0;
     overlap.dat.mer.compression_length = g->compression;
     overlap.dat.mer.fwd                = t->hits[i].dat.val.fwd;
     overlap.dat.mer.palindrome         = t->hits[i].dat.val.pal;
@@ -764,7 +664,7 @@ int
 main(int argc, char **argv) {
   ovmGlobalData  *g = new ovmGlobalData;
 
-  //assert(sizeof(kmerhit) == 8);
+  assert(sizeof(kmerhit) == 8);
 
   argc = AS_configure(argc, argv);
 
@@ -778,22 +678,8 @@ main(int argc, char **argv) {
       g->merSize = atoi(argv[++arg]);
     } else if (strcmp(argv[arg], "-c") == 0) {
       g->compression = atoi(argv[++arg]);
-
     } else if (strcmp(argv[arg], "-T") == 0) {
-      ++arg;
-
-      //  Do NOT reset maxCountGlobal on the per frag types.  We might want to use the global to
-      //  limit pathological cases.
-      //
-      //  Do NOT set maxCountType on the global setting.  This will let us do "-T mean -T 100" or
-      //  "-T 100 -T mean".
-      //
-      if        (strcmp(argv[arg], "mean") == 0)
-        g->maxCountType   = MAX_COUNT_FRAG_MEAN;
-      else if (strcmp(argv[arg], "mode") == 0)
-        g->maxCountType   = MAX_COUNT_FRAG_MODE;
-      else
-        g->maxCountGlobal = atoi(argv[arg]);
+      g->maxCount = atoi(argv[++arg]);
 
     } else if (strcmp(argv[arg], "-mc") == 0) {
       g->merCountsFile = argv[++arg];

@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: AS_PER_gkStream.C,v 1.6 2009-10-28 17:27:29 brianwalenz Exp $";
+static char *rcsid = "$Id: AS_PER_gkStream.C,v 1.3 2009-07-13 02:31:33 brianwalenz Exp $";
 
 #include "AS_PER_gkpStore.h"
 
@@ -32,97 +32,154 @@ gkStream::gkStream(gkStore *gkp_, AS_IID beginIID_, AS_IID endIID_, uint32 flags
   curIID  = 0;
   endIID  = 0;
 
-  fpk = NULL;
+  fsm = NULL;
 
-  fnm = NULL;
-  snm = NULL;
-  qnm = NULL;
+  fmd = NULL;
+  smd = NULL;
+  qmd = NULL;
 
-  fsb = NULL;
-  ssb = NULL;
-  qsb = NULL;
+  flg = NULL;
+  slg = NULL;
+  qlg = NULL;
 
   reset(beginIID_, endIID_);
 }
 
 gkStream::~gkStream() {
-  closeStream(fpk);
+  closeStream(fsm);
 
-  closeStream(fnm);
-  closeStream(snm);
-  closeStream(qnm);
+  closeStream(fmd);
+  closeStream(smd);
+  closeStream(qmd);
 
-  closeStream(fsb);
-  closeStream(ssb);
-  closeStream(qsb);
+  closeStream(flg);
+  closeStream(slg);
+  closeStream(qlg);
 }
 
 
 void
-gkStream::reset(AS_IID bgnIID_, AS_IID endIID_) {
-  uint32  bgnPK=0, endPK=0, valPK=0;
-  uint32  bgnNM=0, endNM=0, valNM=0;
-  uint32  bgnSB=0, endSB=0, valSB=0;
+gkStream::reset(AS_IID beginIID_, AS_IID endIID_) {
+  uint32  stType    = 0;
+  uint32  stTiid    = 0;
+  uint32  edType    = 0;
+  uint32  edTiid    = 0;
 
-  if (bgnIID_ <= 0)
-    bgnIID_ = 1;
+  uint32  firstmd   = 0;
+  uint32  firstlg   = 0;
+
+  if (beginIID_ <= 0)
+    beginIID_ = 1;
   if (endIID_ <= 0)
     endIID_ = gkp->gkStore_getNumFragments();
 
   //  Close any open streams, we'll open them again as needed.
 
-  closeStream(fpk);  fpk = NULL;
+  closeStream(fsm);  fsm = NULL;
 
-  closeStream(fnm);  fnm = NULL;
-  closeStream(snm);  snm = NULL;
-  closeStream(qnm);  qnm = NULL;
+  closeStream(fmd);  fmd = NULL;
+  closeStream(smd);  smd = NULL;
+  closeStream(qmd);  qmd = NULL;
 
-  closeStream(fsb);  fsb = NULL;
-  closeStream(ssb);  ssb = NULL;
-  closeStream(qsb);  qsb = NULL;
+  closeStream(flg);  flg = NULL;
+  closeStream(slg);  slg = NULL;
+  closeStream(qlg);  qlg = NULL;
 
-  //  Position the metadata stream -- this code is similar to gkStore_load.
+  //  Position the metadata stream -- this code is similar to
+  //  gkStore_loadPartition.
 
-  bgnIID = bgnIID_;
-  curIID = bgnIID_ - 1;
+  bgnIID = beginIID_;
+  curIID = beginIID_ - 1;
   endIID = endIID_;
 
-  gkp->gkStore_computeRanges(bgnIID, endIID,
-                             bgnPK, endPK, valPK,
-                             bgnNM, endNM, valNM,
-                             bgnSB, endSB, valSB);
+  gkp->gkStore_decodeTypeFromIID(bgnIID, stType, stTiid);
+  gkp->gkStore_decodeTypeFromIID(endIID, edType, edTiid);
 
-  if (valPK) {
-    fpk = openStream(gkp->fpk);
+  if (stType == edType) {
+    switch (stType) {
+      case GKFRAGMENT_SHORT:
+        fsm = openStream(gkp->fsm);
+        resetStream(fsm, stTiid, edTiid);
+        break;
+      case GKFRAGMENT_MEDIUM:
+        fmd = openStream(gkp->fmd);
+        smd = openStream(gkp->smd);
+        qmd = openStream(gkp->qmd);
 
-    resetStream(fpk, bgnPK, endPK);
+        firstmd = stTiid;
+
+        resetStream(fmd, stTiid, edTiid);
+        break;
+      case GKFRAGMENT_LONG:
+        flg = openStream(gkp->flg);
+        slg = openStream(gkp->slg);
+        qlg = openStream(gkp->qlg);
+
+        firstlg = stTiid;
+
+        resetStream(flg, stTiid, edTiid);
+        break;
+    }
+  } else if ((stType == GKFRAGMENT_SHORT) && (edType == GKFRAGMENT_MEDIUM)) {
+    fsm = openStream(gkp->fsm);
+
+    fmd = openStream(gkp->fmd);
+    smd = openStream(gkp->smd);
+    qmd = openStream(gkp->qmd);
+
+    resetStream(fsm, stTiid, STREAM_UNTILEND);
+    resetStream(fmd, STREAM_FROMSTART, edTiid);
+
+  } else if ((stType == GKFRAGMENT_SHORT) && (edType == GKFRAGMENT_LONG)) {
+    fsm = openStream(gkp->fsm);
+
+    fmd = openStream(gkp->fmd);
+    smd = openStream(gkp->smd);
+    qmd = openStream(gkp->qmd);
+
+    flg = openStream(gkp->flg);
+    slg = openStream(gkp->slg);
+    qlg = openStream(gkp->qlg);
+
+    resetStream(fsm, stTiid, STREAM_UNTILEND);
+    resetStream(fmd, STREAM_FROMSTART, STREAM_UNTILEND);
+    resetStream(flg, STREAM_FROMSTART, edTiid);
+
+  } else if ((stType == GKFRAGMENT_MEDIUM) && (edType == GKFRAGMENT_LONG)) {
+    fmd = openStream(gkp->fmd);
+    smd = openStream(gkp->smd);
+    qmd = openStream(gkp->qmd);
+
+    flg = openStream(gkp->flg);
+    slg = openStream(gkp->slg);
+    qlg = openStream(gkp->qlg);
+
+    firstmd = stTiid;
+
+    resetStream(fmd, stTiid, STREAM_UNTILEND);
+    resetStream(flg, STREAM_FROMSTART, edTiid);
+  } else {
+    assert(0);
   }
 
-  if (valNM) {
-    gkNormalFragment nm;
+  //  Position the streams.  This requires us to grab a couple fragments.
 
-    fnm = openStream(gkp->fnm);
-    snm = openStream(gkp->snm);
-    qnm = openStream(gkp->qnm);
+  if (firstmd) {
+    gkMediumFragment md;
 
-    resetStream(fnm, bgnNM, endNM);
+    getIndexStore(gkp->fmd, firstmd, &md);
 
-    getIndexStore(gkp->fnm, bgnNM, &nm);
-
-    resetStream(snm, nm.seqOffset, STREAM_UNTILEND);
-    resetStream(qnm, nm.qltOffset, STREAM_UNTILEND);
+    resetStream(smd, md.seqOffset, STREAM_UNTILEND);
+    resetStream(qmd, md.qltOffset, STREAM_UNTILEND);
   }
 
-  if (valSB) {
-    gkStrobeFragment sb;
+  if (firstlg) {
+    gkLongFragment lg;
 
-    fsb = openStream(gkp->fsb);
-    resetStream(fsb, bgnSB, endSB);
+    getIndexStore(gkp->flg, firstlg, &lg);
 
-    getIndexStore(gkp->fsb, bgnSB, &sb);
-
-    resetStream(ssb, sb.seqOffset, STREAM_UNTILEND);
-    resetStream(qsb, sb.qltOffset, STREAM_UNTILEND);
+    resetStream(slg, lg.seqOffset, STREAM_UNTILEND);
+    resetStream(qlg, lg.qltOffset, STREAM_UNTILEND);
   }
 }
 
@@ -131,8 +188,6 @@ gkStream::reset(AS_IID bgnIID_, AS_IID endIID_) {
 int
 gkStream::next(gkFragment *fr) {
   int           loaded = 0;
-  uint32        type   = 0;
-  uint32        tiid   = 0;
 
   if ((bgnIID == 0) && (curIID == 0) && (endIID == 0))
     reset(0, 0);
@@ -142,85 +197,45 @@ gkStream::next(gkFragment *fr) {
 
   fr->gkp = gkp;
 
-  if (gkp->IIDtoTYPE == NULL) {
+  //  If nextStream() on whatever stream is open returns 1, we've got
+  //  a valid read.  Otherwise, move to the next type.
 
-    //  A conforming store.  Reads were loaded in the correct order, and we can just return the
-    //  first store that gives us a read.
-
-    if ((!loaded) && (fpk)) {
-      if (nextStream(fpk, &fr->fr.packed, 0, NULL)) {
-        type   = GKFRAGMENT_PACKED;
-        tiid   = curIID;
-        loaded = 1;
-      } else {
-        closeStream(fpk);
-        fpk = NULL;
-      }
+  if ((!loaded) && (fsm)) {
+    if (nextStream(fsm, &fr->fr.sm, 0, NULL)) {
+      fr->type = GKFRAGMENT_SHORT;
+      fr->tiid = curIID;
+      loaded = 1;
+    } else {
+      closeStream(fsm);
+      fsm = NULL;
     }
-
-    if ((!loaded) && (fnm)) {
-      if (nextStream(fnm, &fr->fr.normal, 0, NULL)) {
-        type   = GKFRAGMENT_NORMAL;
-        tiid   = curIID - gkp->inf.numPacked;
-        loaded = 1;
-      } else {
-        closeStream(fnm);
-        fnm = NULL;
-      }
-    }
-
-    if ((!loaded) && (fsb)) {
-      if (nextStream(fsb, &fr->fr.strobe, 0, NULL)) {
-        type   = GKFRAGMENT_STROBE;
-        tiid   = curIID - gkp->inf.numPacked - gkp->inf.numNormal;
-        loaded = 1;
-      } else {
-        closeStream(fsb);
-        fsb = NULL;
-      }
-    }
-
-    if (!loaded) {
-      fprintf(stderr, "gkStream::next()-- Failed to load the next (conforming) fragment.\n");
-      fprintf(stderr, "                   bgnIID=%d curIID=%d endIID=%d\n", bgnIID, curIID, endIID);
-      fprintf(stderr, "                   numPacked=%d numNormal=%d numStrobe=%d\n", gkp->inf.numPacked, gkp->inf.numNormal, gkp->inf.numStrobe);
-    }
-    assert(loaded);
-
-  } else {
-
-    //  Otherwise, not a conforming store.  Use the type map to decide which store to read from.
-
-    type = gkp->IIDtoTYPE[curIID];
-    tiid = gkp->IIDtoTIID[curIID];
-
-    switch (type) {
-      case GKFRAGMENT_PACKED:
-        loaded = nextStream(fpk, &fr->fr.packed, 0, NULL);
-        break;
-      case GKFRAGMENT_NORMAL:
-        loaded = nextStream(fnm, &fr->fr.normal, 0, NULL);
-        break;
-      case GKFRAGMENT_STROBE:
-        loaded = nextStream(fsb, &fr->fr.strobe, 0, NULL);
-        break;
-      default:
-        fprintf(stderr, "gkStream::next()-- invalid type "F_U32" for iid "F_U32"\n", type, curIID);
-        assert(0);
-        break;
-    }
-
-    if (!loaded) {
-      fprintf(stderr, "gkStream::next()-- Failed to load the next (nonconforming) fragment.\n");
-      fprintf(stderr, "                   bgnIID=%d curIID=%d endIID=%d\n", bgnIID, curIID, endIID);
-      fprintf(stderr, "                   numPacked=%d numNormal=%d numStrobe=%d\n", gkp->inf.numPacked, gkp->inf.numNormal, gkp->inf.numStrobe);
-    }
-    assert(loaded);
   }
 
+  if ((!loaded) && (fmd)) {
+    if (nextStream(fmd, &fr->fr.md, 0, NULL)) {
+      fr->type = GKFRAGMENT_MEDIUM;
+      fr->tiid = curIID - gkp->inf.numShort;
+      loaded = 1;
+    } else {
+      closeStream(fmd);
+      fmd = NULL;
+    }
+  }
 
-  fr->type = type;
-  fr->tiid = tiid;
+  if ((!loaded) && (flg)) {
+    if (nextStream(flg, &fr->fr.lg, 0, NULL)) {
+      fr->type = GKFRAGMENT_LONG;
+      fr->tiid = curIID - gkp->inf.numShort - gkp->inf.numMedium;
+      loaded = 1;
+    } else {
+      closeStream(flg);
+      flg = NULL;
+    }
+  }
+
+  if (!loaded) {
+    assert(0);
+  }
 
   gkp->gkStore_getFragmentData(this, fr, flags);
 

@@ -22,12 +22,22 @@
 #ifndef OUTPUT_CGW_H
 #define OUTPUT_CGW_H
 
-static const char *rcsid_OUTPUT_CGW_H = "$Id: Output_CGW.h,v 1.7 2009-12-01 00:20:30 brianwalenz Exp $";
+static const char *rcsid_OUTPUT_CGW_H = "$Id: Output_CGW.h,v 1.5 2008-10-08 22:02:55 brianwalenz Exp $";
+
+void OutputMateDists(ScaffoldGraphT *graph);
+
+void OutputFrags(ScaffoldGraphT *graph);
 
 void MarkContigEdges(void);
 
-void OutputContigsFromMultiAligns(int32 outputFragsPerPartition);
+void OutputContigsFromMultiAligns(void);
+void OutputContigLinks(ScaffoldGraphT *graph, int outputOverlapOnlyContigEdges);
+void OutputScaffoldLinks(ScaffoldGraphT *graph);
+
 void OutputUnitigsFromMultiAligns(void);
+void OutputUnitigLinksFromMultiAligns(void);
+
+void OutputScaffolds(ScaffoldGraphT *graph);
 
 #endif
 

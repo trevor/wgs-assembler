@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: AS_BOG_MateChecker.cc,v 1.83 2009-12-18 05:18:37 brianwalenz Exp $";
+static const char *rcsid = "$Id: AS_BOG_MateChecker.cc,v 1.80 2009-07-30 10:42:55 brianwalenz Exp $";
 
 #include "AS_BOG_Datatypes.hh"
 #include "AS_BOG_BestOverlapGraph.hh"
@@ -369,7 +369,7 @@ void MateChecker::moveContains(UnitigGraph& tigGraph) {
     DoveTailNode         *frags         = new DoveTailNode [thisUnitig->dovetail_path_ptr->size()];
     int                   fragsLen      = 0;
 
-    bool                  verbose       = false;
+    bool                  verbose       = true;
 
     if (verbose)
       fprintf(stderr, "moveContain unitig %d\n", thisUnitig->id());
@@ -568,10 +568,9 @@ void MateChecker::moveContains(UnitigGraph& tigGraph) {
       if (moveToContainer == true) {
         //  Move the fragment to be with its container.
 
-        Unitig         *thatUnitig = (*tigGraph.unitigs)[contUtgID];
+#warning DANGEROUS assume unitig is at id-1 in vector
+        Unitig         *thatUnitig = (*tigGraph.unitigs)[contUtgID - 1];
         DoveTailNode    containee  = *fragIter;
-
-        assert(thatUnitig->id() == contUtgID);
 
         //  Nuke the fragment in the current list
         fragIter->ident        = 999999999;
@@ -585,9 +584,9 @@ void MateChecker::moveContains(UnitigGraph& tigGraph) {
           fprintf(stderr, "Moving contained fragment %d from unitig %d to be with its container %d in unitig %d\n",
                   thisFrgID, thisUtgID, contFrgID, contUtgID);
 
-        assert(bestcont->container == contFrgID);
+        containee.contained = contFrgID;
 
-        thatUnitig->addContainedFrag(thisFrgID, bestcont, verbose);
+        thatUnitig->addContainedFrag(containee, bestcont, verbose);
 
       } else if ((moveToSingleton == true) && (thisUnitig->getNumFrags() != 1)) {
         //  Eject the fragment to a singleton (unless we ARE the singleton)
@@ -671,7 +670,7 @@ void MateChecker::moveContains(UnitigGraph& tigGraph) {
 //
 void MateChecker::splitDiscontinuousUnitigs(UnitigGraph& tigGraph) {
 
-  bool  verbose = false;
+  bool  verbose = true;
 
   for (int  ti=0; ti<tigGraph.unitigs->size(); ti++) {
     Unitig  *unitig = (*tigGraph.unitigs)[ti];
@@ -728,16 +727,14 @@ void MateChecker::splitDiscontinuousUnitigs(UnitigGraph& tigGraph) {
             (_fi->mateIID(splitFrags[0].ident) == 0) &&
             (splitFrags[0].contained != 0)) {
 
-          Unitig           *dangler  = (*tigGraph.unitigs)[unitig->fragIn(splitFrags[0].contained)];
+#warning DANGEROUS assume unitig is at id-1 in vector
+          Unitig           *dangler  = (*tigGraph.unitigs)[unitig->fragIn(splitFrags[0].contained) - 1];
           BestContainment  *bestcont = tigGraph.bog_ptr->getBestContainer(splitFrags[0].ident);
 
-          assert(dangler->id() == unitig->fragIn(splitFrags[0].contained));
-
           if (verbose)
-            fprintf(stderr, "Dangling contained fragment %d in unitig %d -> move them to container unitig %d\n",
-                    splitFrags[0].ident, unitig->id(), dangler->id());
+            fprintf(stderr, "Dangling contained fragment in unitig %d -> move them to container unitig %d\n", unitig->id(), dangler->id());
 
-          dangler->addContainedFrag(splitFrags[0].ident, bestcont, verbose);
+          dangler->addContainedFrag(splitFrags[0], bestcont, verbose);
         } else {
           Unitig *dangler = new Unitig(verbose);
 
@@ -890,8 +887,6 @@ IntervalList* findPeakBad(std::vector<short>* badGraph, int tigLen, int badMateB
 UnitigBreakPoints* MateChecker::computeMateCoverage(Unitig* tig, BestOverlapGraph* bog_ptr, int badMateBreakThreshold) {
   int tigLen = tig->getLength();
 
-  bool verbose = false;
-
   MateLocation positions(_fi);
   positions.buildTable( tig );
   MateCounts *unused = positions.buildHappinessGraphs( tigLen, _globalStats );
@@ -925,18 +920,16 @@ UnitigBreakPoints* MateChecker::computeMateCoverage(Unitig* tig, BestOverlapGrap
       fwdIter++;
       if (lastBreakBBEnd >= bad.bgn) {
         // Skip, instead of combine trying to detect in combine case
-        if (verbose)
-          fprintf(stderr,"Skip fwd bad range %d %d due to backbone %d\n",
-                  bad.bgn, bad.end, lastBreakBBEnd);
+        fprintf(stderr,"Skip fwd bad range %d %d due to backbone %d\n",
+                bad.bgn, bad.end, lastBreakBBEnd);
         continue;
       }
     } else {                     // reverse bad group, break at last frag
       bad = *revIter;
       if (lastBreakBBEnd >= bad.bgn) {
         // Skip, instead of combine trying to detect in combine case
-        if (verbose)
-          fprintf(stderr,"Skip rev bad range %d %d due to backbone %d\n",
-                  bad.bgn, bad.end, lastBreakBBEnd);
+        fprintf(stderr,"Skip rev bad range %d %d due to backbone %d\n",
+                bad.bgn, bad.end, lastBreakBBEnd);
         revIter++;
         continue;
       }
@@ -951,9 +944,8 @@ UnitigBreakPoints* MateChecker::computeMateCoverage(Unitig* tig, BestOverlapGrap
           if ( fwdIter->bgn < bad.end &&
                fwdIter->end > bad.end &&
                bad.end - fwdIter->end < 200) {
-            if (verbose)
-              fprintf(stderr,"Combine bad ranges %d - %d with %d - %d\n",
-                      bad.bgn, bad.end, fwdIter->bgn, fwdIter->end);
+            fprintf(stderr,"Combine bad ranges %d - %d with %d - %d\n",
+                    bad.bgn, bad.end, fwdIter->bgn, fwdIter->end);
             if (bad.bgn == 0) { // ignore reverse at start of tig
               bad.bgn = fwdIter->bgn;
               bad.end = fwdIter->end;
@@ -971,8 +963,7 @@ UnitigBreakPoints* MateChecker::computeMateCoverage(Unitig* tig, BestOverlapGrap
       }
     }
 
-    if (verbose)
-      fprintf(stderr,"Bad peak from %d to %d\n",bad.bgn,bad.end);
+    fprintf(stderr,"Bad peak from %d to %d\n",bad.bgn,bad.end);
 
     for(;tigIter != tig->dovetail_path_ptr->end(); tigIter++) {
       DoveTailNode frag = *tigIter;
@@ -1006,9 +997,8 @@ UnitigBreakPoints* MateChecker::computeMateCoverage(Unitig* tig, BestOverlapGrap
       if (breakNow) {
         combine = false;
         lastBreakBBEnd = currBackboneEnd;
-        if (verbose)
-          fprintf(stderr,"Frg to break in peak bad range is %d fwd %d pos (%d,%d) backbone %d\n",
-                  frag.ident, isFwdBad, loc.bgn, loc.end, currBackboneEnd );
+        fprintf(stderr,"Frg to break in peak bad range is %d fwd %d pos (%d,%d) backbone %d\n",
+                frag.ident, isFwdBad, loc.bgn, loc.end, currBackboneEnd );
         uint32 fragEndInTig = THREE_PRIME;
         // If reverse mate is 1st and overlaps its mate break at 5'
         if ( mloc.mleUtgID2 == tig->id() && isReverse( loc ) &&
@@ -1054,9 +1044,8 @@ UnitigBreakPoints* MateChecker::computeMateCoverage(Unitig* tig, BestOverlapGrap
               bp.inSize = 100001;
               bp.inFrags = 11;
               breaks->push_back( bp );
-              if (verbose)
-                fprintf(stderr,"Might make frg %d singleton, end %d size %d pos %d,%d\n",
-                        frag.ident, fragEndInTig, breaks->size(),loc.bgn,loc.end);
+              fprintf(stderr,"Might make frg %d singleton, end %d size %d pos %d,%d\n",
+                      frag.ident, fragEndInTig, breaks->size(),loc.bgn,loc.end);
             }
           }
         }

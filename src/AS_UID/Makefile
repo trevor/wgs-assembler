@@ -22,8 +22,8 @@
 ###########################################################################
 #
 
-SOURCES   = uidclient.C uidserver.C
-CXX_PROGS = uidclient   uidserver
+SOURCES   = uidclient.C uidsrvd.C SYS_UIDcommon.C SYS_UIDerror.C SYS_UIDclient.C
+CXX_PROGS = uidclient uidsvrd
 
 LIBRARIES = libAS_UID.a libCA.a
 
@@ -44,8 +44,8 @@ ifeq ($(SITE_NAME), LOCAL)
 endif
 
 ifeq ($(SITE_NAME), BRI)
-  SOURCES        += SYS_UIDclient_SERVER.C
-  SITEOBJS       += SYS_UIDclient_SERVER.o
+  SOURCES        += SYS_UIDclient_LOCAL.C
+  SITEOBJS       += SYS_UIDclient_LOCAL.o
 endif
 
 OBJECTS = $(SOURCES:.C=.o)
@@ -56,8 +56,8 @@ include $(LOCAL_WORK)/src/c_make.as
 all: $(LIBRARIES) $(CXX_PROGS)
 	@test -n nop
 
-libAS_UID.a: $(SITEOBJS)
-libCA.a:     $(SITEOBJS)
+libAS_UID.a: SYS_UIDcommon.o SYS_UIDclient.o SYS_UIDerror.o $(SITEOBJS)
+libCA.a:     SYS_UIDcommon.o SYS_UIDclient.o SYS_UIDerror.o $(SITEOBJS)
 
-uidserver: uidserver.o libAS_UID.a libAS_UTL.a
+uidsvrd:   uidsrvd.o   libAS_UID.a libAS_UTL.a
 uidclient: uidclient.o libAS_UID.a libAS_UTL.a

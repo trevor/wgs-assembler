@@ -19,13 +19,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: AS_BOG_UnitigGraph.cc,v 1.119 2009-11-30 20:37:39 brianwalenz Exp $";
+static const char *rcsid = "$Id: AS_BOG_UnitigGraph.cc,v 1.114 2009-08-07 19:17:36 brianwalenz Exp $";
 
 #include "AS_BOG_Datatypes.hh"
 #include "AS_BOG_UnitigGraph.hh"
 #include "AS_BOG_BestOverlapGraph.hh"
-
-#include "MultiAlignStore.h"
 
 #undef max
 
@@ -53,7 +51,7 @@ UnitigGraph::checkUnitigMembership(void) {
       for (DoveTailIter it=utg->dovetail_path_ptr->begin(); it != utg->dovetail_path_ptr->end(); it++) {
         if (it->ident > _fi->numFragments())
           fprintf(stderr, "HUH?  ident=%d numfrags=%d\n", it->ident, _fi->numFragments());
-        inUnitig[it->ident] = ti;
+        inUnitig[it->ident] = utg->id();
         nfrg++;
       }
     }
@@ -165,10 +163,10 @@ UnitigGraph::~UnitigGraph() {
 }
 
 
-void UnitigGraph::build(ChunkGraph *cg_ptr, bool enableIntersectionBreaking, bool enableBubblePopping, char *output_prefix) {
+void UnitigGraph::build(ChunkGraph *cg_ptr, bool unitigIntersectBreaking, char *output_prefix) {
   bool verbose = false;
 
-  // Initialize where we've been to nowhere
+  // Initialize where we've been to nowhere; "Do not retraverse list"
   Unitig::resetFragUnitigMap( _fi->numFragments() );
 
   // Invert the containment map to key by container, instead of containee
@@ -182,52 +180,194 @@ void UnitigGraph::build(ChunkGraph *cg_ptr, bool enableIntersectionBreaking, boo
 
   fprintf(stderr, "==> BUILDING UNITIGS from %d fragments.\n", _fi->numFragments());
 
-  //  There is no 0th unitig.
-  unitigs->push_back(NULL);
-
   uint32 frag_idx;
   while ((frag_idx = cg_ptr->nextFragByChunkLength()) > 0) {
-    if ((_fi->fragmentLength(frag_idx) == 0) ||
-        (Unitig::fragIn(frag_idx) != 0) ||
-        (bog_ptr->isContained(frag_idx) == true))
-      //  Skip deleted fragments, already placed fragments, and contained fragments.
+
+    if (_fi->fragmentLength(frag_idx) == 0)
+      //  Deleted fragment.
       continue;
 
-    populateUnitig(frag_idx, false);
+    if (Unitig::fragIn(frag_idx) != 0)
+      //  Fragment already placed.
+      continue;
+
+    if (bog_ptr->isContained(frag_idx) == true)
+      //  A contained fragment, will deal with later
+      continue;
+
+    //  Make new unitig, then follow edges off the 5' end.
+
+    Unitig *utg = new Unitig(verbose);
+
+    unitigs->push_back(utg);
+
+    populateUnitig(utg,
+                   frag_idx, FIVE_PRIME,
+                   0, NULL,
+                   verbose);
+
+    //  Attempt to go off the 3' end
+
+    BestEdgeOverlap   *tpBest   = bog_ptr->getBestEdgeOverlap(frag_idx, THREE_PRIME);
+
+    if (tpBest->frag_b_id == 0)
+      //  No next fragment
+      continue;
+
+    if (Unitig::fragIn(tpBest->frag_b_id) == utg->id())
+      //  Already in this unitig; deal with circularity later
+      continue;
+
+    if (Unitig::fragIn(tpBest->frag_b_id)) {
+      //  Save the outgoing intersection edge for later splitting.
+      fprintf(stderr,"unitigIntersect: unitig %5d frag %7d -> unitig %5d frag %7d\n",
+              utg->id(), frag_idx, Unitig::fragIn(tpBest->frag_b_id), tpBest->frag_b_id);
+      unitigIntersect[tpBest->frag_b_id].push_back(frag_idx);
+      continue;
+    }
+
+    //  Otherwise, we can extend the unitig, walking off the other end
+    //  of the unitig.
+
+    utg->reverseComplement();
+
+    fprintf(stderr, "continue unitig %u (length = "F_S64", lastfraglen = %u) with frag %u (hang %d %d)\n",
+            utg->id(), utg->getLength(), _fi->fragmentLength(frag_idx),
+            tpBest->frag_b_id, tpBest->ahang, -tpBest->bhang);
+
+    populateUnitig(utg,
+                   tpBest->frag_b_id, (tpBest->bend == THREE_PRIME) ? FIVE_PRIME : THREE_PRIME,
+                   frag_idx, tpBest,
+                   verbose);
   }
 
   reportOverlapsUsed("overlaps.afterbuild");
 
   fprintf(stderr, "==> BUILDING UNITIGS catching missed fragments.\n");
 
-  //  Pick up frags missed above, leftovers from possibly circular unitigs
+  // Pick up frags missed above, possibly circular unitigs
+  for(frag_idx=1; frag_idx<=_fi->numFragments(); frag_idx++){
 
-  for (frag_idx=1; frag_idx <= _fi->numFragments(); frag_idx++) {
-    if ((_fi->fragmentLength(frag_idx) == 0) ||
-        (Unitig::fragIn(frag_idx) != 0) ||
-        (bog_ptr->isContained(frag_idx) == true))
+    if (_fi->fragmentLength(frag_idx) == 0)
       continue;
 
-    populateUnitig(frag_idx, false);
+    if (Unitig::fragIn(frag_idx) > 0)
+      continue;
+
+    uint32 fp_dst_frag_id = bog_ptr->getBestEdgeOverlap(frag_idx, FIVE_PRIME) ->frag_b_id;
+    uint32 tp_dst_frag_id = bog_ptr->getBestEdgeOverlap(frag_idx, THREE_PRIME)->frag_b_id;
+
+    if (bog_ptr->isContained(frag_idx) == 0)
+      fprintf(stderr, "frag %d missed; fp_dst_frag_id=%d tp_dst_frag_id=%d contained=%d\n",
+              frag_idx, fp_dst_frag_id, tp_dst_frag_id, bog_ptr->isContained(frag_idx));
+
+    if ((fp_dst_frag_id != 0) &&
+        (tp_dst_frag_id != 0)) {
+
+      Unitig *utg = new Unitig(true);
+
+      populateUnitig(utg, frag_idx, FIVE_PRIME, 0, NULL, verbose);
+
+      unitigs->push_back(utg);
+    } else {
+      // Should both be null or neither null otherwise main loop
+      // failed to find it
+      assert(fp_dst_frag_id == 0);
+      assert(tp_dst_frag_id == 0);
+    }
   }
 
   reportOverlapsUsed("overlaps.afterbuild2");
 
-  if (enableIntersectionBreaking)
+  fprintf(stderr, "==> BREAKING UNITIGS.\n");
+
+  if (unitigIntersectBreaking)
     breakUnitigs(cMap, output_prefix);
 
   reportOverlapsUsed("overlaps.afterbreak");
 
-  placeContains();
+  fprintf(stderr, "==> PLACING CONTAINED FRAGMENTS\n");
+
+  for (int  ti=0; ti<unitigs->size(); ti++) {
+    Unitig  *thisUnitig = (*unitigs)[ti];
+    if (thisUnitig)
+      thisUnitig->recomputeFragmentPositions(cMap, bog_ptr);
+  }
 
   reportOverlapsUsed("overlaps.aftercontains");
 
-  placeZombies();
+  ////////////////////////////////////////
+  //
+  //  This is a huge hack to get around a bug somewhere before us.  We
+  //  seem to not be placing all fragments.  So, run through all
+  //  fragments, and for anything not placed, toss it into a new
+  //  unitig.  Let scaffolder figure out where to put it.
+  //
+  //  Notice the similarity between this code and checkUnitigMembership().
+  //
+  {
+    fprintf(stderr, "==> SEARCHING FOR ZOMBIES\n");
 
-  checkUnitigMembership();
+    uint32 *inUnitig   = new uint32 [_fi->numFragments()+1];
+    int     numZombies = 0;
 
-  if (enableBubblePopping)
-    popBubbles();
+    //  Sorry, poor fella that has more than 987,654,321 unitigs.  I
+    //  can't imagine the rest of the pipeline would run though.
+    //
+    //  Mark fragments as dead.
+    //
+    for (uint32 i=0; i<_fi->numFragments()+1; i++)
+      inUnitig[i] = 987654321;
+
+    //  ZZZzzzzaapaapppp!  IT'S ALIVE!
+    //
+    for (int  ti=0; ti<unitigs->size(); ti++) {
+      Unitig  *utg = (*unitigs)[ti];
+
+      if (utg)
+        for (DoveTailIter it=utg->dovetail_path_ptr->begin(); it != utg->dovetail_path_ptr->end(); it++)
+          inUnitig[it->ident] = utg->id();
+    }
+
+    //  Anything still dead?
+    //
+    for (uint32 i=0; i<_fi->numFragments()+1; i++) {
+      if (_fi->fragmentLength(i) > 0) {
+        if (inUnitig[i] == 0) {
+          //  We'll catch this error inna second in checkUnitigMembership().
+        } else if (inUnitig[i] != 987654321) {
+          //  We'll count this inna second there too.
+        } else {
+          //  Ha!  Gotcha!  You're now a resurrected brain eating
+          //  zomibie?  Some day we'll figure out how to put you in
+          //  properly.  For now, enjoy the ride.
+
+          Unitig *utg = new Unitig(false);
+
+          DoveTailNode frag;
+
+          frag.type         = AS_READ;
+          frag.ident        = i;
+          frag.contained    = 0;
+          frag.delta_length = 0;
+          frag.delta        = NULL;
+
+          frag.position.bgn = 0;
+          frag.position.end = _fi->fragmentLength(i);
+
+          utg->addFrag(frag, 0, true);
+          unitigs->push_back(utg);
+
+          numZombies++;
+        }
+      }
+    }
+
+    if (numZombies > 0)
+      fprintf(stderr, "RESURRECTED %d ZOMBIE FRAGMENTS.\n", numZombies);
+
+    delete inUnitig;
+  }
 
   checkUnitigMembership();
 }
@@ -282,10 +422,12 @@ UnitigGraph::setParentAndHang(ChunkGraph *cg) {
         bestedge5 = NULL;
       }
 
+
       //  Initialize to 'unset'.
       frg->parent       = 0;
       frg->ahang        = 0;
       frg->bhang        = 0;
+
 
       //  Now search for the correct overlap
       //
@@ -337,159 +479,166 @@ UnitigGraph::setParentAndHang(ChunkGraph *cg) {
           }
         }
       }
+
+      //  If we didn't find our best, pick any thing that overlaps us.
+      //  This should only happen for contained fragments.
+
+#if 0
+      //  Unfortunately, we didn't save the overlap info, so we cannot
+      //  set the hangs.
+
+      if (frg->parent == 0) {
+        for (int oi=fi-1; (frg->parent == 0) && (oi >= 0); oi--) {
+          if (tigGraph.bog_ptr->containHaveEdgeTo(frg->ident, oi)) {
+            frg->parent = oi;
+            frg->ahang  = 0;
+            frg->bhang  = 0;
+          }
+        }
+      }
+#endif
+
     }
   }
 }
-
-
 
 
 void
 UnitigGraph::populateUnitig(Unitig           *unitig,
-                            BestEdgeOverlap  *bestnext,
+                            uint32            firstFragID,
+                            uint32            walkEnd,
+                            uint32            lastID,
+                            BestEdgeOverlap  *lastEdge,
                             bool              verbose){
+  uint32            fragID   = firstFragID;
+  uint32            nextID   = 0;
+  int               fragBgn  = 0;
+  int               fragEnd  = 0;
+  BestEdgeOverlap  *nextEdge = NULL;
+  DoveTailNode     frag;
 
-  assert(unitig->getLength() > 0);
+  fprintf(stderr, "populateUnitig()--  STARTS for id %d\n", unitig->id());
 
-  if ((bestnext == NULL) || (bestnext->frag_b_id == 0))
-    //  Nothing to add!
+  if (fragID == 0)
     return;
 
-  DoveTailNode frag = unitig->dovetail_path_ptr->back();
-
-  //  The ID of the last fragment in the unitig, and the end we should walk off of it.
-  int32 lastID  = frag.ident;
-  int32 lastEnd = (frag.position.bgn < frag.position.end) ? THREE_PRIME : FIVE_PRIME;
-
-                   
-  if (Unitig::fragIn(bestnext->frag_b_id) == unitig->id())
-    //  Cicrular unitig.  Deal with later.
+  if (Unitig::fragIn(fragID) != 0)
     return;
 
-  if (Unitig::fragIn(bestnext->frag_b_id) != 0) {
-    //  Intersection.  Remember.
-    fprintf(stderr,"unitigIntersect: unitig %5d frag %7d -> unitig %5d frag %7d (before construction)\n",
-            unitig->id(), lastID, Unitig::fragIn(bestnext->frag_b_id), bestnext->frag_b_id);
-    unitigIntersect[bestnext->frag_b_id].push_back(lastID);
-    return;
+  memset(&frag, 0, sizeof(DoveTailNode));
+
+  //  Decide on a placement for the end of this fragment.  Easy if
+  //  there are no existing fragments, just the length.
+  //
+  if (unitig->getLength() <= 0) {
+    fragBgn = 0;
+    fragEnd = _fi->fragmentLength(fragID);
+    fprintf(stderr, "new unitig; new frag at %d - %d\n", fragBgn, fragEnd);
   }
 
-  //  While there are fragments to add, construct a reverse-edge, and add the fragment.
+  //  With existing fragments, we need to grab the last fragment, get
+  //  the edge that got us to this fragment, and use the bhang there
+  //  to place the end.
+  //
+  if (unitig->getLength() > 0) {
+    int ahang = (lastEdge->ahang > 0) ? lastEdge->ahang : -lastEdge->bhang;
+    int bhang = (lastEdge->ahang > 0) ? lastEdge->bhang : -lastEdge->ahang;
 
-  while (bestnext->frag_b_id != 0) {
-    BestEdgeOverlap  bestprev;
+    DoveTailNode last = unitig->dovetail_path_ptr->back();
 
-    //  Reverse nextedge (points from the unitig to the next fragment to add) so that it points from
-    //  the next fragment to add back to something in the unitig.  If the fragments are
-    //  innie/outtie, we need to reverse the overlap to maintain that the A fragment is forward.
+    assert(last.ident == lastID);
 
-    bestprev.frag_b_id = lastID;
-    bestprev.bend      = lastEnd;
-    bestprev.ahang     = -bestnext->ahang;
-    bestprev.bhang     = -bestnext->bhang;
+    int bgn = (last.position.bgn < last.position.end) ? last.position.bgn : last.position.end;
+    int end = (last.position.bgn < last.position.end) ? last.position.end : last.position.bgn;
 
-    if (bestprev.bend == bestnext->bend) {
-      bestprev.ahang = bestnext->bhang;
-      bestprev.bhang = bestnext->ahang;
-    }
+    //  Deep coverage (and lots of contains) result in placement based
+    //  on hangs being wrong.  We don't know the length of the
+    //  overlap, and any indel in the overlap change the amount
+    //  hanging.  Reset the end to be based on the length of the fragment.
+    //
+    //  This is also reset in AS_BOG_Unitig.c::placeContains().
 
-    //  Call the usual placement routine to place the next fragment relative to the last one.  This
-    //  call depends on which end of the frag-to-be-added we are working with.
+    fragBgn = bgn + ahang;
+    fragEnd = end + bhang;
 
-    frag.ident = bestnext->frag_b_id;
+#warning not knowing the overlap length really hurts.
+    if (fragBgn < fragEnd)
+      fragEnd = fragBgn + _fi->fragmentLength(fragID);
+    else
+      fragBgn = fragEnd + _fi->fragmentLength(fragID);
 
-    int32  bidx5 = -1, bidx3 = -1;
+    fprintf(stderr, "existing unitig; new frag at %d - %d\n", fragBgn, fragEnd);
+  }
 
-    if (unitig->placeFrag(frag, bidx5, (bestnext->bend == THREE_PRIME) ? NULL : &bestprev,
-                          frag, bidx3, (bestnext->bend == THREE_PRIME) ? &bestprev : NULL)) {
-      unitig->addFrag(frag, 0, true);
+  do {
 
-    } else {
+    //  Grab the edge to the next fragment.
 
-      fprintf(stderr, "ERROR:  Failed to place frag %d into BOG path.\n", frag.ident);
-      assert(0);
-    }
+    nextEdge = bog_ptr->getBestEdgeOverlap(fragID, walkEnd);
+    //nextEdge->print(stderr);
 
-    //  Set up for the next fragmnet
+    //  We only work with dovetails.
 
-    lastID  = frag.ident;
-    lastEnd = (frag.position.bgn < frag.position.end) ? THREE_PRIME : FIVE_PRIME;
+    assert(((nextEdge->ahang >= 0) && (nextEdge->bhang >= 0)) ||
+           ((nextEdge->ahang <= 0) && (nextEdge->bhang <= 0)));
 
-    bestnext = bog_ptr->getBestEdgeOverlap(lastID, lastEnd);
+    //  Our ahang and bhang are relative to fragID.
 
-    //  Abort if we intersect, or are circular
+    int ahang = (nextEdge->ahang > 0) ? nextEdge->ahang : -nextEdge->bhang;
+    int bhang = (nextEdge->ahang > 0) ? nextEdge->bhang : -nextEdge->ahang;
 
-    if (Unitig::fragIn(bestnext->frag_b_id) == unitig->id()) {
-      //fprintf(stderr,"unitigIntersect: unitig %5d frag %7d -> unitig %5d frag %7d\n",
-      //        unitig->id(), lastID, Unitig::fragIn(bestnext->frag_b_id), bestnext->frag_b_id);
-      //unitigIntersect[bestnext->frag_b_id].push_back(lastID);
-      //bestnext->frag_b_id = 0;BAD
-      break;
-    }
+    frag.type         = AS_READ;
+    frag.ident        = fragID;
+    frag.contained    = 0;
+    frag.parent       = nextEdge->frag_b_id;
+    frag.sourceInt    = -1;
+    frag.ahang        = ahang;
+    frag.bhang        = bhang;
+    frag.position.bgn = (walkEnd == FIVE_PRIME) ? fragEnd : fragBgn;
+    frag.position.end = (walkEnd == FIVE_PRIME) ? fragBgn : fragEnd;
+    frag.delta_length = 0;
+    frag.delta        = NULL;
 
-    if (Unitig::fragIn(bestnext->frag_b_id) != 0) {
-      fprintf(stderr,"unitigIntersect: unitig %5d frag %7d -> unitig %5d frag %7d (during construction)\n",
-              unitig->id(), lastID, Unitig::fragIn(bestnext->frag_b_id), bestnext->frag_b_id);
-      unitigIntersect[bestnext->frag_b_id].push_back(lastID);
-      //bestnext->frag_b_id = 0;
-      break;
-    }
+    unitig->addFrag(frag, 0, verbose);
+
+    //  Find the start of the next fragment.  See above comment.
+
+    fragBgn += ahang;
+    fragEnd += bhang;
+
+#warning not knowing the overlap length really hurts.
+    if (fragBgn < fragEnd)
+      fragEnd = fragBgn + _fi->fragmentLength(nextEdge->frag_b_id);
+    else
+      fragBgn = fragEnd + _fi->fragmentLength(nextEdge->frag_b_id);
+
+    // Move to next fragment in the chain
+
+    lastID   = fragID;
+    fragID   = nextEdge->frag_b_id;
+    walkEnd  = (nextEdge->bend == FIVE_PRIME) ? THREE_PRIME : FIVE_PRIME;
+
+    //  But stop if we're in a circle
+
+    if (fragID == firstFragID)
+      fragID = 0;
+
+  } while ((fragID != 0) &&
+           (Unitig::fragIn(fragID) == 0));
+
+  fprintf(stderr, "populateUnitig()--  FINISHES for id %d (fragID=%d in unitig %d)\n", unitig->id(), fragID, Unitig::fragIn(fragID));
+
+  //  Save this outgoing intersection point for future use
+  //  (another circular unitig test here too)
+
+  if ((lastID != 0) &&
+      (fragID != 0) &&
+      (Unitig::fragIn(fragID) != 0)) {
+    fprintf(stderr,"unitigIntersect: unitig %5d frag %7d -> unitig %5d frag %7d\n",
+            unitig->id(), lastID, Unitig::fragIn(fragID), fragID);
+    unitigIntersect[fragID].push_back(lastID);
   }
 }
-
-
-
-
-void
-UnitigGraph::populateUnitig(int32 frag_idx,
-                            bool  verbose) {
-
-  Unitig *utg = new Unitig(verbose);
-
-  unitigs->push_back(utg);
-
-  //  Add a first fragment -- to be 'compatable' with the old code, the first fragment is added
-  //  reversed, we walk off of its 5' end, flip it, and add the 3' walk.
-
-  DoveTailNode  frag;
-
-  frag.type         = AS_READ;
-  frag.ident        = frag_idx;
-  frag.contained    = 0;
-  frag.parent       = 0;
-  frag.ahang        = 0;
-  frag.bhang        = 0;
-  frag.position.bgn = _fi->fragmentLength(frag_idx);
-  frag.position.end = 0;
-  frag.delta_length = 0;
-  frag.delta        = NULL;
-
-  utg->addFrag(frag, 0, true);
-
-  //  Add fragments as long as there is a path to follow...from the 3' end of the first fragment.
-
-  BestEdgeOverlap  *bestedge5 = bog_ptr->getBestEdgeOverlap(frag_idx, FIVE_PRIME);
-  BestEdgeOverlap  *bestedge3 = bog_ptr->getBestEdgeOverlap(frag_idx, THREE_PRIME);
-
-  fprintf(stderr, "Adding 5' edges off of fragment %d in unitig %d\n",
-          utg->dovetail_path_ptr->back().ident, utg->id());
-
-  if (bestedge5->frag_b_id)
-    populateUnitig(utg, bestedge5, verbose);
-
-  utg->reverseComplement(false);
-
-  fprintf(stderr, "Adding 3' edges off of fragment %d in unitig %d\n",
-          utg->dovetail_path_ptr->back().ident, utg->id());
-
-  if (bestedge3->frag_b_id)
-    populateUnitig(utg, bestedge3, verbose);
-
-  utg->reverseComplement(false);
-}
-
-
-
 
 void UnitigGraph::breakUnitigs(ContainerMap &cMap, char *output_prefix) {
   FILE *breakFile;
@@ -504,15 +653,9 @@ void UnitigGraph::breakUnitigs(ContainerMap &cMap, char *output_prefix) {
       fprintf(stderr, "Failed to open '%s' to write unitig breaks.\n", name), exit(1);
   }
 
-  fprintf(stderr, "==> BREAKING UNITIGS.\n");
-
   //  Debug output
   for (int  ti=0; ti<unitigs->size(); ti++) {
     Unitig        *tig   = (*unitigs)[ti];
-
-    if (tig == NULL)
-      continue;
-
     DoveTailNode   first = tig->dovetail_path_ptr->front();
     uint32         prev  = 0;
     DoveTailNode   last  = tig->getLastBackboneNode(prev);
@@ -547,10 +690,6 @@ void UnitigGraph::breakUnitigs(ContainerMap &cMap, char *output_prefix) {
 
   for (int  ti=0; ti<tiMax; ti++) {
     Unitig             *tig = (*unitigs)[ti];
-
-    if (tig == NULL)
-      continue;
-
     UnitigBreakPoints   breaks;
     DoveTailNode        lastBackbone;
 
@@ -582,116 +721,121 @@ void UnitigGraph::breakUnitigs(ContainerMap &cMap, char *output_prefix) {
       if (cMap.find(f->ident) != cMap.end())
         fragCount += cMap[f->ident].size();
 
-#ifdef VERBOSEBREAK
+#if 1
+      //  First fragment?
       if (fragIdx == 0) {
         uint32             dtEnd = (isReverse(f->position)) ? THREE_PRIME : FIVE_PRIME;
         BestEdgeOverlap   *bEdge = bog_ptr->getBestEdgeOverlap(f->ident, dtEnd);
 
+#ifdef VERBOSEBREAK
         if ((bEdge) && (bEdge->frag_b_id > 0))
           fprintf(stderr,"unitig %d %c' frag %d points to unitig %d frag %d\n",
                   tig->id(), (dtEnd == THREE_PRIME) ? '3' : '5', f->ident,
                   Unitig::fragIn(bEdge->frag_b_id), bEdge->frag_b_id);
+#endif
       }
 
+      //  Last fragment?
       if (fragIdx + 1 == tig->dovetail_path_ptr->size()) {
         uint32             dtEnd = (isReverse(f->position)) ? FIVE_PRIME : THREE_PRIME;
         BestEdgeOverlap   *bEdge = bog_ptr->getBestEdgeOverlap(f->ident, dtEnd);
 
+#ifdef VERBOSEBREAK
         if ((bEdge) && (bEdge->frag_b_id > 0))
           fprintf(stderr,"unitig %d %c' frag %d points to unitig %d frag %d\n",
                   tig->id(), (dtEnd == THREE_PRIME) ? '3' : '5', f->ident,
                   Unitig::fragIn(bEdge->frag_b_id), bEdge->frag_b_id);
+#endif
       }
 #endif
 
       FragmentEdgeList::const_iterator edge_itr = unitigIntersect.find(f->ident);
 
-      if (edge_itr == unitigIntersect.end())
-        continue;
+      if (edge_itr != unitigIntersect.end()) {
 
-      // We have a set of best edges incoming from other unitigs
-      for (FragmentList::const_iterator fragItr = edge_itr->second.begin();
-           fragItr != edge_itr->second.end();
-           fragItr++) {
-        uint32 inFrag = *fragItr;
+        // We have a set of best edges incoming from other unitigs
+        for (FragmentList::const_iterator fragItr = edge_itr->second.begin();
+             fragItr != edge_itr->second.end();
+             fragItr++) {
+          uint32 inFrag = *fragItr;
 
-        // check if it's incoming frag's 5' best edge.  If not, it must be the 3' edge.
-        uint32            bestEnd  = FIVE_PRIME;
-        BestEdgeOverlap  *bestEdge = bog_ptr->getBestEdgeOverlap(inFrag, bestEnd);
+          // check if it's incoming frag's 5' best edge.  If not, it must be the 3' edge.
+          uint32            bestEnd  = FIVE_PRIME;
+          BestEdgeOverlap  *bestEdge = bog_ptr->getBestEdgeOverlap(inFrag, bestEnd);
 
-        if (bestEdge->frag_b_id != f->ident) {
-          bestEnd  = THREE_PRIME;
-          bestEdge = bog_ptr->getBestEdgeOverlap(inFrag, bestEnd);
-          assert(bestEdge->frag_b_id == f->ident);
-        }
+          if (bestEdge->frag_b_id != f->ident) {
+            bestEnd  = THREE_PRIME;
+            bestEdge = bog_ptr->getBestEdgeOverlap(inFrag, bestEnd);
+            assert(bestEdge->frag_b_id == f->ident);
+          }
 
-        int pos = (bestEdge->bend == FIVE_PRIME) ? f->position.bgn : f->position.end;
+          int pos = (bestEdge->bend == FIVE_PRIME) ? f->position.bgn : f->position.end;
 
-        Unitig *inTig = (*unitigs)[Unitig::fragIn(inFrag)];
+#warning DANGEROUS assume unitig is at id-1 in vector
+          Unitig *inTig = (*unitigs)[Unitig::fragIn(inFrag)-1];
 
-        assert(inTig->id() == Unitig::fragIn(inFrag));
+          if (inTig) {
+            UnitigBreakPoint breakPoint(f->ident, bestEdge->bend);
 
-        if (inTig) {
-          UnitigBreakPoint breakPoint(f->ident, bestEdge->bend);
+            breakPoint.fragPos     = f->position;
+            breakPoint.fragsBefore = fragCount;
+            breakPoint.fragsAfter  = numFragsInUnitig - fragCount;
+            breakPoint.inSize      = inTig->getLength();
+            breakPoint.inFrags     = inTig->getNumFrags();
 
-          breakPoint.fragPos     = f->position;
-          breakPoint.fragsBefore = fragCount;
-          breakPoint.fragsAfter  = numFragsInUnitig - fragCount;
-          breakPoint.inSize      = inTig->getLength();
-          breakPoint.inFrags     = inTig->getNumFrags();
-
-          breaks.push_back(breakPoint);
-        } else {
-          //fprintf(stderr, "  NullBreak tig %5d at frag %7d\n", tig->id(), f->ident);
-        }
+            breaks.push_back(breakPoint);
+          } else {
+            //fprintf(stderr, "  NullBreak tig %5d at frag %7d\n", tig->id(), f->ident);
+          }
 
 #ifdef VERBOSEBREAK
-        fprintf(stderr, "unitig %d (%d frags, len %d) frag %d end %c' into unitig %d frag %d end %c' pos %d\n",
-                Unitig::fragIn(inFrag),
-                inTig->getNumFrags(),
-                inTig->getLength(),
-                inFrag,
-                (bestEnd == FIVE_PRIME) ? '5' : '3',
-                tig->id(),
-                f->ident,
-                (bestEdge->bend == FIVE_PRIME) ? '5' : '3',
-                pos);
+          fprintf(stderr, "unitig %d (%d frags, len %d) frag %d end %c' into unitig %d frag %d end %c' pos %d\n",
+                  Unitig::fragIn(inFrag),
+                  inTig->getNumFrags(),
+                  inTig->getLength(),
+                  inFrag,
+                  (bestEnd == FIVE_PRIME) ? '5' : '3',
+                  tig->id(),
+                  f->ident,
+                  (bestEdge->bend == FIVE_PRIME) ? '5' : '3',
+                  pos);
 #endif
-        {
-          GenericMesg  pmesg;
-          OverlapMesg  omesg;
+          {
+            GenericMesg  pmesg;
+            OverlapMesg  omesg;
 
-          omesg.aifrag          = inFrag;
-          omesg.bifrag          = f->ident;
-          omesg.ahg             = bestEdge->ahang;
-          omesg.bhg             = bestEdge->bhang;
-          omesg.orientation     = AS_UNKNOWN;
-          omesg.overlap_type    = AS_DOVETAIL;
-          omesg.quality         = 0.0;
-          omesg.min_offset      = 0;
-          omesg.max_offset      = 0;
-          omesg.polymorph_ct    = 0;
-          omesg.alignment_trace = NULL;
+            omesg.aifrag          = inFrag;
+            omesg.bifrag          = f->ident;
+            omesg.ahg             = bestEdge->ahang;
+            omesg.bhg             = bestEdge->bhang;
+            omesg.orientation     = AS_UNKNOWN;
+            omesg.overlap_type    = AS_DOVETAIL;
+            omesg.quality         = 0.0;
+            omesg.min_offset      = 0;
+            omesg.max_offset      = 0;
+            omesg.polymorph_ct    = 0;
+            omesg.alignment_trace = NULL;
 #ifdef AS_MSG_USE_OVL_DELTA
-          omesg.alignment_delta = NULL;
+            omesg.alignment_delta = NULL;
 #endif
 
-          if ((bestEnd == FIVE_PRIME) && (bestEdge->bend == FIVE_PRIME))
-            omesg.orientation = AS_OUTTIE;
-          if ((bestEnd == FIVE_PRIME) && (bestEdge->bend == THREE_PRIME))
-            omesg.orientation = AS_ANTI;
-          if ((bestEnd == THREE_PRIME) && (bestEdge->bend == FIVE_PRIME))
-            omesg.orientation = AS_NORMAL;
-          if ((bestEnd == THREE_PRIME) && (bestEdge->bend == THREE_PRIME))
-            omesg.orientation = AS_INNIE;
+            if ((bestEnd == FIVE_PRIME) && (bestEdge->bend == FIVE_PRIME))
+              omesg.orientation = AS_OUTTIE;
+            if ((bestEnd == FIVE_PRIME) && (bestEdge->bend == THREE_PRIME))
+              omesg.orientation = AS_ANTI;
+            if ((bestEnd == THREE_PRIME) && (bestEdge->bend == FIVE_PRIME))
+              omesg.orientation = AS_NORMAL;
+            if ((bestEnd == THREE_PRIME) && (bestEdge->bend == THREE_PRIME))
+              omesg.orientation = AS_INNIE;
 
-          pmesg.t = MESG_OVL;
-          pmesg.m = &omesg;
+            pmesg.t = MESG_OVL;
+            pmesg.m = &omesg;
 
-          WriteProtoMesg_AS(breakFile, &pmesg);
+            WriteProtoMesg_AS(breakFile, &pmesg);
+          }
         }
-      }  //  Over all fragments that intersect with us
-    }  //  Over all fragments in the unitig
+      }
+    }
 
     if (breaks.empty() == false) {
       DoveTailNode  *f = &tig->dovetail_path_ptr->back();
@@ -724,295 +868,10 @@ void UnitigGraph::breakUnitigs(ContainerMap &cMap, char *output_prefix) {
 
       delete newUs;
     }
-  }  //  Over all tigs
+  }
 
   fclose(breakFile);
 }
-
-
-
-void
-UnitigGraph::placeContains(void) {
-  uint32   fragsPlaced  = 1;
-  uint32   fragsPending = 0;
-
-  while (fragsPlaced > 0) {
-    fragsPlaced  = 0;
-    fragsPending = 0;
-
-    fprintf(stderr, "==> PLACING CONTAINED FRAGMENTS\n");
-
-    for (uint32 fid=0; fid<_fi->numFragments()+1; fid++) {
-      BestContainment *bestcont = bog_ptr->getBestContainer(fid);
-      Unitig          *utg;
-
-      if (bestcont == NULL)
-        //  Not a contained fragment.
-        continue;
-
-      if (bestcont->isPlaced == true)
-        //  Containee already placed.
-        continue;
-
-      if (Unitig::fragIn(bestcont->container) == 0) {
-        //  Container not placed (yet).
-        fragsPending++;
-        continue;
-      }
-
-      utg = (*unitigs)[Unitig::fragIn(bestcont->container)];
-      utg->addContainedFrag(fid, bestcont, true);
-
-      bestcont->isPlaced = true;
-
-      fragsPlaced++;
-    }
-
-    fprintf(stderr, "==> PLACING CONTAINED FRAGMENTS - placed %d fragments; still need to place %d\n",
-            fragsPlaced, fragsPending);
-
-    if ((fragsPlaced == 0) && (fragsPending > 0)) {
-      fprintf(stderr, "Stopping contained fragment placement due to zombies.\n");
-      fragsPlaced  = 0;
-      fragsPending = 0;
-    }
-  }
-
-  for (int ti=0; ti<unitigs->size(); ti++) {
-    Unitig *utg = (*unitigs)[ti];
-
-    if (utg)
-      utg->sort();
-  }
-}
-
-
-
-//  This is a huge hack to get around a bug somewhere before us.  We
-//  seem to not be placing all fragments.  So, run through all
-//  fragments, and for anything not placed, toss it into a new
-//  unitig.  Let scaffolder figure out where to put it.
-//
-//  Notice the similarity between this code and checkUnitigMembership().
-//
-void
-UnitigGraph::placeZombies(void) {
-
-  fprintf(stderr, "==> SEARCHING FOR ZOMBIES\n");
-
-  uint32 *inUnitig   = new uint32 [_fi->numFragments()+1];
-  int     numZombies = 0;
-
-  //  Sorry, poor fella that has more than 987,654,321 unitigs.  I
-  //  can't imagine the rest of the pipeline would run though.
-  //
-  //  Mark fragments as dead.
-  //
-  for (uint32 i=0; i<_fi->numFragments()+1; i++)
-    inUnitig[i] = 987654321;
-
-  //  ZZZzzzzaapaapppp!  IT'S ALIVE!
-  //
-  for (int  ti=0; ti<unitigs->size(); ti++) {
-    Unitig  *utg = (*unitigs)[ti];
-
-    if (utg)
-      for (DoveTailIter it=utg->dovetail_path_ptr->begin(); it != utg->dovetail_path_ptr->end(); it++)
-        inUnitig[it->ident] = utg->id();
-  }
-
-  //  Anything still dead?
-  //
-  for (uint32 i=0; i<_fi->numFragments()+1; i++) {
-    if (_fi->fragmentLength(i) > 0) {
-      if (inUnitig[i] == 0) {
-        //  We'll catch this error inna second in checkUnitigMembership().
-      } else if (inUnitig[i] != 987654321) {
-        //  We'll count this inna second there too.
-      } else {
-        //  Ha!  Gotcha!  You're now a resurrected brain eating
-        //  zomibie?  Some day we'll figure out how to put you in
-        //  properly.  For now, enjoy the ride.
-
-        Unitig *utg = new Unitig(false);
-
-        DoveTailNode frag;
-
-        frag.type         = AS_READ;
-        frag.ident        = i;
-        frag.contained    = 0;
-        frag.delta_length = 0;
-        frag.delta        = NULL;
-
-        frag.position.bgn = 0;
-        frag.position.end = _fi->fragmentLength(i);
-
-        utg->addFrag(frag, 0, false);
-        unitigs->push_back(utg);
-
-        numZombies++;
-      }
-    }
-  }
-
-  if (numZombies > 0)
-    fprintf(stderr, "RESURRECTED %d ZOMBIE FRAGMENTS.\n", numZombies);
-
-  delete inUnitig;
-}
-
-
-//  Sometimes, we don't include fragments into a unitig, even though the best overlap off of both
-//  ends is to the same unitig.  This will include those.
-//
-void
-UnitigGraph::popBubbles(void) {
-
-  fprintf(stderr, "==> SEARCHING FOR BUBBLES\n");
-
-  for (int  ti=0; ti<unitigs->size(); ti++) {
-    Unitig        *utg = (*unitigs)[ti];
-
-    if ((utg == NULL) ||
-        (utg->dovetail_path_ptr == NULL) ||
-        (utg->dovetail_path_ptr->size() >= 30))
-      continue;
-
-    uint32         otherUtg  = 987654321;
-    uint32         conflicts = 0;
-    uint32         self      = 0;
-    uint32         nonmated  = 0;
-    uint32         matedcont = 0;
-    uint32         spurs     = 0;
-
-    for (int fi=0; fi<utg->dovetail_path_ptr->size(); fi++) {
-      DoveTailNode *frg = &(*utg->dovetail_path_ptr)[fi];
-
-      int32  frgID = frg->ident;
-      int32  utgID = utg->id();
-
-      BestEdgeOverlap *bestedge5 = bog_ptr->getBestEdgeOverlap(frg->ident, FIVE_PRIME);
-      BestEdgeOverlap *bestedge3 = bog_ptr->getBestEdgeOverlap(frg->ident, THREE_PRIME);
-      BestContainment *bestcont  = bog_ptr->getBestContainer(frg->ident);
-
-      if (_fi->mateIID(frgID) > 0) {
-        if (bestcont)
-          matedcont++;
-      } else {
-        nonmated++;
-      }
-
-      if (bestcont)
-        continue;
-
-      if (bestedge5->frag_b_id == 0) {
-        spurs++;
-      } else {
-        int32 ou5 = utg->fragIn(bestedge5->frag_b_id);
-
-        assert(ou5 > 0);
-
-        if (ou5 == utg->id()) {
-          self++;
-        } else {
-          if ((otherUtg == 987654321) && (ou5 != 0))
-            otherUtg = ou5;
-          if (otherUtg != ou5)
-            conflicts++;
-        }
-      }
-
-      if (bestedge3->frag_b_id == 0) {
-        spurs++;
-      } else {
-        int32 ou3 = utg->fragIn(bestedge3->frag_b_id);
-
-        assert(ou3 > 0);
-
-        if (ou3 == utg->id()) {
-          self++;
-        } else {
-          if ((otherUtg == 987654321) && (ou3 != 0))
-            otherUtg = ou3;
-          if (otherUtg != ou3)
-            conflicts++;
-        }
-      }
-    }  //  Over all frags
-
-    fprintf(stderr, "CONFLICTS %d SPURS %d SELF %d len %d frags %d matedcont %d nonmated %d\n",
-            conflicts, spurs, self, utg->getLength(), utg->dovetail_path_ptr->size(), matedcont, nonmated);
-
-    if ((conflicts > 0) ||
-        (spurs     > 0) ||
-        (self      > 6) ||
-        (matedcont > 6) ||
-        (otherUtg == 987654321))
-      continue;
-
-    //  Does the new length make sense?
-
-    Unitig  *mergeTig    = (*unitigs)[otherUtg];
-
-#if 0
-    int32  minU = 0;
-    int32  maxU = 0;
-
-    for (int fi=0; fi<utg->dovetail_path_ptr->size(); fi++) {
-      DoveTailNode *frg = &(*utg->dovetail_path_ptr)[fi];
-
-      BestEdgeOverlap *bestedge5 = bog_ptr->getBestEdgeOverlap(frg->ident, FIVE_PRIME);
-      BestEdgeOverlap *bestedge3 = bog_ptr->getBestEdgeOverlap(frg->ident, THREE_PRIME);
-
-      DoveTailNode place5 = {0};
-      DoveTailNode place3 = {0};
-
-      mergeTig->placeFrag(place5, place3, bestedge5, bestedge3);
-
-      int32  minF5 = 0, minF3 = 0;
-      int32  maxF5 = 0, maxF3 = 0;
-
-      if (place5.position.bgn != place5.position.end) {
-        minF5 = MIN(place5.position.bgn, place5.position.end);
-        maxF5 = MAX(place5.position.bgn, place5.position.end);
-      }
-
-      if (place3.position.bgn != place3.position.end) {
-        minF3 = MIN(place3.position.bgn, place3.position.end);
-        maxF3 = MAX(place3.position.bgn, place3.position.end);
-      }
-    }
-#endif
-
-    //  Merge this unitig into otherUtg.
-
-    fprintf(stderr, "MERGE unitig %d (len %d) into unitig %d (len %d)\n",
-            utg->id(), utg->getLength(),
-            mergeTig->id(), mergeTig->getLength());
-
-    for (int fi=0; fi<utg->dovetail_path_ptr->size(); fi++) {
-      DoveTailNode  *frag = &(*utg->dovetail_path_ptr)[fi];
-
-      if (bog_ptr->getBestContainer(frag->ident))
-        mergeTig->addContainedFrag(frag->ident,
-                                   bog_ptr->getBestContainer(frag->ident),
-                                   true);
-      else
-        mergeTig->addAndPlaceFrag(frag->ident,
-                                  bog_ptr->getBestEdgeOverlap(frag->ident, FIVE_PRIME),
-                                  bog_ptr->getBestEdgeOverlap(frag->ident, THREE_PRIME),
-                                  true);
-    }
-
-    mergeTig->sort();
-
-    //  Mark this unitig as dead.
-
-    (*unitigs)[ti] = NULL;
-    delete utg;
-  }  //  over all unitigs
-}  //  orphan searching scope
-
 
 
 
@@ -1475,7 +1334,7 @@ UnitigVector* UnitigGraph::breakUnitigAt(ContainerMap &cMap,
 
         if (newTig->dovetail_path_ptr->empty())
           offset = reverse ? -frg.position.end : -frg.position.bgn;
-        newTig->addFrag( frg, offset, false );
+        newTig->addFrag( frg, offset, verbose );
 
         newTig = NULL;  //  delay until we need to make it
       }
@@ -1493,7 +1352,7 @@ UnitigVector* UnitigGraph::breakUnitigAt(ContainerMap &cMap,
 
         if (newTig->dovetail_path_ptr->empty())
           offset = reverse ? -frg.position.end : -frg.position.bgn;
-        newTig->addFrag( frg, offset, false );
+        newTig->addFrag( frg, offset, verbose );
       }
 
       else if (breakPoint.fragEnd.fragEnd() ==  FIVE_PRIME && reverse ||
@@ -1509,7 +1368,7 @@ UnitigVector* UnitigGraph::breakUnitigAt(ContainerMap &cMap,
 
         if (newTig->dovetail_path_ptr->empty())
           offset = reverse ? -frg.position.end : -frg.position.bgn;
-        newTig->addFrag( frg, offset, false );
+        newTig->addFrag( frg, offset, verbose );
 
         if (verbose)
           fprintf(stderr,"  Break tig %d after %d num %d\n", tig->id(), breakPoint.fragEnd.fragId(), breakPoint.fragsBefore);
@@ -1542,7 +1401,7 @@ UnitigVector* UnitigGraph::breakUnitigAt(ContainerMap &cMap,
       }
       if (newTig->dovetail_path_ptr->empty())
         offset = reverse ? -frg.position.end : -frg.position.bgn;
-      newTig->addFrag( frg, offset, false );
+      newTig->addFrag( frg, offset, verbose );
     }
   }
 
@@ -1551,126 +1410,86 @@ UnitigVector* UnitigGraph::breakUnitigAt(ContainerMap &cMap,
 
 
 
-void UnitigGraph::writeIUMtoFile(char *fileprefix, char *tigStorePath, int frg_count_target){
-  int32       utg_count              = 0;
-  int32       frg_count              = 0;
-  int32       prt_count              = 1;
+void UnitigGraph::writeIUMtoFile(char *fileprefix, int fragment_count_target){
+  int         fragment_count         = 0;
+  int         file_count             = 1;
   char        filename[FILENAME_MAX] = {0};
-  uint32     *partmap                = new uint32 [unitigs->size()];
+  int         iumiid                 = 0;
+  GenericMesg mesg;
 
-  //  This code closely follows that in AS_CGB_unitigger.c::output_the_chunks()
-
-  checkUnitigMembership();
+  int nf = 0;
+  int nu = 0;
 
   // Open up the initial output file
 
+  sprintf(filename, "%s_%03d.cgb", fileprefix, file_count++);
+  FILE *file = fopen(filename,"w");
+  assert(NULL != file);
+
   sprintf(filename, "%s.iidmap", fileprefix);
-  FILE *iidm = fopen(filename, "w");
+  FILE *iidm = fopen(filename,"w");
   assert(NULL != iidm);
 
-  sprintf(filename, "%s.partitioning", fileprefix);
-  FILE *part = fopen(filename, "w");
-  assert(NULL != part);
+  // Step through all the unitigs
 
-  sprintf(filename, "%s.partitioningInfo", fileprefix);
-  FILE *pari = fopen(filename, "w");
-  assert(NULL != pari);
+  checkUnitigMembership();
 
-  //  Step through all the unitigs once to build the partition mapping and IID mapping.
-
-  for (uint32 iumiid=0, ti=0; ti<unitigs->size(); ti++) {
+  for (uint32  ti=0; ti<unitigs->size(); ti++) {
     Unitig  *utg = (*unitigs)[ti];
-    uint32   nf  = (utg) ? utg->getNumFrags() : 0;
 
-    if ((utg == NULL) || (nf == 0))
+    if (utg == NULL) {
+      //fprintf(stderr, "unitig %d is null, skip.\n", ti);
       continue;
+    }
+
+    if (utg->getNumFrags() == 0) {
+      fprintf(stderr, "unitig %d HAS NO FRAGS?\n", ti);
+      continue;
+    }
+
+    IntUnitigMesg *ium_mesg_ptr = new IntUnitigMesg;
 
     assert(utg->getLength() > 0);
-    assert(nf == utg->dovetail_path_ptr->size());
+    assert(utg->getNumFrags() == utg->dovetail_path_ptr->size());
 
-    if ((0              <= frg_count_target) &&
-        (frg_count + nf >= frg_count_target) &&
-        (frg_count                      >  0)) {
-      fprintf(pari, "Partition %d has %d unitigs and %d fragments.\n",
-              prt_count, utg_count, frg_count);
+    ium_mesg_ptr->iaccession    = iumiid++;
+    ium_mesg_ptr->coverage_stat = utg->getCovStat(_fi);
+    ium_mesg_ptr->microhet_prob = 1.01;
+    ium_mesg_ptr->status        = AS_UNASSIGNED;
+    ium_mesg_ptr->unique_rept   = AS_FORCED_NONE;
+    ium_mesg_ptr->length        = utg->getLength();
+    ium_mesg_ptr->consensus     = "";
+    ium_mesg_ptr->quality       = "";
+    ium_mesg_ptr->forced        = 0;
+    ium_mesg_ptr->num_frags     = utg->getNumFrags();
+    ium_mesg_ptr->f_list        = &(utg->dovetail_path_ptr->front());
 
-      prt_count++;
-      utg_count = 0;
-      frg_count = 0;
+    fprintf(iidm, "Unitig "F_U32" == IUM "F_U32" (with "F_S64" frags)\n", utg->id(), ium_mesg_ptr->iaccession, utg->getNumFrags());
+
+    fragment_count += ium_mesg_ptr->num_frags;
+
+    if ((fragment_count_target >= 0) &&
+        (fragment_count >= fragment_count_target)) {
+      fclose(file);
+      sprintf(filename, "%s_%03d.cgb", fileprefix, file_count++);
+      file = fopen(filename,"w");
+      assert(NULL != file);
+      fragment_count = ium_mesg_ptr->num_frags;
     }
 
-    partmap[iumiid] = prt_count;
+    mesg.m = ium_mesg_ptr;
+    mesg.t = MESG_IUM;
 
-    fprintf(iidm, "Unitig "F_U32" == IUM "F_U32" (in partition "F_U32" with "F_S64" frags)\n",
-            utg->id(), iumiid, partmap[iumiid], nf);
+    nf += ium_mesg_ptr->num_frags;
+    nu += 1;
 
-    for (int32 fragIdx=0; fragIdx<nf; fragIdx++) {
-      DoveTailNode  *f = &(*utg->dovetail_path_ptr)[fragIdx];
+    WriteProtoMesg_AS(file, &mesg);
 
-      fprintf(part, "%d\t%d\n", prt_count, f->ident);
-
-      //  We abused the delta_length field earlier.  Make sure it's sane.  If not, we assert when
-      //  writing the tig.
-      f->delta_length = 0;
-      f->delta        = NULL;
-    }
-
-    utg_count += 1;
-    frg_count += nf;
-
-    iumiid++;
+    delete ium_mesg_ptr;
   }
 
-  fprintf(pari, "Partition %d has %d unitigs and %d fragments.\n",
-          prt_count, utg_count, frg_count);
-
-  fclose(pari);
-  fclose(part);
+  fclose(file);
   fclose(iidm);
-
-  //  Step through all the unitigs once to build the partition mapping and IID mapping.
-
-  MultiAlignStore  *MAS = new MultiAlignStore(tigStorePath);
-  MultiAlignT      *ma  = CreateEmptyMultiAlignT();
-
-  MAS->writeToPartitioned(partmap, NULL);
-
-  for (uint32 iumiid=0, ti=0; ti<unitigs->size(); ti++) {
-    Unitig  *utg = (*unitigs)[ti];
-    uint32   nf  = (utg) ? utg->getNumFrags() : 0;
-
-    if ((utg == NULL) || (nf == 0))
-      continue;
-
-    //  Massage the Unitig into a MultiAlignT (also used in SplitChunks_CGW.c)
-
-    ma->maID                      = iumiid;
-    ma->data.unitig_coverage_stat = utg->getCovStat(_fi);
-    ma->data.unitig_microhet_prob = 1.0;  //  Default to 100% probability of unique
-
-    ma->data.unitig_status        = AS_UNASSIGNED;
-    ma->data.unitig_unique_rept   = AS_FORCED_NONE;
-
-    ma->data.contig_status        = AS_UNPLACED;
-
-    //  Add the fragments
-
-    ResetVA_IntMultiPos(ma->f_list);
-    SetRangeVA_IntMultiPos(ma->f_list, 0, nf, &(*utg->dovetail_path_ptr)[0]);
-
-    //  NOTE!  This is not currently a valid multialign as it has NO IntUnitigPos.  That is
-    //  added during consensus.  CGW will correctly assert that it reads in unitigs with
-    //  exactly one IUP.
-
-    //  Stash the unitig in the store
-
-    MAS->insertMultiAlign(ma, TRUE, FALSE);
-
-    iumiid++;
-  }
-
-  delete    MAS;
-  delete [] partmap;
 }
 
 

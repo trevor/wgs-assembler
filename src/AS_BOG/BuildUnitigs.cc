@@ -17,7 +17,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: BuildUnitigs.cc,v 1.65 2009-11-26 02:54:52 brianwalenz Exp $";
+const char *mainid = "$Id: BuildUnitigs.cc,v 1.61 2009-08-07 19:17:36 brianwalenz Exp $";
 
 #include "AS_BOG_Datatypes.hh"
 #include "AS_BOG_ChunkGraph.hh"
@@ -28,9 +28,8 @@ const char *mainid = "$Id: BuildUnitigs.cc,v 1.65 2009-11-26 02:54:52 brianwalen
 #include "getopt.h"
 #include "AS_CGB_histo.h"
 
-//  Used in AS_BOG_Unitig.cc
 FragmentInfo     *debugfi = 0L;
-BestOverlapGraph *bog     = 0L;
+
 
 void outputHistograms(UnitigGraph *utg, FragmentInfo *fi, FILE *stats) {
   const int nsample=500;
@@ -48,12 +47,12 @@ void outputHistograms(UnitigGraph *utg, FragmentInfo *fi, FILE *stats) {
   extend_histogram(arate_histogram, sizeof(MyHistoDataType),
                    myindexdata,mysetdata,myaggregate,myprintdata);
 
-  for (uint32 ti=0; ti<utg->unitigs->size(); ti++) {
-    Unitig  *u = (*utg->unitigs)[ti];
+  UnitigVector::const_iterator uiter = utg->unitigs->begin();
+  for(;uiter != utg->unitigs->end(); uiter++) {
 
+    Unitig *u = *uiter;
     if (u == NULL)
       continue;
-
     zork.nsamples = 1;
     int numFrags = u->getNumFrags();
     zork.sum_frags = zork.min_frags = zork.max_frags = numFrags;
@@ -71,7 +70,7 @@ void outputHistograms(UnitigGraph *utg, FragmentInfo *fi, FILE *stats) {
     float arateF = u->getLocalArrivalRate(fi) * 10000;
     int arate = static_cast<int>(rintf(arateF));
     if (arate < 0)
-      fprintf(stats, "Negative Local ArrivalRate %f id %d arate %d\n", arateF, ti, arate);
+      fprintf(stats, "Negative Local ArrivalRate %f id %d arate %d\n", arateF, u->id(), arate);
     zork.sum_arrival = zork.min_arrival = zork.max_arrival = arate;
 
     zork.sum_rs_frags=zork.min_rs_frags=zork.max_rs_frags=0;
@@ -102,7 +101,6 @@ main (int argc, char * argv []) {
   char      *gkpStorePath           = NULL;
   char      *ovlStoreUniqPath       = NULL;
   char      *ovlStoreReptPath       = NULL;
-  char      *tigStorePath           = NULL;
 
   double    erate                   = 0.015;
   long      genome_size             = 0;
@@ -110,8 +108,7 @@ main (int argc, char * argv []) {
   int       fragment_count_target   = 0;
   char     *output_prefix           = NULL;
 
-  bool      popBubbles              = false;
-  bool      breakIntersections      = false;
+  bool      unitigIntersectBreaking = false;
   int       badMateBreakThreshold   = -7;
 
   argc = AS_configure(argc, argv);
@@ -136,14 +133,8 @@ main (int argc, char * argv []) {
       else
         err++;
 
-    } else if (strcmp(argv[arg], "-T") == 0) {
-      tigStorePath = argv[++arg];
-
-    } else if (strcmp(argv[arg], "-U") == 0) {
-      popBubbles = true;
-
     } else if (strcmp(argv[arg], "-b") == 0) {
-      breakIntersections = true;
+      unitigIntersectBreaking = true;
 
     } else if (strcmp(argv[arg], "-e") == 0) {
       erate = atof(argv[++arg]);
@@ -169,24 +160,17 @@ main (int argc, char * argv []) {
     err++;
   if (ovlStoreUniqPath == NULL)
     err++;
-  if (tigStorePath == NULL)
-    err++;
 
   if (err) {
-    fprintf(stderr, "usage: %s -o outputName -O ovlStore -G gkpStore -T tigStore\n", argv[0]);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "  -O         Mandatory path to an ovlStore.\n");
-    fprintf(stderr, "  -G         Mandatory path to a gkpStore.\n");
-    fprintf(stderr, "  -T         Mandatory path to a tigStore (can exist or not).\n");
-    fprintf(stderr, "  -o prefix  Mandatory name for the output files\n");
+    fprintf(stderr, "usage: %s -o outputName -O ovlStore -G gkpStore\n", argv[0]);
     fprintf(stderr, "\n");
     fprintf(stderr, "  -B b       Target number of fragments per IUM batch.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  -o prefix  Name of the output files\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "  -s size    If the genome size is set to 0, this will cause the unitigger\n");
     fprintf(stderr, "             to try to estimate the genome size based on the constructed\n");
     fprintf(stderr, "             unitig lengths.\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "  -U         Enable EXPERIMENTAL bubble popping.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "  -b         Break promisciuous unitigs at unitig intersection points\n");
     fprintf(stderr, "  -e         Fraction error to generate unitigs for; default is 0.015\n");
@@ -209,19 +193,11 @@ main (int argc, char * argv []) {
     if ((ovlStoreUniqPath != NULL) && (ovlStoreUniqPath == ovlStoreReptPath))
       fprintf(stderr, "Too many overlap stores (-O option) supplied.\n");
 
-    if (tigStorePath == NULL)
-      fprintf(stderr, "No output tigStore (-T option) supplied.\n");
-
     exit(1);
   }
 
-  fprintf(stderr, "\n");
-  fprintf(stderr, "Bubble popping        = %s\n", (popBubbles) ? "on" : "off");
-  fprintf(stderr, "Intersection breaking = %s\n", (breakIntersections) ? "on" : "off");
-  fprintf(stderr, "Bad mate threshold    = %d\n", badMateBreakThreshold);
-  fprintf(stderr, "Error threshold       = %.3f%%\n", erate * 100);
-  fprintf(stderr, "Genome Size           = "F_S64"\n", genome_size);
-  fprintf(stderr, "\n");
+  fprintf(stderr, "Error threshold = %.3f%%\n", AS_OVS_decodeQuality(erate) * 100.0);
+  fprintf(stderr, "Genome Size     = "F_S64"\n", genome_size);
 
   gkStore          *gkpStore     = new gkStore(gkpStorePath, FALSE, FALSE);
   OverlapStore     *ovlStoreUniq = AS_OVS_openOverlapStore(ovlStoreUniqPath);
@@ -233,11 +209,9 @@ main (int argc, char * argv []) {
 
   BestOverlapGraph      *BOG = new BestOverlapGraph(fragInfo, ovlStoreUniq, ovlStoreRept, erate);
 
-  bog = BOG;
-
   ChunkGraph *cg = new ChunkGraph(fragInfo, BOG);
   UnitigGraph utg(fragInfo, BOG);
-  utg.build(cg, breakIntersections, popBubbles, output_prefix);
+  utg.build(cg, unitigIntersectBreaking, output_prefix);
 
   MateChecker  mateChecker(fragInfo);
   mateChecker.checkUnitigGraph(utg, badMateBreakThreshold);
@@ -247,7 +221,7 @@ main (int argc, char * argv []) {
 
   utg.setParentAndHang(cg);
 
-  utg.writeIUMtoFile(output_prefix, tigStorePath, fragment_count_target);
+  utg.writeIUMtoFile(output_prefix, fragment_count_target);
   utg.writeOVLtoFile(output_prefix);
 
   {

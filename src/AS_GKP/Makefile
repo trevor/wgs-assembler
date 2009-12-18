@@ -25,6 +25,7 @@
 LOCAL_WORK = $(shell cd ../..; pwd)
 
 GKPSRC    = AS_GKP_buildPartition.C \
+            AS_GKP_checkBatch.C \
             AS_GKP_checkLibrary.C \
             AS_GKP_checkFrag.C \
             AS_GKP_checkLink.C \
@@ -32,7 +33,8 @@ GKPSRC    = AS_GKP_buildPartition.C \
             AS_GKP_dump.C \
             AS_GKP_edit.C \
             AS_GKP_errors.C \
-            AS_GKP_illumina.C
+            AS_GKP_rebuildMap.C \
+            AS_GKP_rearrange.C
 
 SOURCES   = AS_GKP_main.C AS_GKP_bench.C $(GKPSRC) sffToCA.C
 OBJECTS   = $(SOURCES:.C=.o)
@@ -47,4 +49,3 @@ all:    $(OBJECTS) $(LIBRARIES) $(CXX_PROGS)
 gatekeeper:      AS_GKP_main.o $(GKPSRC:.C=.o) libCA.a
 gatekeeperbench: AS_GKP_bench.o                libCA.a
 sffToCA:         sffToCA.o                     libCA.a
-illuminaToCA:    illuminaToCA.o                libCA.a

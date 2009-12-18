@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: AS_GKP_main.c,v 1.86 2009-12-02 12:52:25 skoren Exp $";
+const char *mainid = "$Id: AS_GKP_main.c,v 1.83 2009-08-25 06:11:19 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,9 +102,6 @@ usage(char *filename, int longhelp) {
   fprintf(stdout, "  -tabular               dump info, libraries or fragments in a tabular\n");
   fprintf(stdout, "                         format (for -dumpinfo, -dumplibraries,\n");
   fprintf(stdout, "                         and -dumpfragments, ignores -withsequence and -clear)\n");
-  fprintf(stdout, "  -isfeatureset <libID> <X> sets exit value to 0 if feature X is set in library libID, 1 otherwise.\n");
-  fprintf(stdout, "                        If libID == 0, check all libraries.\n");
-  fprintf(stdout, "  -nouid                dump info without including the read UID (for -dumpinfo, -dumplibraries, -dumpfragments)\n");
   fprintf(stdout, "\n");
   fprintf(stdout, "  ----------------\n");
   fprintf(stdout, "  [format of dump]\n");
@@ -387,7 +384,6 @@ constructIIDdump(char  *gkpStoreName,
 #define DUMP_NEWBLER     6
 #define DUMP_LASTFRG     7
 #define DUMP_VELVET      8
-#define DUMP_FEATURE     9
 
 int
 main(int argc, char **argv) {
@@ -435,11 +431,6 @@ main(int argc, char **argv) {
   double           dumpRandFraction  = 0.0;
   uint64           dumpRandLength    = 0;
   char            *iidToDump         = NULL;
-  
-  AS_IID           featureLibIID     = 0;
-  char            *featureName       = NULL;
-
-  int              dumpDoNotUseUIDs  = FALSE;
 
   progName = argv[0];
   gkpStore = NULL;
@@ -545,12 +536,6 @@ main(int argc, char **argv) {
     } else if (strcmp(argv[arg], "-dumpvelvet") == 0) {
       dump = DUMP_VELVET;
       velvetPrefix = argv[++arg];
-    } else if (strcmp(argv[arg], "-isfeatureset") == 0 ) {
-      dump = DUMP_FEATURE;
-      featureLibIID = atoi(argv[++arg]);
-      featureName = argv[++arg];
-    } else if (strcmp(argv[arg], "-nouid") == 0 ) {
-      dumpDoNotUseUIDs = 1;
     } else if (strcmp(argv[arg], "-donotfixmates") == 0) {
       doNotFixMates = 1;
 
@@ -561,7 +546,7 @@ main(int argc, char **argv) {
     //  exit(0);
 
     } else if (strcmp(argv[arg], "--revertclear") == 0) {
-      //  Takes two args:  clear region name, gkpStore
+      //  Takes two args:  edit file, gkpStore
       //
       revertClearRange(argv[arg+1], argv[arg+2]);
       exit(0);
@@ -607,25 +592,18 @@ main(int argc, char **argv) {
   iidToDump = constructIIDdump(gkpStoreName, iidToDump, dumpRandLib, dumpRandMateNum, dumpRandSingNum, dumpRandFraction, dumpRandLength);
 
   if (dump != DUMP_NOTHING) {
-    if (dumpDoNotUseUIDs == 1) {
-      fprintf(stderr, "WARNING: Output selected to exclude UIDs, an NA will be output instead of UID values.\n");
-    }
-    
-    int exitVal = 0;
-   
     switch (dump) {
       case DUMP_INFO:
-        dumpGateKeeperInfo(gkpStoreName, dumpTabular, dumpDoNotUseUIDs);
+        dumpGateKeeperInfo(gkpStoreName, dumpTabular);
         break;
       case DUMP_LIBRARIES:
-        dumpGateKeeperLibraries(gkpStoreName, begIID, endIID, iidToDump, dumpTabular, dumpDoNotUseUIDs);
+        dumpGateKeeperLibraries(gkpStoreName, begIID, endIID, iidToDump, dumpTabular);
         break;
       case DUMP_FRAGMENTS:
         dumpGateKeeperFragments(gkpStoreName, begIID, endIID, iidToDump,
                                 dumpWithSequence,
                                 dumpClear,
-                                dumpTabular,
-                                dumpDoNotUseUIDs);
+                                dumpTabular);
         break;
       case DUMP_FASTA:
         dumpGateKeeperAsFasta(gkpStoreName, begIID, endIID, iidToDump,
@@ -656,13 +634,11 @@ main(int argc, char **argv) {
                                 doNotFixMates,
                                 dumpFRGClear);
         break;
-      case DUMP_FEATURE:
-         exitVal = (dumpGateKeeperIsFeatureSet(gkpStoreName, featureLibIID, featureName) == 0);
       default:
         break;
     }
 
-    exit(exitVal);
+    exit(0);
   }
 
 

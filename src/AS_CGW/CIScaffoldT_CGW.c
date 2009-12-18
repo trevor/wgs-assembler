@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: CIScaffoldT_CGW.c,v 1.44 2009-10-27 12:26:40 skoren Exp $";
+static char *rcsid = "$Id: CIScaffoldT_CGW.c,v 1.39 2009-08-14 13:37:05 skoren Exp $";
 
 #undef DEBUG_INSERT
 #undef DEBUG_DIAG
@@ -54,8 +54,9 @@ VA_DEF(PtrT);
 void PrintCINodeFields(FILE * stream, NodeCGW_T * node)
 {
   fprintf(stream, "\t\tcontigID:"F_CID "\n", node->info.CI.contigID);
-  fprintf(stream, "\t\tnumFragments:%d\n", ScaffoldGraph->tigStore->getNumFrags(node->id, TRUE));
-  fprintf(stream, "\t\tcoverageStat:%d\n", ScaffoldGraph->tigStore->getUnitigCoverageStat(node->id));
+  fprintf(stream, "\t\theadOfFragments:"F_CID "\n", node->info.CI.headOfFragments);
+  fprintf(stream, "\t\tnumFragments:%d\n", node->info.CI.numFragments);
+  fprintf(stream, "\t\tcoverageStat:%d\n", node->info.CI.coverageStat);
   fprintf(stream, "\t\tbaseID:"F_CID "\n", node->info.CI.baseID);
   fprintf(stream, "\t\tnumInstances:%d\n", node->info.CI.numInstances);
 }
@@ -112,8 +113,8 @@ void PrintNodeFlagBits(FILE * stream, NodeCGW_T * node)
 
 void PrintNodeFields(FILE * stream, NodeCGW_T * node)
 {
-  fprintf(stream,"\ttype:%c, scaffoldID:"F_CID ", prevScaffoldID:"F_CID "\n",
-          node->type, node->scaffoldID, node->prevScaffoldID);
+  fprintf(stream,"\ttype:%c, outputID:"F_CID ", scaffoldID:"F_CID ", prevScaffoldID:"F_CID "\n",
+          node->type, node->outputID, node->scaffoldID, node->prevScaffoldID);
   fprintf(stream,"\tindexInScaffold:%d, smoothExpectedCID:"F_CID "\n",
           node->indexInScaffold, node->smoothExpectedCID);
   fprintf(stream, "\tnumEssentialA:%d, numEssentialB:%d\n",
@@ -288,7 +289,7 @@ InsertCIInScaffold(ScaffoldGraphT *sgraph,
                    int contigNow) {
 
   CIScaffoldT *ciScaffold = GetGraphNode(sgraph->ScaffoldGraph, sid);
-  ChunkInstanceT *chunkInstance = GetGraphNode(sgraph->ContigGraph, ci);
+  ChunkInstanceT *chunkInstance = GetGraphNode(sgraph->RezGraph, ci);
   int32 reversed;
   LengthT *maxOffset, *minOffset;
 
@@ -400,7 +401,7 @@ InsertCIInScaffold(ScaffoldGraphT *sgraph,
 
   //  Reget the pointers.
   ciScaffold    = GetGraphNode(sgraph->ScaffoldGraph, sid);
-  chunkInstance = GetGraphNode(sgraph->ContigGraph, ci);
+  chunkInstance = GetGraphNode(sgraph->RezGraph, ci);
 
   assert(!chunkInstance->flags.bits.isDead);
   MarkCIElementsForScaffoldMembership(chunkInstance, sid);
@@ -426,7 +427,7 @@ InsertCIInScaffold(ScaffoldGraphT *sgraph,
   ciScaffold->info.Scaffold.numElements++;
 
 #ifdef DEBUG_INSERT
-  fprintf(stderr,"* Inserting cid "F_CID " into scaffold "F_CID " at offset %d,%d\n",
+  fprintf(GlobalData->stderrc,"* Inserting cid "F_CID " into scaffold "F_CID " at offset %d,%d\n",
           ci, sid, (int) aEndOffset.mean, (int) bEndOffset.mean);
 #endif
 
@@ -459,7 +460,7 @@ InsertCIInScaffold(ScaffoldGraphT *sgraph,
 	chunkInstance->BEndNext = CI->id;
 	chunkInstance->AEndNext = CI->AEndNext;
 	if (CI->AEndNext != NULLINDEX) {
-	  prevCI = GetGraphNode(sgraph->ContigGraph, CI->AEndNext);
+	  prevCI = GetGraphNode(sgraph->RezGraph, CI->AEndNext);
 	  AssertPtr(prevCI);
 	  prevCI->BEndNext = ci;
 	}
@@ -494,7 +495,7 @@ InsertCIInScaffold(ScaffoldGraphT *sgraph,
 
 
 #ifndef DEBUG_INSERT
-    fprintf(stderr,"* Inserted CI "F_CID " in scaffold "F_CID " at offset %d,%d  Anext = "F_CID "   Bnext = "F_CID "\n",
+    fprintf(GlobalData->stderrc,"* Inserted CI "F_CID " in scaffold "F_CID " at offset %d,%d  Anext = "F_CID "   Bnext = "F_CID "\n",
 	    chunkInstance->id, sid, (int)aEndOffset.mean, (int)bEndOffset.mean, chunkInstance->AEndNext, chunkInstance->BEndNext);
 #endif
 
@@ -508,7 +509,7 @@ InsertCIInScaffold(ScaffoldGraphT *sgraph,
       ciScaffold->bpLength.variance = maxOffset->variance;
 
     if(GlobalData->debugLevel > 0){
-      NodeCGW_T *previous = GetGraphNode(ScaffoldGraph->ContigGraph, chunkInstance->AEndNext);
+      NodeCGW_T *previous = GetGraphNode(ScaffoldGraph->RezGraph, chunkInstance->AEndNext);
 
       if(previous &&
 	 MAX(previous->offsetAEnd.variance, previous->offsetBEnd.variance) >
@@ -538,7 +539,7 @@ int RemoveCIFromScaffold(ScaffoldGraphT *sgraph, CIScaffoldT *ciScaffold,
 
 #if 0
   if(ciScaffold->info.Scaffold.numElements < 3){;
-  fprintf(stderr,"* Removing CI "F_CID " from scaffold "F_CID ", elements left %d\nBEFORE:\n",
+  fprintf(GlobalData->stderrc,"* Removing CI "F_CID " from scaffold "F_CID ", elements left %d\nBEFORE:\n",
 	  CI->id, ciScaffold->id, ciScaffold->info.Scaffold.numElements);
 
   DumpCIScaffold(stderr,sgraph, ciScaffold, FALSE);
@@ -553,10 +554,10 @@ int RemoveCIFromScaffold(ScaffoldGraphT *sgraph, CIScaffoldT *ciScaffold,
   assert(ciScaffold && !isDeadCIScaffoldT(ciScaffold));
 
   if(CI->AEndNext != NULLINDEX)
-    anext = GetGraphNode(sgraph->ContigGraph, CI->AEndNext);
+    anext = GetGraphNode(sgraph->RezGraph, CI->AEndNext);
 
   if(CI->BEndNext != NULLINDEX)
-    bnext = GetGraphNode(sgraph->ContigGraph, CI->BEndNext);
+    bnext = GetGraphNode(sgraph->RezGraph, CI->BEndNext);
 
 #if 0
   fprintf(stderr,"* Predecessor is "F_CID " Successor is "F_CID "\n",
@@ -659,6 +660,245 @@ int RemoveCIFromScaffold(ScaffoldGraphT *sgraph, CIScaffoldT *ciScaffold,
 
 
 
+/****************************************************************************/
+void FindScaffoldComponents(ScaffoldGraphT *graph, int findPaths){
+  int32 numScaffolds = GetNumCIScaffoldTs(graph->CIScaffolds);
+  UFDataT *UFData;
+  int scaffoldMap[numScaffolds];
+  CDS_CID_t i;
+  int set = 0;
+  int setA, setB;
+  int numComponents;
+
+  UFData = UFCreateSets(graph->numLiveScaffolds);
+  //  scaffoldMap = (int *)malloc(sizeof(int) * numScaffolds);
+
+#ifdef DEBUG_MERGE
+  fprintf(stderr,"* ScaffoldGraph has %d scaffolds\n", graph->numLiveScaffolds);
+#endif
+
+  for(i = 0; i < numScaffolds; i++){
+    CIScaffoldT *scaffold = GetGraphNode(graph->ScaffoldGraph, i);
+    UFSetT *scaffoldSet = UFGetSet(UFData, set);
+    SEdgeTIterator SEdges;
+    SEdgeT *sedge, *sedgeA, *sedgeB;
+    int32 aEndEdges, bEndEdges;
+    CDS_CID_t essentialEdgeA = NULLINDEX, essentialEdgeB = NULLINDEX;
+
+    if(isDeadCIScaffoldT(scaffold) ||
+       scaffold->type != REAL_SCAFFOLD){
+      scaffoldMap[i] = NULLINDEX;
+      continue;
+    }
+    AssertPtr(scaffoldSet);
+    scaffoldMap[i] = set++;
+    scaffoldSet->data = (void *)scaffold;
+
+    // TEMPORARY-- WE ARE FILTERING EDGES WITH MEAN < 0
+    //
+
+    aEndEdges = 0;
+    InitSEdgeTIterator(graph, i, FALSE, TRUE, A_END, FALSE, &SEdges);
+
+    // This merging code is simpleminded.  We want to prevent merges
+    // that imply an overlap between the two scaffolds, since we don't
+    // deal with them in an elegant manner.
+
+#define MIN_MERGE_GAP_SIZE 0
+
+    while((sedge = NextSEdgeTIterator(&SEdges)) != NULL){
+      //  At some point in the past, someone tried subtracting 3.0 *
+      //  sqrt(sedge->distance.variance) from the mean, and then
+      //  ifdef'd it out.
+      if(sedge->distance.mean > MIN_MERGE_GAP_SIZE){
+        aEndEdges++;
+        essentialEdgeA = GetVAIndex_SEdgeT(graph->SEdges, sedge);
+        sedgeA = sedge;
+      }
+    }
+
+    bEndEdges = 0;
+    InitSEdgeTIterator(graph, i, FALSE, TRUE, B_END, FALSE, &SEdges);
+    while((sedge = NextSEdgeTIterator(&SEdges)) != NULL){
+      //  At some point in the past, someone tried subtracting 3.0 *
+      //  sqrt(sedge->distance.variance) from the mean, and then
+      //  ifdef'd it out.
+      if(sedge->distance.mean > MIN_MERGE_GAP_SIZE){
+        bEndEdges++;
+        essentialEdgeB = GetVAIndex_SEdgeT(graph->SEdges, sedge);
+        sedgeB = sedge;
+      }
+    }
+
+    scaffold->numEssentialA = aEndEdges;
+    scaffold->numEssentialB = bEndEdges;
+
+    scaffold->essentialEdgeA = (aEndEdges == 1?essentialEdgeA:NULLINDEX);
+    scaffold->essentialEdgeB = (bEndEdges == 1?essentialEdgeB:NULLINDEX);
+
+#ifdef DEBUG_MERGE
+    fprintf(stderr,"* Scaffold "F_CID " has (%d,%d) edges\n", i,aEndEdges, bEndEdges);
+    if(aEndEdges)PrintSEdgeT(stderr,graph, " ", sedgeA, i);
+    if(bEndEdges)PrintSEdgeT(stderr,graph, " ", sedgeB, i);
+#endif
+
+  }
+
+  /* Now connect two scaffolds if they each have only a single confirmed edge on the
+     side where their connecting edge attaches */
+
+  for(i = 0; i < numScaffolds; i++){
+    CIScaffoldT *scaffold = GetGraphNode(graph->ScaffoldGraph, i);
+    SEdgeT *sedge;
+    SEdgeTIterator SEdges;
+
+    if(isDeadCIScaffoldT(scaffold) ||
+       scaffold->type != REAL_SCAFFOLD)
+      continue;
+
+    if(findPaths){
+      //    fprintf(stderr,"* Scaffold "F_CID " has %d a edges and %d b edges\n",
+      //	    i,scaffold->numEssentialA, scaffold->numEssentialB);
+
+      if(scaffold->numEssentialA == 1){
+        CIScaffoldT *otherScaffold;
+        int end;
+        int edgeCount;
+
+        sedge = GetGraphEdge(graph->ScaffoldGraph, scaffold->essentialEdgeA);
+
+        if(sedge->idA != i)
+          continue;
+
+        if(sedge->distance.mean < -50000)
+          continue;
+
+#ifndef DONT_FIX_BUG
+        if(sedge->flags.bits.inAssembly)
+          continue;
+#endif
+
+        otherScaffold = GetGraphNode(graph->ScaffoldGraph,sedge->idB);
+        if(sedge->orient == BA_AB){
+          end = A_END;
+          edgeCount = otherScaffold->numEssentialA;
+        }else{
+          end = B_END;
+          edgeCount = otherScaffold->numEssentialB;
+        }
+#ifdef DEBUG_MERGE
+        fprintf(stderr,"* Considering edge ("F_CID ","F_CID ") between sets (%d, %d)\n",
+                sedge->idA, sedge->idB,
+                scaffoldMap[sedge->idA],
+                scaffoldMap[sedge->idB]);
+#endif
+        if(edgeCount == 1){
+#ifndef DONT_FIX_BUG
+          sedge->flags.bits.inAssembly = TRUE;
+#endif
+          setA = scaffoldMap[sedge->idA];
+          setB = scaffoldMap[sedge->idB];
+          //	fprintf(stderr,"* Union (%d,%d)\n", setA, setB);
+          UFUnion(UFData, setA, setB);
+        }else{
+          /*
+            fprintf(stderr,"* Scaffold "F_CID " has edgeCount = %d on %s end\n",
+            sedge->idB,edgeCount,(end == A_END?"A":"B"));
+          */
+        }
+      }else{
+        /* We've ruled this edge out...so remove reference to it */
+        scaffold->essentialEdgeA = NULLINDEX;
+        scaffold->numEssentialA = 0;
+      }
+
+      if(scaffold->numEssentialB == 1){
+        CIScaffoldT *otherScaffold;
+        int end;
+        int edgeCount = 0;
+
+        sedge = GetGraphEdge(graph->ScaffoldGraph, scaffold->essentialEdgeB);
+
+        if(sedge->idA != i)
+          continue;
+
+        if(sedge->distance.mean < -50000)
+          continue;
+
+#ifdef DONT_FIX_BUG
+        if(sedge->flags.bits.inAssembly)
+          continue;
+#endif
+#ifdef DEBUG_MERGE
+        fprintf(stderr,"* Considering edge ("F_CID ","F_CID ") between sets (%d, %d)\n",
+                sedge->idA, sedge->idB,
+                scaffoldMap[sedge->idA],
+                scaffoldMap[sedge->idB]);
+#endif
+        otherScaffold = GetGraphNode(graph->ScaffoldGraph,sedge->idB);
+        if(sedge->orient == AB_AB){
+          end = A_END;
+          edgeCount = otherScaffold->numEssentialA;
+        }else{
+          end = B_END;
+          edgeCount = otherScaffold->numEssentialB;
+        }
+
+        if(edgeCount == 1){
+#ifdef DONT_FIX_BUG
+          sedge->flags.bits.inAssembly = TRUE;
+#endif
+          setA = scaffoldMap[sedge->idA];
+          setB = scaffoldMap[sedge->idB];
+          //	fprintf(stderr,"* Union (%d,%d)\n", setA, setB);
+          UFUnion(UFData, setA, setB);
+        }else{
+          /*
+            fprintf(stderr,"* Scaffold "F_CID " has edgeCount = %d on %s end\n",
+            sedge->idB, edgeCount,(end == A_END?"A":"B"));
+          */
+        }
+      }else{
+        /* We've ruled this edge out...so remove reference to it */
+        scaffold->essentialEdgeB = NULLINDEX;
+        scaffold->numEssentialB = 0;
+      }
+
+
+    }else{
+
+      InitSEdgeTIterator(graph, i, FALSE, TRUE, ALL_END, FALSE, &SEdges);
+      while((sedge = NextSEdgeTIterator(&SEdges)) != NULL){
+        if(sedge->idA != i)
+          continue;
+        setA = scaffoldMap[sedge->idA];
+        setB = scaffoldMap[sedge->idB];
+        //	fprintf(stderr,"* Union (%d,%d)\n", setA, setB);
+        UFUnion(UFData, setA, setB);
+      }
+    }
+  }
+  numComponents = UFRenumberSets(UFData);
+  fprintf(stderr," Scaffold Graph has %d subPaths\n", numComponents);
+
+  for(set = 0; set < UFData->numSets; set++){
+    UFSetT *scaffoldSet = UFGetSet(UFData, set);
+    CIScaffoldT *scaffold = (CIScaffoldT *)scaffoldSet->data;
+
+    scaffold->setID = scaffoldSet->component;
+#ifdef DEBUG_DIAG
+    fprintf(GlobalData->stderrc,"* Scaffold "F_CID " has component "F_CID "\n",
+            scaffold->id, scaffold->setID);
+#endif
+  }
+
+  UFFreeSets(UFData);
+  //  free(scaffoldMap);
+
+}
+
+
+
 /***************************************************************************/
 int IsScaffoldInternallyConnected(ScaffoldGraphT *sgraph,
                                   CIScaffoldT *scaffold, int32 edgeTypes) {
@@ -710,7 +950,7 @@ int IsScaffoldInternallyConnected(ScaffoldGraphT *sgraph,
                           FALSE, &CIs);
   while ((chunk = NextCIScaffoldTIterator(&CIs)) != NULL) {
     assert(chunk->setID >= 0);
-    InitGraphEdgeIterator(sgraph->ContigGraph, chunk->id,
+    InitGraphEdgeIterator(sgraph->RezGraph, chunk->id,
                           ALL_END, edgeTypes, // ALL_TRUSTED_EDGES,
                           GRAPH_EDGE_DEFAULT, //GRAPH_EDGE_CONFIRMED_ONLY,
                           &edges);
@@ -719,7 +959,7 @@ int IsScaffoldInternallyConnected(ScaffoldGraphT *sgraph,
       // get the other end
       //
       ChunkInstanceT
-        * otherChunk = GetGraphNode(sgraph->ContigGraph,
+        * otherChunk = GetGraphNode(sgraph->RezGraph,
                                     (chunk->id == edge->idA) ?
                                     edge->idB : edge->idA);
       int32 weight = edge->edgesContributing - (isOverlapEdge(edge));
@@ -765,7 +1005,7 @@ int IsScaffoldInternallyConnected(ScaffoldGraphT *sgraph,
         
     // merge unions based on closure reads as well (i.e. consider them edges)
     if (chunk->flags.bits.isClosure) {
-       MultiAlignT *ma = ScaffoldGraph->tigStore->loadMultiAlign(chunk->id, chunk->flags.bits.isCI);
+       MultiAlignT *ma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, chunk->id, chunk->flags.bits.isCI);
        int i = 0;
        assert(ma != NULL);
        
@@ -780,13 +1020,13 @@ int IsScaffoldInternallyConnected(ScaffoldGraphT *sgraph,
           assert(gkpl->bound2);
    
           // get the reads indicated by the input line
-          CIFragT *leftMate = GetCIFragT(ScaffoldGraph->CIFrags, gkpl->bound1); 
-          CIFragT *rightMate = GetCIFragT(ScaffoldGraph->CIFrags, gkpl->bound2);
+          CIFragT *leftMate = GetCIFragT(ScaffoldGraph->CIFrags, GetInfoByIID(ScaffoldGraph->iidToFragIndex, gkpl->bound1)->fragIndex); 
+          CIFragT *rightMate = GetCIFragT(ScaffoldGraph->CIFrags, GetInfoByIID(ScaffoldGraph->iidToFragIndex, gkpl->bound2)->fragIndex);
           if (leftMate->contigID == NULLINDEX || rightMate->contigID == NULLINDEX) {
             continue;
           }
-          ChunkInstanceT * begin_chunk = GetGraphNode(ScaffoldGraph->ContigGraph, leftMate->contigID);
-          ChunkInstanceT * end_chunk   = GetGraphNode(ScaffoldGraph->ContigGraph, rightMate->contigID);
+          ChunkInstanceT * begin_chunk = GetGraphNode(ScaffoldGraph->RezGraph, leftMate->contigID);
+          ChunkInstanceT * end_chunk   = GetGraphNode(ScaffoldGraph->RezGraph, rightMate->contigID);
           
           if (chunk->scaffoldID != begin_chunk->scaffoldID) {
             continue;
@@ -831,6 +1071,135 @@ int IsScaffoldInternallyConnected(ScaffoldGraphT *sgraph,
   return numComponents;
 }
 
+/****************************************************************************/
+int IsScaffoldInternallyConnectedCheck(ScaffoldGraphT *sgraph,
+                                       CIScaffoldT *scaffold,
+                                       int32 edgeTypes,
+                                       CDS_CID_t ignoredChunkID)
+{
+  //
+  // returns the number of connected components of the <scaffold>
+  // NOTE: it considers ONLY trusted edges
+  // Will modify the setId field of the NodeCGW_T structure to reflect
+  // which component a node belongs to.
+  //
+  UFDataT  * UFData = UFCreateSets(scaffold->info.Scaffold.numElements);
+  CIEdgeT  * edge;
+  ChunkInstanceT  * chunk;
+  GraphEdgeIterator   edges;
+  CIScaffoldTIterator CIs;
+  int32 numComponents;
+  int set = 0;
+
+  assert(UFData != NULL);
+  assert(scaffold != NULL);
+  assert(sgraph != NULL);
+
+  //
+  // make a set for each vertex
+  //
+  InitCIScaffoldTIterator(sgraph, scaffold, TRUE,  FALSE, &CIs);
+  while ((chunk = NextCIScaffoldTIterator(&CIs)) != NULL) {
+    //
+    // create a set
+    //
+    UFSetT
+      * chunkSet = UFGetSet(UFData, set);
+
+    if (chunk->id == ignoredChunkID)
+      continue;
+
+    //
+    // map the set to a chunk
+    //
+    chunkSet->data = (void *)chunk;
+    //
+    // map the chunkId to setId
+    //
+    chunk->setID = set++;
+  }
+
+  //
+  // now do the unions: iterate over all trusted/raw edges
+  //
+  InitCIScaffoldTIterator(sgraph, scaffold, TRUE,
+                          FALSE, &CIs);
+  while ((chunk = NextCIScaffoldTIterator(&CIs)) != NULL) {
+    if (chunk->id == ignoredChunkID)
+      continue;
+    assert(chunk->setID >= 0);
+    InitGraphEdgeIterator(sgraph->RezGraph, chunk->id,
+                          ALL_END, edgeTypes, // ALL_TRUSTED_EDGES,
+                          GRAPH_EDGE_DEFAULT, //GRAPH_EDGE_CONFIRMED_ONLY,
+                          &edges);
+    while ((edge = NextGraphEdgeIterator(&edges)) != NULL) {
+      //
+      // get the other end
+      //
+      ChunkInstanceT
+        * otherChunk = GetGraphNode(sgraph->RezGraph,
+                                    (chunk->id == edge->idA) ?
+                                    edge->idB : edge->idA);
+      int32 weight = edge->edgesContributing - (isOverlapEdge(edge));
+      assert(otherChunk != NULL);
+
+      // See each edge only once
+      if(chunk->id != edge->idA)
+        continue;
+
+#if 0
+      if(edge->flags.bits.isBridge){
+        fprintf(stderr,"* WARNING: chunk "F_CID " weight = %d bridge edge\n", chunk->id, weight);
+        PrintGraphEdge(stderr, ScaffoldGraph->ContigGraph, "Bridge ",edge, chunk->id);
+      }
+#endif
+
+      if(isSingletonOverlapEdge(edge) ||
+         (weight == 1 && edge->flags.bits.isBridge))
+        continue;
+
+      //
+      // if the other end is not in this scaffold
+      // ignore it
+      //
+      if (chunk->scaffoldID != otherChunk->scaffoldID)
+        continue;
+
+      //
+      // do union
+      //
+      UFUnion(UFData, chunk->setID, otherChunk->setID);
+    }
+  }
+
+  //
+  // clean it up and return the # of components
+  //
+  numComponents = UFRenumberSets(UFData);
+
+  //
+  // renumber the NodeCGW_T setID to reflect component membership
+  //
+  set = 0;
+  InitCIScaffoldTIterator(sgraph, scaffold, TRUE,  FALSE, &CIs);
+  while ((chunk = NextCIScaffoldTIterator(&CIs)) != NULL) {
+    //
+    // create a set
+    //
+    UFSetT
+      * chunkSet = UFGetSet(UFData, set);
+    assert(chunkSet->data == (void *)chunk);
+    //
+    // map the chunkId to setId
+    //
+    chunk->setID = chunkSet->component;
+    set++;
+  }
+  UFFreeSets(UFData);
+  return numComponents;
+}
+
+
 static
 void
 DeleteScaffoldEdgesForScaffold(ScaffoldGraphT * graph, CIScaffoldT * scaffold) {
@@ -874,7 +1243,7 @@ killScaffoldIfOnlySurrogate(CDS_CID_t scaffoldID) {
       //
       if (basechunk->info.CI.numInstances == 1) {
         basechunk->flags.bits.isChaff = FALSE;
-        if (ScaffoldGraph->tigStore->getNumFrags(basechunk->id, TRUE) == 1)
+        if (basechunk->info.CI.numFragments == 1)
           basechunk->flags.bits.isChaff = TRUE;
         basechunk->info.CI.instances.in_line.instance1 = -1;
         basechunk->info.CI.instances.in_line.instance2 = -1;
@@ -1001,7 +1370,7 @@ int32 CheckScaffoldConnectivityAndSplit(ScaffoldGraphT *graph, CDS_CID_t scaffol
       scaffold = GetCIScaffoldT(graph->CIScaffolds, scaffoldID);
 
       for(inode = 0, seenFirstOffset = FALSE; inode < numNodes; inode++){
-        NodeCGW_T *thisNode = GetGraphNode(graph->ContigGraph, nodes[inode]);
+        NodeCGW_T *thisNode = GetGraphNode(graph->RezGraph, nodes[inode]);
         if(thisNode->setID == component){
           LengthT offsetAEnd, offsetBEnd;
           if(!seenFirstOffset){
@@ -1064,10 +1433,10 @@ void CheckTrustedEdges(ScaffoldGraphT * sgraph,  CDS_CID_t cid) {
   CIEdgeT * edge;
   CDS_CID_t next;
   ChunkInstanceT * next_chunk;
-  ChunkInstanceT * this_chunk = GetGraphNode(sgraph->ContigGraph, cid);
+  ChunkInstanceT * this_chunk = GetGraphNode(sgraph->RezGraph, cid);
   CDS_CID_t sid = this_chunk->scaffoldID;
 
-  InitGraphEdgeIterator(sgraph->ContigGraph, cid,
+  InitGraphEdgeIterator(sgraph->RezGraph, cid,
                         ALL_END, ALL_TRUSTED_EDGES,
                         GRAPH_EDGE_DEFAULT,
                         &edges);
@@ -1082,13 +1451,13 @@ void CheckTrustedEdges(ScaffoldGraphT * sgraph,  CDS_CID_t cid) {
       //      continue;  // avoid double checking of (i,j) and (j,i)
       next = edge->idA;
 
-    next_chunk = GetGraphNode(ScaffoldGraph->ContigGraph, next);
+    next_chunk = GetGraphNode(ScaffoldGraph->RezGraph, next);
     assert(next_chunk != NULL);
 
     if (next_chunk->scaffoldID != sid)
 #if 1
       fprintf(stderr,"-=> BAD edge id:"F_CID " "F_CID "("F_CID ")->"F_CID "("F_CID ") (weight %d, status %d)\n",
-              (CDS_CID_t) GetVAIndex_CIEdgeT(sgraph->ContigGraph->edges, edge),
+              (CDS_CID_t) GetVAIndex_CIEdgeT(sgraph->RezGraph->edges, edge),
               cid,
               sid,
               next,
@@ -1106,7 +1475,7 @@ void CheckAllTrustedEdges(ScaffoldGraphT * sgraph){
   GraphNodeIterator nodes;
   ChunkInstanceT *contig;
 
-  InitGraphNodeIterator(&nodes, sgraph->ContigGraph, GRAPH_NODE_DEFAULT);
+  InitGraphNodeIterator(&nodes, sgraph->RezGraph, GRAPH_NODE_DEFAULT);
   while((contig = NextGraphNodeIterator(&nodes)) != NULL){
 
     if(contig->scaffoldID == NULLINDEX)
@@ -1132,7 +1501,7 @@ int CheckAllEdges(ScaffoldGraphT * sgraph,  CDS_CID_t sid, CDS_CID_t cid) {
   NodeCGW_T * next_chunk;
   int out_of_sid_links = 0;
 
-  InitGraphEdgeIterator(sgraph->ContigGraph, cid, ALL_END, ALL_EDGES, GRAPH_EDGE_DEFAULT, &edges);
+  InitGraphEdgeIterator(sgraph->RezGraph, cid, ALL_END, ALL_EDGES, GRAPH_EDGE_DEFAULT, &edges);
   while((edge = NextGraphEdgeIterator(&edges)) != NULL){
     assert(edge != NULL);
 
@@ -1146,14 +1515,14 @@ int CheckAllEdges(ScaffoldGraphT * sgraph,  CDS_CID_t sid, CDS_CID_t cid) {
     else
       next = edge->idA;
 
-    next_chunk = GetGraphNode(ScaffoldGraph->ContigGraph, next);
+    next_chunk = GetGraphNode(ScaffoldGraph->RezGraph, next);
     assert(next_chunk != NULL);
 
     if ((next_chunk->scaffoldID != sid) && (next_chunk->scaffoldID != -1)) {
       out_of_sid_links++;
       /*** mjf ***/
       fprintf(stderr, "in CheckAllEdges -=> BAD edge id:"F_CID " "F_CID "("F_CID ")->"F_CID "("F_CID ") (weight %d, status %d)\n",
-              (CDS_CID_t) GetVAIndex_EdgeCGW_T(sgraph->ContigGraph->edges, edge),
+              (CDS_CID_t) GetVAIndex_EdgeCGW_T(sgraph->RezGraph->edges, edge),
               cid,
               sid,
               next,
@@ -1221,11 +1590,11 @@ void  SetCIScaffoldTLength(ScaffoldGraphT *sgraph, CIScaffoldT *scaffold, int32 
 
   if(verbose && (scaffold->bpLength.mean != maxOffset.mean ||
                  scaffold->bpLength.variance != maxOffset.variance)){
-    fprintf(stderr, "SetCIScaffoldTLength adjusted length of scaffold "F_CID " from (%g,%g) to (%g,%g)\n",
+    fprintf(GlobalData->stderrc, "SetCIScaffoldTLength adjusted length of scaffold "F_CID " from (%g,%g) to (%g,%g)\n",
             scaffold->id, scaffold->bpLength.mean, scaffold->bpLength.variance,
             maxOffset.mean, maxOffset.variance);
     if (verbose > 2)
-      DumpCIScaffold(stderr, sgraph, scaffold, FALSE);
+      DumpCIScaffold(GlobalData->stderrc, sgraph, scaffold, FALSE);
   }
 
   scaffold->bpLength = maxOffset;
@@ -1370,7 +1739,7 @@ void CheckCIScaffoldT(ScaffoldGraphT *sgraph, CIScaffoldT *scaffold){
   ScaffoldSanity(scaffold, sgraph);
 
   if(scaffold->info.Scaffold.numElements == 1){
-    //fprintf(stderr, " Early end to CheckCIScaffoldT() for scaffold "F_CID ": numElements ==1\n",scaffold->id);
+    //fprintf(GlobalData->stderrc, " Early end to CheckCIScaffoldT() for scaffold "F_CID ": numElements ==1\n",scaffold->id);
     return;
   }
 
@@ -1453,7 +1822,7 @@ void CheckCIScaffoldT(ScaffoldGraphT *sgraph, CIScaffoldT *scaffold){
 
       if(chunk->offsetAEnd.mean < mean ||
          chunk->offsetBEnd.mean < mean){
-        fprintf(stderr,"* Screwed up scaffold "F_CID ": Chunk "F_CID " has bad mean\n",
+        fprintf(GlobalData->stderrc,"* Screwed up scaffold "F_CID ": Chunk "F_CID " has bad mean\n",
                 sid, chunk->id);
 
         AppendPtrT(chunksToBeRemoved, (void **) &chunk);
@@ -1516,7 +1885,7 @@ void CheckCIScaffoldT(ScaffoldGraphT *sgraph, CIScaffoldT *scaffold){
     if((chunk->offsetAEnd.mean > mean && chunk->offsetAEnd.variance < variance) ||
        (chunk->offsetBEnd.mean > mean && chunk->offsetBEnd.variance < variance)){
       cgwError = TRUE;
-      fprintf(stderr,"* Screwed up scaffold "F_CID ": Chunk "F_CID " has bad variance\n",
+      fprintf(GlobalData->stderrc,"* Screwed up scaffold "F_CID ": Chunk "F_CID " has bad variance\n",
               sid, chunk->id);
     }
 
@@ -1527,7 +1896,7 @@ void CheckCIScaffoldT(ScaffoldGraphT *sgraph, CIScaffoldT *scaffold){
       }
   }
   if(cgwError){
-    fprintf(stderr,"* Screwed up scaffold "F_CID "\n", sid);
+    fprintf(GlobalData->stderrc,"* Screwed up scaffold "F_CID "\n", sid);
     DumpCIScaffold(stderr,sgraph, scaffold, FALSE);
     iterationError = TRUE;
   }
@@ -1630,13 +1999,11 @@ void DemoteSmallSingletonScaffolds(void) {
     numSingletonScaffolds++;
 
     // if we are forced marked unique and we are not allowed to be demoted, continue
-    if (ScaffoldGraph->tigStore->getUnitigFUR(CI->id) == AS_FORCED_UNIQUE &&
-        GlobalData->allowDemoteMarkedUnitigs == FALSE) {
+    if (CI->info.CI.forceUniqueRepeat == AS_FORCED_UNIQUE && GlobalData->allowDemoteMarkedUnitigs == FALSE) {
        continue;
     }
 
-    if ((ScaffoldGraph->tigStore->getUnitigFUR(CI->id) != AS_FORCED_REPEAT &&
-         ScaffoldGraph->tigStore->getUnitigCoverageStat(CI->id) > GlobalData->cgbDefinitelyUniqueCutoff) ||
+    if ((CI->info.CI.forceUniqueRepeat != AS_FORCED_REPEAT && CI->info.CI.coverageStat > GlobalData->cgbDefinitelyUniqueCutoff) ||
          (CI->bpLength.mean > 2000.0))
        continue;
 
@@ -1644,9 +2011,9 @@ void DemoteSmallSingletonScaffolds(void) {
 
     numDemoted++;
 
-    fprintf(stderr,
+    fprintf(GlobalData->stderrc,
              "** Demoting Contig/Unitig "F_CID "/"F_CID " with coverage stat %d length %g scaffold "F_CID "\n",
-             contig->id, CI->id, ScaffoldGraph->tigStore->getUnitigCoverageStat(CI->id), scaffold->bpLength.mean, scaffold->id);
+             contig->id, CI->id, CI->info.CI.coverageStat, scaffold->bpLength.mean, scaffold->id);
     // Mark the Underlying Unitig as un-scaffolded, and not-unique
     SetNodeType(CI, UNRESOLVEDCHUNK_CGW);
   
@@ -1678,7 +2045,7 @@ void DemoteSmallSingletonScaffolds(void) {
     MergeAllGraphEdges(ScaffoldGraph->ScaffoldGraph, TRUE, TRUE);
   }
 
-  fprintf(stderr,
+  fprintf(GlobalData->stderrc,
           "# Considered %d scaffolds of which %d were single and %d (%g%%) were demoted\n",
           numScaffolds, numSingletonScaffolds, numDemoted,
           (numSingletonScaffolds > 0? ((double)(numDemoted)/(double)(numSingletonScaffolds)): 0.0));

@@ -18,12 +18,12 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-/* $Id: AS_MSG_pmesg.h,v 1.83 2009-10-06 02:55:50 brianwalenz Exp $   */
+/* $Id: AS_MSG_pmesg.h,v 1.78 2009-08-14 13:37:06 skoren Exp $   */
 
 #ifndef AS_MSG_PMESG_INCLUDE_H
 #define AS_MSG_PMESG_INCLUDE_H
 
-static const char *rcsid_AS_MSG_PMESG_INCLUDE_H = "$Id: AS_MSG_pmesg.h,v 1.83 2009-10-06 02:55:50 brianwalenz Exp $";
+static const char *rcsid_AS_MSG_PMESG_INCLUDE_H = "$Id: AS_MSG_pmesg.h,v 1.78 2009-08-14 13:37:06 skoren Exp $";
 
 #include <stdio.h>
 #include <time.h>
@@ -271,6 +271,14 @@ typedef enum {
   AS_B_END = (int)'B'
 } ChunkOrientType;
 
+typedef enum {
+  AS_SINGLETON    = (int)'S',
+  AS_INTERCHUNK_A = (int)'A',
+  AS_INTERCHUNK_B = (int)'B',
+  AS_INTRACHUNK   = (int)'I',
+  AS_CONTCHUNK    = (int)'C'
+} LabelType;
+
 
 /* UOM message */
 
@@ -400,6 +408,8 @@ typedef struct IntMultiPos {
   IntFragment_ID  contained;
   IntFragment_ID  parent;     //  IID of the fragment we align to
 
+  IntFragment_ID  sourceInt;  //  This should probably be called frgSource
+
   int32           ahang;      //  If parent defined, these are relative
   int32           bhang;      //  that fragment
 
@@ -412,31 +422,18 @@ VA_DEF(IntMultiPos);
 
 /* IMV message */
 
-typedef struct IntVarAllele {
-  int32           num_reads;
-  int32           weight;
-  int32           var_seq_offset;  //  offset into var_seq_memory for this allele
-  int32           read_id_offset;  //  offset into read_id_memory for this allele
-} IntVarAllele;
-
 typedef struct IntMultiVar {
-  int32           var_id;                 // id of current VAR record
-  int32           phased_id;              // id of the VAR record phased with the current one
-  SeqInterval     position;               // position of the var region
-  int32           num_reads;              // num reads total
-  int32           num_alleles;            // num alleles total
-  int32           num_alleles_confirmed;  // num confirmed alleles
-  int32           min_anchor_size;        //
-  int32           var_length;             // bases in the var region
-  IntVarAllele   *alleles;                // list of num_alleles alleles
-
-  char           *var_seq_memory;         // single allocation for all memory
-  int32          *read_id_memory;         // single allocation for all memory
-
-  char           *enc_num_reads;          //  the nra field
-  char           *enc_weights;            //  the wgt field
-  char           *enc_var_seq;            //  the seq field
-  char           *enc_read_ids;           //  the rid field
+  SeqInterval     position;
+  int32           num_reads;
+  int32           num_conf_alleles;
+  int32           min_anchor_size;
+  int32           var_length;
+  int32           curr_var_id; // id of current VAR record
+  int32           phased_var_id;  // id of the VAR record phased with the current one
+  char           *nr_conf_alleles;
+  char           *weights;
+  char           *var_seq;
+  char           *conf_read_iids; // iids of phased reads
 } IntMultiVar;
 
 VA_DEF(IntMultiVar);
@@ -479,7 +476,7 @@ typedef struct {
   float           microhet_prob;
   UnitigStatus    status;
   UnitigFUR       unique_rept;
-  int32           length;
+  int32     length;
   char            *consensus;
   char            *quality;
   int32		  forced;
@@ -494,7 +491,7 @@ typedef struct {
   UnitigStatus    status;
   int32           num_occurences;
   AS_UID          *occurences;
-  int32           length;
+  int32     length;
   char            *consensus;
   char            *quality;
   int32           num_reads;
@@ -506,14 +503,14 @@ typedef struct {
 typedef enum {
   AS_PLACED	= (int)'P',
   AS_UNPLACED   = (int)'U'
-} ContigStatus;
+} ContigPlacementStatusType;
 
 /* ICM */
 
 typedef struct {
   IntContig_ID               iaccession;
-  ContigStatus               placed;
-  int32                      length;
+  ContigPlacementStatusType  placed;
+  int32                length;
   char                       *consensus;
   char                       *quality;
   int32		             forced;
@@ -724,7 +721,7 @@ typedef struct {
 typedef struct {
   AS_UID                      eaccession;
   IntContig_ID                iaccession;
-  ContigStatus   placed;
+  ContigPlacementStatusType   placed;
   int32                 length;
   char                       *consensus;
   char                       *quality;

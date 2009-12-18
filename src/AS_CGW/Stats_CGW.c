@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: Stats_CGW.c,v 1.23 2009-10-05 22:49:42 brianwalenz Exp $";
+static char *rcsid = "$Id: Stats_CGW.c,v 1.21 2009-07-30 10:42:56 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,7 +53,7 @@ void GenerateCIGraph_U_Stats(void){
 
   AS_UTL_mkdir("stat");
 
-  fprintf(stderr,"**** GenerateCIGraph_U_Stats ****\n");
+  fprintf(GlobalData->stderrc,"**** GenerateCIGraph_U_Stats ****\n");
 
   InitGraphNodeIterator(&Nodes, graph, GRAPH_NODE_DEFAULT);
   while(NULL != (node = NextGraphNodeIterator(&Nodes))){
@@ -142,7 +142,7 @@ void GenerateCIGraphStats(void){
   int nu_unitigs_no_links_no_bac_fragments = 0;
   int n_unitigs = 0;
 
-  fprintf(stderr,"**** GenerateCIGraphStats ****\n");
+  fprintf(GlobalData->stderrc,"**** GenerateCIGraphStats ****\n");
 
   InitGraphNodeIterator(&Nodes, graph, GRAPH_NODE_DEFAULT);
   while(NULL != (node = NextGraphNodeIterator(&Nodes))){
@@ -151,7 +151,7 @@ void GenerateCIGraphStats(void){
     int cnt = 0;
 
     // Filter surrogates
-    if(ScaffoldGraph->tigStore->getNumFrags(node->id, TRUE) == 0)
+    if(node->info.CI.numFragments == 0)
       continue;
 
     n_unitigs++;
@@ -164,18 +164,27 @@ void GenerateCIGraphStats(void){
       cnt++;
     }
 
+    //if(node->flags.bits.includesFinishedBacFragments){
+    //  nu_unitigs_no_bac_fragments++;
+    //  tfrags_nobf += node->info.CI.numFragments;
+    //}
     if(cnt == 0){
       nu_unitigs_no_links++;
-      tfrags_nolinks += ScaffoldGraph->tigStore->getNumFrags(node->id, TRUE);
+      tfrags_nolinks += node->info.CI.numFragments;
     }
+
+    //if(cnt == 0 && node->flags.bits.includesFinishedBacFragments){
+    //  nu_unitigs_no_links_no_bac_fragments++;
+    //  tfrags_nobf_nolinks += node->info.CI.numFragments;
+    //}
   }
-  fprintf(stderr,"*@ Graph has %d unitigs of which %d are non-unique\n",
+  fprintf(GlobalData->stderrc,"*@ Graph has %d unitigs of which %d are non-unique\n",
 	  n_unitigs, nu_unitigs);
-  fprintf(stderr,"*@ %d unitigs have no external data comprising %d total fragments\n",
+  fprintf(GlobalData->stderrc,"*@ %d unitigs have no external data comprising %d total fragments\n",
 	  nu_unitigs_no_bac_fragments, tfrags_nobf);
-  fprintf(stderr,"*@ %d unitigs have no links comprising %d total fragments\n",
+  fprintf(GlobalData->stderrc,"*@ %d unitigs have no links comprising %d total fragments\n",
 	  nu_unitigs_no_links, tfrags_nolinks);
-  fprintf(stderr,"*@ %d unitigs have no external data AND no links comprising %d total fragments\n",
+  fprintf(GlobalData->stderrc,"*@ %d unitigs have no external data AND no links comprising %d total fragments\n",
 	  nu_unitigs_no_links_no_bac_fragments, tfrags_nobf_nolinks);
 }
 
@@ -202,7 +211,7 @@ void GeneratePlacedContigGraphStats(char *label,int iteration){
 
   AS_UTL_mkdir("stat");
 
-  fprintf(stderr,"**** GeneratePlacedContigStats %s %d****\n", label, iteration);
+  fprintf(GlobalData->stderrc,"**** GeneratePlacedContigStats %s %d****\n", label, iteration);
 
 
   sprintf(buffer,"stat/%s%d.PlacedContig.nodelength.cgm", label, iteration);
@@ -340,7 +349,7 @@ void GenerateScaffoldGraphStats(char *label, int iteration){
 
   AS_UTL_mkdir("stat");
 
-  fprintf(stderr,"**** GeneratePlacedContigStats %s %d ****\n", label,iteration);
+  fprintf(GlobalData->stderrc,"**** GeneratePlacedContigStats %s %d ****\n", label,iteration);
 
 
   sprintf(buffer,"stat/%s%d.Scaffolds.nodelength.cgm", label,iteration);
@@ -613,7 +622,7 @@ void GenerateLinkStats(GraphCGW_T *graph, char *label, int iteration){
     }
   }
   if(graph->type == CONTIG_GRAPH)
-    fprintf(stderr,"*** Links confirmed by cgbOlaps %d  onCGBOlaps %d\n",
+    fprintf(GlobalData->stderrc,"*** Links confirmed by cgbOlaps %d  onCGBOlaps %d\n",
 	    cgbOverlap, nonCGBOverlap);
 
   fclose(linkstd_all);
@@ -626,7 +635,7 @@ void GenerateLinkStats(GraphCGW_T *graph, char *label, int iteration){
 int32 ApproximateUnitigCoverage(NodeCGW_T *unitig){
   int32 length=0;
   int i;
-  MultiAlignT *ma = ScaffoldGraph->tigStore->loadMultiAlign(unitig->id, TRUE);
+  MultiAlignT *ma = loadMultiAlignTFromSequenceDB(ScaffoldGraph->sequenceDB, unitig->id, TRUE);
 
   for(i = 0; i < GetNumIntMultiPoss(ma->f_list); i++){
     IntMultiPos *pos = GetIntMultiPos(ma->f_list, i);
@@ -705,7 +714,7 @@ void GenerateSurrogateStats(char *phase){
         break;
     }
 #ifdef DEBUG_DETAILED
-    fprintf(stderr,"* Node " F_CID " %c contig:" F_CID "  numInstances %d\n",
+    fprintf(GlobalData->stderrc,"* Node " F_CID " %c contig:" F_CID "  numInstances %d\n",
 	    node->id, type, node->info.CI.contigID, node->info.CI.numInstances);
 #endif
     if((node->type != UNRESOLVEDCHUNK_CGW) ||    // is not a surrogate parent
@@ -713,10 +722,10 @@ void GenerateSurrogateStats(char *phase){
       continue;
     fprintf(surrogSize,"%d\n", (int)node->bpLength.mean);
     fprintf(surrogPer, "%d\n", (int)node->info.CI.numInstances);
-    fprintf(surrogFrags, "%d\n", ScaffoldGraph->tigStore->getNumFrags(node->id, TRUE));
+    fprintf(surrogFrags, "%d\n", node->info.CI.numFragments);
     fprintf(surrogRatio, "%d\n", ApproximateUnitigCoverage(node)/node->info.CI.numInstances );
   }
-  fprintf(stderr,"* Stones: %d  Walks:%d\n",
+  fprintf(GlobalData->stderrc,"* Stones: %d  Walks:%d\n",
 	  stoneSurrogs, walkSurrogs);
 
 

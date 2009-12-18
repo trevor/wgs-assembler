@@ -19,12 +19,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-/* $Id: AS_GKP_include.h,v 1.54 2009-12-02 12:52:24 skoren Exp $ */
+/* $Id: AS_GKP_include.h,v 1.51 2009-08-25 06:11:19 brianwalenz Exp $ */
 
 #ifndef AS_GKP_INCLUDE_H
 #define AS_GKP_INCLUDE_H
 
-static const char *rcsid_AS_GKP_INCLUDE_H = "$Id: AS_GKP_include.h,v 1.54 2009-12-02 12:52:24 skoren Exp $";
+static const char *rcsid_AS_GKP_INCLUDE_H = "$Id: AS_GKP_include.h,v 1.51 2009-08-25 06:11:19 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <errno.h>
@@ -48,9 +48,6 @@ int
 Check_DistanceMesg(DistanceMesg     *dst_mesg,
                    int                believeInputStdDev);
 
-void
-checkLibraryForIlluminaPointers(LibraryMesg *lib_mesg);
-
 int
 Check_LibraryMesg(LibraryMesg       *dst_mesg,
                   int                believeInputStdDev);
@@ -67,16 +64,14 @@ Check_PlacementMesg(PlacementMesg   *plc_mesg);
 
 void
 dumpGateKeeperInfo(char       *gkpStoreName,
-                   int         asTable,
-                   int         withoutUIDs);
+                   int         asTable);
 
 void
 dumpGateKeeperLibraries(char       *gkpStoreName,
                         AS_IID      begIID,
                         AS_IID      endIID,
                         char       *iidToDump,
-                        int         asTable,
-                        int         withoutUIDs);
+                        int         asTable);
 
 void
 dumpGateKeeperFragments(char       *gkpStoreName,
@@ -85,8 +80,7 @@ dumpGateKeeperFragments(char       *gkpStoreName,
                         char       *iidToDump,
                         int         dumpWithSequence,
                         int         dumpClear,
-                        int         asTable,
-                        int         withoutUIDs);
+                        int         asTable);
 
 void
 dumpGateKeeperAsFasta(char       *gkpStoreName,
@@ -125,11 +119,6 @@ dumpGateKeeperAsVelvet(char       *gkpStoreName,
                         char       *iidToDump,
                         int         doNotFixMates,
                         int         dumpFRGClear);
-
-int
-dumpGateKeeperIsFeatureSet(char       *gkpStoreName,
-                           AS_IID     featureLibIID,
-                           char      *featureName);
 
 int
 Build_Partition(char      *gatekeeperName,

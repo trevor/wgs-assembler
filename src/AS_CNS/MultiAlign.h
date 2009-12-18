@@ -22,7 +22,7 @@
 #ifndef MULTIALIGN_H
 #define MULTIALIGN_H
 
-static const char *rcsid_MULTIALIGN_H = "$Id: MultiAlign.h,v 1.8 2009-12-10 04:01:10 brianwalenz Exp $";
+static const char *rcsid_MULTIALIGN_H = "$Id: MultiAlign.h,v 1.4 2009-06-10 18:05:13 brianwalenz Exp $";
 
 #include "AS_MSG_pmesg.h"
 #include "AS_UTL_Var.h"
@@ -32,32 +32,16 @@ VA_DEF(char);
 VA_DEF(int32);
 
 typedef struct {
-  double                     unitig_coverage_stat;
-  double                     unitig_microhet_prob;
-
-  UnitigStatus               unitig_status;
-  UnitigFUR                  unitig_unique_rept;
-
-  ContigStatus               contig_status;
-
-  uint32                     num_frags;
-  uint32                     num_unitigs;
-} MultiAlignD;
-
-typedef struct {
-  int32                      maID;
-  MultiAlignD                data;
-
-  VA_TYPE(char)             *consensus;  // gapped consensus
-  VA_TYPE(char)             *quality;    // gapped quality
-
-  VA_TYPE(IntMultiPos)      *f_list;     // positions of fragments
-  VA_TYPE(IntUnitigPos)     *u_list;     // positions of unitigs
-  VA_TYPE(IntMultiVar)      *v_list;     // variations
-
-  VA_TYPE(int32)            *fdelta;     // deltas for all fragments in f_list
-  VA_TYPE(int32)            *udelta;     // deltas for all unitigs in u_list
+  int32                   maID;
+  VA_TYPE(char)          *consensus;  // gapped consensus
+  VA_TYPE(char)          *quality;    // quality
+  VA_TYPE(int32)         *fdelta;     // deltas for all fragments in f_list
+  VA_TYPE(IntMultiPos)   *f_list;     // positions of fragments
+  VA_TYPE(int32)         *udelta;     // deltas for all unitigs in u_list
+  VA_TYPE(IntUnitigPos)  *u_list;     // positions of unitigs
+  VA_TYPE(IntMultiVar)   *v_list;     // variations
 } MultiAlignT;
+VA_DEF(MultiAlignT)
 
 
 MultiAlignT *CreateMultiAlignT(void);
@@ -66,6 +50,10 @@ void         ClearMultiAlignT(MultiAlignT *multiAlign);
 
 #define      DeleteMultiAlignT(M) { DeleteMultiAlignTWorker(M); (M) = NULL; }
 void         DeleteMultiAlignTWorker(MultiAlignT *multiAlign);
+
+MultiAlignT *CreateMultiAlignTFromIUM(IntUnitigMesg *ium, int32 localFragID, int sequenceOnly);
+MultiAlignT *CreateMultiAlignTFromICM(IntConConMesg *ium, int32 localFragID, int sequenceOnly);
+MultiAlignT *CreateMultiAlignTFromCCO(SnapConConMesg *ium, int32 localFragID, int sequenceOnly);
 
 //  Copies oldma into newma.  If newma is NULL, a new one is allocated.
 //  Both cases return the copy.
@@ -83,9 +71,6 @@ void         GetMultiAlignUngappedConsensus(MultiAlignT *ma, VA_TYPE(char) *unga
 void         GetMultiAlignUngappedOffsets(MultiAlignT *ma, VA_TYPE(int32) *ungappedOffsets);
 
 void         MakeCanonicalMultiAlignT(MultiAlignT *ma);
-
-void         DumpMultiAlignForHuman(FILE *out, MultiAlignT *ma, bool isUnitig);
-bool         LoadMultiAlignFromHuman(MultiAlignT *ma, bool &isUnitig, FILE *in);
 
 void         PrintMultiAlignT(FILE *out,
                               MultiAlignT *ma,

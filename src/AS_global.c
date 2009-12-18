@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: AS_global.c,v 1.17 2009-11-26 02:53:33 brianwalenz Exp $";
+static const char *rcsid = "$Id: AS_global.c,v 1.16.6.1 2009-12-18 18:07:34 brianwalenz Exp $";
 
 #include "AS_global.h"
 
@@ -48,7 +48,7 @@ double AS_MAX_ERROR_RATE =   0.25;
 
 extern
 const char *mainid;
-const char *releaseid = "CVS TIP";
+const char *releaseid = "5.5";
 
 //  We take argc and argv, so, maybe, eventually, we'll want to parse
 //  something out of there.  We return argc in case what we parse we
@@ -223,13 +223,8 @@ AS_configure(int argc, char **argv) {
       fprintf(F, "\n");
       fprintf(F, "Command:\n");
       fprintf(F, "%s", argv[0]);
-
       for (i=1; i<argc; i++)
-        if (argv[i][0] == '-')
-          fprintf(F, " \\\n  %s", argv[i]);
-        else
-          fprintf(F, " %s", argv[i]);
-
+        fprintf(F, " \\\n  %s", argv[i]);
       fprintf(F, "\n");
     }
 

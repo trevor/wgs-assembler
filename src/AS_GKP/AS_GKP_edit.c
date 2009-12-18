@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char const *rcsid = "$Id: AS_GKP_edit.c,v 1.21 2009-10-26 13:20:26 brianwalenz Exp $";
+static char const *rcsid = "$Id: AS_GKP_edit.c,v 1.19 2009-08-25 06:11:19 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -127,8 +127,8 @@ void
 revertClearRange(char *clearRegionName, char *gkpStoreName) {
   gkStore    *gkpStore = new gkStore(gkpStoreName, FALSE, TRUE);
   gkFragment  fr;
-  uint32      br, er;  //  Begin, End, of the range to revert to
-  uint32      bl, el;  //  Begin, End, of the latest
+  uint32      br, er;
+  uint32      bl, el;
   uint32      which = gkStore_decodeClearRegionLabel(clearRegionName);
 
   if (which == AS_READ_CLEAR_ERROR)
@@ -142,13 +142,9 @@ revertClearRange(char *clearRegionName, char *gkpStoreName) {
     fr.gkFragment_getClearRegion(br, er, which);
     fr.gkFragment_getClearRegion(bl, el, AS_READ_CLEAR_LATEST);
 
-    //  If the latest is different, reset the clear region.  It looks like nonsense (why set the
-    //  clear range to the value it already has?!) but it also updates the latest clear range to
-    //  this value, which is what we want to do.
-    //
     if ((br != bl) ||
         (er != el)) {
-      fr.gkFragment_setClearRegion(br, er, which);
+      fr.gkFragment_setClearRegion(bl, el, which);
       gkpStore->gkStore_setFragment(&fr);
     }
   }
@@ -570,20 +566,20 @@ editStore(char *editsFileName, char *gkpStoreName, int update) {
         if (update)
           fprintf(stdout, "lib uid %s doNotOverlapTrim %c -> %c\n",
                   AS_UID_toString(gklr.libraryUID), (o) ? 'T' : 'F', (gklr.doNotOverlapTrim) ? 'T' : 'F');
-      } else if (strcasecmp(ACT, "usePackedFragments") == 0) {
-        uint32 o = gklr.usePackedFragments;
+      } else if (strcasecmp(ACT, "useShortFragments") == 0) {
+        uint32 o = gklr.useShortFragments;
         if      ((E[0] == '1') || (E[0] == 't') || (E[0] == 'T'))
-          gklr.usePackedFragments = 1;
+          gklr.useShortFragments = 1;
         else if ((E[0] == '0') || (E[0] == 'f') || (E[0] == 'F'))
-          gklr.usePackedFragments = 0;
+          gklr.useShortFragments = 0;
         else {
-          fprintf(stderr, "invalid lib usePackedFragments flag in edit line: '%s'\n", L);
+          fprintf(stderr, "invalid lib useShortFragments flag in edit line: '%s'\n", L);
           errors++;
           goto nextline;
         }
         if (update)
-          fprintf(stdout, "lib uid %s usePackedFragments %c -> %c\n",
-                  AS_UID_toString(gklr.libraryUID), (o) ? 'T' : 'F', (gklr.usePackedFragments) ? 'T' : 'F');
+          fprintf(stdout, "lib uid %s useShortFragments %c -> %c\n",
+                  AS_UID_toString(gklr.libraryUID), (o) ? 'T' : 'F', (gklr.useShortFragments) ? 'T' : 'F');
       } else if (strcasecmp(ACT, "orientation") == 0) {
         uint32 o = gklr.orientation;
         uint32 i;

@@ -19,19 +19,19 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: uidclient.c,v 1.6 2009-11-23 00:31:38 brianwalenz Exp $";
+static const char *rcsid = "$Id: uidclient.c,v 1.4 2008-10-08 22:03:00 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
+#include "SYS_UIDcommon.h"
 #include "SYS_UIDclient.h"
 
 int
 main(int argc, char **argv) {
-  int     blockSize = 1;
+  int     blockSize = 256;
   int     numUIDs   = 1;
-  int     doThrash  = 0;
+  int     msDelay   = 0;
 
   int arg=1;
   int err=0;
@@ -40,16 +40,12 @@ main(int argc, char **argv) {
       numUIDs = atoi(argv[++arg]);
       if (numUIDs < blockSize)
         blockSize = numUIDs;
-
     } else if (strcmp(argv[arg], "-n") == 0) {
-      //SYS_UIDset_euid_namespace(argv[++arg]);
-
+      SYS_UIDset_euid_namespace(argv[++arg]);
     } else if (strcmp(argv[arg], "-E") == 0) {
-      //SYS_UIDset_euid_server(argv[++arg]);
-
+      SYS_UIDset_euid_server(argv[++arg]);
     } else if (strcmp(argv[arg], "-thrash") == 0) {
-      doThrash = 1;
-
+      msDelay = atoi(argv[++arg]);
     } else {
       fprintf(stderr, "%s: unknown option '%s'\n", argv[0], argv[arg]);
       err++;
@@ -61,20 +57,27 @@ main(int argc, char **argv) {
     fprintf(stderr, "  -p n       print n UIDs and exit.\n");
     fprintf(stderr, "  -n ns      use namespace ns.\n");
     fprintf(stderr, "  -E server  contact EUID server 'server'.\n");
-    fprintf(stderr, "  -thrash    debug; get UIDs as fast as possible using blocksize 1.\n");
-    fprintf(stderr, "             This is not what you want.  Don't use it.\n");
+    fprintf(stderr, "  -thrash ms debug; get UIDs, sleeping ms milliseconds between each;\n");
+    fprintf(stderr, "             do not print UIDs; use blocksize min(512, -p).  This is\n");
+    fprintf(stderr, "             not what you want.  Don't use it.\n");
     exit(1);
   }
 
   UIDserver  *uids = UIDserverInitialize(blockSize, 0);
 
-  while (doThrash)
-    getUID(uids);  //  Forever or never.
-
-  while (numUIDs > 0) {
-    fprintf(stdout, F_U64"\n", getUID(uids));
-    numUIDs--;
+  if (msDelay == 0) {
+    while (numUIDs > 0) {
+      fprintf(stdout, F_U64"\n", getUID(uids));
+      numUIDs--;
+    }
+  } else {
+    while (1) {
+      getUID(uids);
+      usleep(msDelay * 1000);
+    }
   }
 
   exit(0);
 }
+
+

@@ -30,7 +30,7 @@
 
 **********************************************************************/
 
-static char *rcsid = "$Id: ConsistencyChecksREZ.c,v 1.16 2009-10-27 12:26:41 skoren Exp $";
+static char *rcsid = "$Id: ConsistencyChecksREZ.c,v 1.14 2009-06-10 18:05:14 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -201,7 +201,8 @@ int Is_Edge_Consistent(CIEdgeT *edge,
 
 
 /* declaration of two function in ChunkOverlap_CGW.c */
-void ComputeCanonicalOverlap(ChunkOverlapperT *chunkOverlapper,
+void ComputeCanonicalOverlap(Global_CGW *data,
+			     ChunkOverlapperT *chunkOverlapper,
 			     ChunkOverlapCheckT *canOlap);
 
 int InitCanonicalOverlapSpec(int cidA, int cidB,
@@ -276,7 +277,7 @@ int check_consistency(Scaffold_Fill_t *gapAssignment, int noScaff, int iteration
 	// If the chunk is tested in round 1 this is set to TRUE
 
 	ChunkInstanceT  *chunk1;
-	chunk1 = GetGraphNode(ScaffoldGraph->ContigGraph, cid1);
+	chunk1 = GetGraphNode(ScaffoldGraph->RezGraph, cid1);
 	round1All++;
 
 #if DEBUG > 1
@@ -295,7 +296,7 @@ int check_consistency(Scaffold_Fill_t *gapAssignment, int noScaff, int iteration
 
 
 	// Initialize the iterator for the CIEdges
-	InitGraphEdgeIterator(ScaffoldGraph->ContigGraph,cid1,ALL_END,ALL_EDGES,GRAPH_EDGE_DEFAULT,&iterator);
+	InitGraphEdgeIterator(ScaffoldGraph->RezGraph,cid1,ALL_END,ALL_EDGES,GRAPH_EDGE_DEFAULT,&iterator);
 
 	while( (edge = NextGraphEdgeIterator(&iterator)) != NULL )
 	  {
@@ -314,7 +315,7 @@ int check_consistency(Scaffold_Fill_t *gapAssignment, int noScaff, int iteration
 	       to a unique chunk. We only test CI edges
 	       between assigned chunks */
 
-	    chunk2 = GetGraphNode(ScaffoldGraph->ContigGraph, citer);
+	    chunk2 = GetGraphNode(ScaffoldGraph->RezGraph, citer);
 	    assert( citer == chunk2->id );
 
 #if DEBUG > 1
@@ -780,7 +781,7 @@ static OverlapStatusREZ check_overlap(Gap_Chunk_t cidA, Gap_Chunk_t cidB,
    else
      maxOlap = abs(cidA.end.mean-cidA.start.mean);
 
-   *olap = OverlapChunks(ScaffoldGraph->ContigGraph,    // handles suspicious
+   *olap = OverlapChunks(ScaffoldGraph->RezGraph,    // handles suspicious
 			 cidA.chunk_id, cidB.chunk_id,
 			 orientation,
 			 minOlap,maxOlap,

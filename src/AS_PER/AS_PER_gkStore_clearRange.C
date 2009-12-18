@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: AS_PER_gkStore_clearRange.C,v 1.9 2009-11-09 01:03:02 brianwalenz Exp $";
+static char *rcsid = "$Id: AS_PER_gkStore_clearRange.C,v 1.4 2009-08-25 06:07:44 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,151 +69,135 @@ gkClearRange::gkClearRange(gkStore *gkp_, uint32 clearType_, uint32 create_) {
   clearType    = clearType_;
   create       = create_;
 
-  pkconfigured = 0;
-  pkdirty      = 0;
-  pkmaxiid     = 0;
-  pk           = NULL;
+  smconfigured = 0;
+  smdirty      = 0;
+  smmaxiid     = 0;
+  sm           = NULL;
 
-  nmconfigured = 0;
-  nmdirty      = 0;
-  nmmaxiid     = 0;
-  nm           = NULL;
+  mdconfigured = 0;
+  mddirty      = 0;
+  mdmaxiid     = 0;
+  md           = NULL;
 
-  sbconfigured = 0;
-  sbdirty      = 0;
-  sbmaxiid     = 0;
-  sb           = NULL;
+  lgconfigured = 0;
+  lgdirty      = 0;
+  lgmaxiid     = 0;
+  lg           = NULL;
 }
 
 
 gkClearRange::~gkClearRange() {
 
-  if ((pkdirty) && (pk != NULL)) {
-    char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_PACKED, clearType);
+  if ((smdirty) && (sm != NULL)) {
+    char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_SHORT, clearType);
 
     errno = 0;
     FILE *F = fopen(filePath, "w");
     if (errno)
       fprintf(stderr, "gkClearRange::~gkClearRange()-- failed to write clear range file '%s': %s\n", filePath, strerror(errno)), exit(1);
 
-    AS_UTL_safeWrite(F, pk, "gkClearRange::~glClearRange()--sm", sizeof(uint8), gkp->inf.numPacked * 2 + 2);
+    AS_UTL_safeWrite(F, sm, "gkClearRange::~glClearRange()--sm", sizeof(uint8), gkp->inf.numShort * 2 + 2);
 
     fclose(F);
   }
 
-  if ((nmdirty) && (nm != NULL)) {
-    char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_NORMAL, clearType);
+  if ((mddirty) && (md != NULL)) {
+    char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_MEDIUM, clearType);
 
     errno = 0;
     FILE *F = fopen(filePath, "w");
     if (errno)
       fprintf(stderr, "gkClearRange::~gkClearRange()-- failed to write clear range file '%s': %s\n", filePath, strerror(errno)), exit(1);
 
-    AS_UTL_safeWrite(F, nm, "gkClearRange::~glClearRange()--nm", sizeof(uint16), gkp->inf.numNormal * 2 + 2);
+    AS_UTL_safeWrite(F, md, "gkClearRange::~glClearRange()--md", sizeof(uint16), gkp->inf.numMedium * 2 + 2);
 
     fclose(F);
   }
 
-  if ((sbdirty) && (sb != NULL)) {
-    char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_STROBE, clearType);
+  if ((lgdirty) && (lg != NULL)) {
+    char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_LONG, clearType);
 
     errno = 0;
     FILE *F = fopen(filePath, "w");
     if (errno)
       fprintf(stderr, "gkClearRange::~gkClearRange()-- failed to write clear range file '%s': %s\n", filePath, strerror(errno)), exit(1);
 
-    AS_UTL_safeWrite(F, sb, "gkClearRange::~glClearRange()--sb", sizeof(uint32), gkp->inf.numStrobe * 2 + 2);
+    AS_UTL_safeWrite(F, lg, "gkClearRange::~glClearRange()--lg", sizeof(uint32), gkp->inf.numLong * 2 + 2);
 
     fclose(F);
   }
 
-  delete [] pk;
-  delete [] nm;
-  delete [] sb;
+  delete [] sm;
+  delete [] md;
+  delete [] lg;
 };
 
 
 
 void
 gkClearRange::gkClearRange_purge(void) {
-  char *filePath = NULL;
+  char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_SHORT, clearType);
 
-  filePath = gkClearRange_makeName(gkp, GKFRAGMENT_PACKED, clearType);
-  if (AS_UTL_fileExists(filePath, FALSE, FALSE)) {
-    fprintf(stderr, "gkStore: purging clear region '%s'\n", filePath);
-    unlink(filePath);
-  }
+  unlink(filePath);
 
-  filePath = gkClearRange_makeName(gkp, GKFRAGMENT_NORMAL, clearType);
-  if (AS_UTL_fileExists(filePath, FALSE, FALSE)) {
-    fprintf(stderr, "gkStore: purging clear region '%s'\n", filePath);
-    unlink(filePath);
-  }
+  delete [] sm;
+  delete [] md;
+  delete [] lg;
 
-  filePath = gkClearRange_makeName(gkp, GKFRAGMENT_STROBE, clearType);
-  if (AS_UTL_fileExists(filePath, FALSE, FALSE)) {
-    fprintf(stderr, "gkStore: purging clear region '%s'\n", filePath);
-    unlink(filePath);
-  }
+  smconfigured = 0;
+  smdirty      = 0;
+  smmaxiid     = 0;
+  sm           = NULL;
 
-  delete [] pk;
-  delete [] nm;
-  delete [] sb;
+  mdconfigured = 0;
+  mddirty      = 0;
+  mdmaxiid     = 0;
+  md           = NULL;
 
-  pkconfigured = 0;
-  pkdirty      = 0;
-  pkmaxiid     = 0;
-  pk           = NULL;
-
-  nmconfigured = 0;
-  nmdirty      = 0;
-  nmmaxiid     = 0;
-  nm           = NULL;
-
-  sbconfigured = 0;
-  sbdirty      = 0;
-  sbmaxiid     = 0;
-  sb           = NULL;
+  lgconfigured = 0;
+  lgdirty      = 0;
+  lgmaxiid     = 0;
+  lg           = NULL;
 }
 
 
 void
 gkClearRange::gkClearRange_getClearRegion(gkFragment *fr, uint32& begin, uint32& end) {
 
-  //  We can be configured (pk is valid) but still ask for a fragment
+  //  We can be configured (sm is valid) but still ask for a fragment
   //  outside the range.  If the first fragment (any early fragment)
   //  is added to the store with a vector clear, but no other
   //  fragments have a vector clear, the clear range is configured,
   //  but too small (we don't add undefined clear ranges).
 
-  if (fr->type == GKFRAGMENT_PACKED) {
-    if (!pkconfigured)
-      gkClearRange_configurePacked();
-    if ((pk) && (fr->tiid <= pkmaxiid)) {
-      begin = pk[2*fr->tiid+0];
-      end   = pk[2*fr->tiid+1];
+  if (fr->type == GKFRAGMENT_SHORT) {
+    if (!smconfigured)
+      gkClearRange_configureShort();
+    if ((sm) && (fr->tiid <= smmaxiid)) {
+      begin = sm[2*fr->tiid+0];
+      end   = sm[2*fr->tiid+1];
     } else {
       begin = 1;
       end   = 0;
     }
   }
-  if (fr->type == GKFRAGMENT_NORMAL) {
-    if (!nmconfigured)
-      gkClearRange_configureNormal();
-    if ((nm) && (fr->tiid <= nmmaxiid)) {
-      begin = nm[2*fr->tiid+0];
-      end   = nm[2*fr->tiid+1];
+  if (fr->type == GKFRAGMENT_MEDIUM) {
+    if (!mdconfigured)
+      gkClearRange_configureMedium();
+    if ((md) && (fr->tiid <= mdmaxiid)) {
+      begin = md[2*fr->tiid+0];
+      end   = md[2*fr->tiid+1];
     } else {
       begin = 1;
       end   = 0;
     }
   }
-  if (fr->type == GKFRAGMENT_STROBE) {
-    if (!sbconfigured)
-      gkClearRange_configureStrobe();
-    if ((sb) && (fr->tiid <= sbmaxiid)) {
-      begin = sb[2*fr->tiid+0];
-      end   = sb[2*fr->tiid+1];
+  if (fr->type == GKFRAGMENT_LONG) {
+    if (!lgconfigured)
+      gkClearRange_configureLong();
+    if ((lg) && (fr->tiid <= lgmaxiid)) {
+      begin = lg[2*fr->tiid+0];
+      end   = lg[2*fr->tiid+1];
     } else {
       begin = 1;
       end   = 0;
@@ -225,29 +209,29 @@ gkClearRange::gkClearRange_getClearRegion(gkFragment *fr, uint32& begin, uint32&
 
 void
 gkClearRange::gkClearRange_setClearRegion(gkFragment *fr, uint32  begin, uint32  end) {
-  if (fr->type == GKFRAGMENT_PACKED) {
-    if (!pkconfigured)
-      gkClearRange_configurePacked();
-    assert(pk != NULL);
-    pkdirty = 1;
-    pk[2*fr->tiid+0] = begin;
-    pk[2*fr->tiid+1] = end;
+  if (fr->type == GKFRAGMENT_SHORT) {
+    if (!smconfigured)
+      gkClearRange_configureShort();
+    assert(sm != NULL);
+    smdirty = 1;
+    sm[2*fr->tiid+0] = begin;
+    sm[2*fr->tiid+1] = end;
   }
-  if (fr->type == GKFRAGMENT_NORMAL) {
-    if (nm == NULL)
-      gkClearRange_configureNormal();
-    assert(nm != NULL);
-    nmdirty = 1;
-    nm[2*fr->tiid+0] = begin;
-    nm[2*fr->tiid+1] = end;
+  if (fr->type == GKFRAGMENT_MEDIUM) {
+    if (md == NULL)
+      gkClearRange_configureMedium();
+    assert(md != NULL);
+    mddirty = 1;
+    md[2*fr->tiid+0] = begin;
+    md[2*fr->tiid+1] = end;
   }
-  if (fr->type == GKFRAGMENT_STROBE) {
-    if (sb == NULL)
-      gkClearRange_configureStrobe();
-    assert(sb != NULL);
-    sbdirty = 1;
-    sb[2*fr->tiid+0] = begin;
-    sb[2*fr->tiid+1] = end;
+  if (fr->type == GKFRAGMENT_LONG) {
+    if (lg == NULL)
+      gkClearRange_configureLong();
+    assert(lg != NULL);
+    lgdirty = 1;
+    lg[2*fr->tiid+0] = begin;
+    lg[2*fr->tiid+1] = end;
   }
 }
 
@@ -256,247 +240,223 @@ gkClearRange::gkClearRange_setClearRegion(gkFragment *fr, uint32  begin, uint32 
 
 
 void
-gkClearRange::gkClearRange_configurePacked(void) {
-  char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_PACKED, clearType);
+gkClearRange::gkClearRange_configureShort(void) {
+  char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_SHORT, clearType);
 
-  if (AS_UTL_fileExists(filePath, FALSE, FALSE)) {
-    pkdirty  = 0;
-    pkmaxiid = gkp->inf.numPacked;
-    pk       = NULL;
+  if (AS_UTL_fileExists(filePath, FALSE, TRUE)) {
+    smdirty  = 0;
+    smmaxiid = gkp->inf.numShort;
+    sm       = NULL;
 
     errno = 0;
     FILE *F = fopen(filePath, "r");
     if (errno)
       fprintf(stderr, "gkClearRange::glClearRange()-- failed to load clear range file '%s': %s\n", filePath, strerror(errno)), exit(1);
 
-    pk = new uint8 [pkmaxiid * 2 + 2];
-    AS_UTL_safeRead(F, pk, "gkClearRange::glClearRange()--pk", sizeof(uint8), pkmaxiid * 2 + 2);
+    sm = new uint8 [smmaxiid * 2 + 2];
+    AS_UTL_safeRead(F, sm, "gkClearRange::glClearRange()--sm", sizeof(uint8), smmaxiid * 2 + 2);
 
     fclose(F);
   } else if (create) {
-    pkmaxiid = (gkp->inf.numPacked > 0) ? gkp->inf.numPacked : 1048576;
-    pkdirty  = 1;
-    pk       = new uint8 [pkmaxiid * 2 + 2];
+    smmaxiid = (gkp->inf.numShort > 0) ? gkp->inf.numShort : 1048576;
+    smdirty  = 1;
+    sm       = new uint8 [smmaxiid * 2 + 2];
 
     gkFragment  fr;
-
-    fr.type = GKFRAGMENT_PACKED;
-
-    for (uint32 iid=1; iid<=gkp->inf.numPacked; iid++) {
-      getIndexStore(gkp->fpk, iid, &fr.fr.packed);
-      pk[2*iid+0] = fr.gkFragment_getClearRegionBegin();
-      pk[2*iid+1] = fr.gkFragment_getClearRegionEnd();
+    gkStream   *gs = new gkStream(gkp,
+                                  1,
+                                  gkp->inf.numShort,
+                                  GKFRAGMENT_INF);
+    while (gs->next(&fr)) {
+      sm[2*fr.tiid+0] = fr.gkFragment_getClearRegionBegin();
+      sm[2*fr.tiid+1] = fr.gkFragment_getClearRegionEnd();
     }
-  } else {
-    //  Nothing to configure.  Not told to create, and file doesn't exist.  We'll return the
-    //  invalid clear range (1,0) on any accesses.
+    delete gs;
   }
 
-  pkconfigured = 1;
+  smconfigured = 1;
 }
 
 
 void
-gkClearRange::gkClearRange_configureNormal(void) {
-  char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_NORMAL, clearType);
+gkClearRange::gkClearRange_configureMedium(void) {
+  char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_MEDIUM, clearType);
 
-  assert(nm == NULL);
-  assert(nmconfigured == 0);
+  assert(md == NULL);
+  assert(mdconfigured == 0);
 
-  if (AS_UTL_fileExists(filePath, FALSE, FALSE)) {
-    nmdirty   = 0;
-    nmmaxiid  = gkp->inf.numNormal;
-    nm        = NULL;
+  if (AS_UTL_fileExists(filePath, FALSE, TRUE)) {
+    mddirty   = 0;
+    mdmaxiid  = gkp->inf.numMedium;
+    md        = NULL;
 
     errno = 0;
     FILE *F = fopen(filePath, "r");
     if (errno)
       fprintf(stderr, "gkClearRange::glClearRange()-- failed to load clear range file '%s': %s\n", filePath, strerror(errno)), exit(1);
 
-    nm = new uint16 [nmmaxiid * 2 + 2];
-    AS_UTL_safeRead(F, nm, "gkClearRange::glClearRange()--nm", sizeof(uint16), nmmaxiid * 2 + 2);
+    md = new uint16 [mdmaxiid * 2 + 2];
+    AS_UTL_safeRead(F, md, "gkClearRange::glClearRange()--md", sizeof(uint16), mdmaxiid * 2 + 2);
 
     fclose(F);
   } else if (create) {
-    nmmaxiid = (gkp->inf.numNormal > 0) ? gkp->inf.numNormal : 1048576;
-    nmdirty  = 1;
-    nm       = new uint16 [nmmaxiid * 2 + 2];
+    mdmaxiid = (gkp->inf.numMedium > 0) ? gkp->inf.numMedium : 1048576;
+    mddirty  = 1;
+    md       = new uint16 [mdmaxiid * 2 + 2];
 
     gkFragment  fr;
-
-    fr.type = GKFRAGMENT_NORMAL;
-
-    for (uint32 iid=1; iid<=gkp->inf.numNormal; iid++) {
-      getIndexStore(gkp->fnm, iid, &fr.fr.normal);
-      nm[2*iid+0] = fr.gkFragment_getClearRegionBegin();
-      nm[2*iid+1] = fr.gkFragment_getClearRegionEnd();
+    gkStream   *gs = new gkStream(gkp,
+                                  gkp->inf.numShort + 1,
+                                  gkp->inf.numShort + gkp->inf.numMedium,
+                                  GKFRAGMENT_INF);
+    while (gs->next(&fr)) {
+      md[2*fr.tiid+0] = fr.gkFragment_getClearRegionBegin();
+      md[2*fr.tiid+1] = fr.gkFragment_getClearRegionEnd();
     }
-  } else {
-    //  Nothing to configure.  Not told to create, and file doesn't exist.  We'll return the
-    //  invalid clear range (1,0) on any accesses.
+    delete gs;
   }
 
-  nmconfigured = 1;
+  mdconfigured = 1;
 }
 
 
 void
-gkClearRange::gkClearRange_configureStrobe(void) {
-  char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_STROBE, clearType);
+gkClearRange::gkClearRange_configureLong(void) {
+  char *filePath = gkClearRange_makeName(gkp, GKFRAGMENT_LONG, clearType);
 
-  if (AS_UTL_fileExists(filePath, FALSE, FALSE)) {
-    sbdirty   = 0;
-    sbmaxiid  = gkp->inf.numStrobe;
-    sb        = NULL;
+  if (AS_UTL_fileExists(filePath, FALSE, TRUE)) {
+    lgdirty   = 0;
+    lgmaxiid  = gkp->inf.numLong;
+    lg        = NULL;
 
     errno = 0;
     FILE *F = fopen(filePath, "r");
     if (errno)
       fprintf(stderr, "gkClearRange::glClearRange()-- failed to load clear range file '%s': %s\n", filePath, strerror(errno)), exit(1);
 
-    sb = new uint32 [sbmaxiid * 2 + 2];
-    AS_UTL_safeRead(F, sb, "gkClearRange::glClearRange()--sb", sizeof(uint32), sbmaxiid * 2 + 2);
+    lg = new uint32 [lgmaxiid * 2 + 2];
+    AS_UTL_safeRead(F, lg, "gkClearRange::glClearRange()--lg", sizeof(uint32), lgmaxiid * 2 + 2);
 
     fclose(F);
   } else if (create) {
-    sbmaxiid = (gkp->inf.numStrobe > 0) ? gkp->inf.numStrobe : 1048576;
-    sbdirty  = 1;
-    sb       = new uint32 [sbmaxiid * 2 + 2];
+    lgmaxiid = (gkp->inf.numLong > 0) ? gkp->inf.numLong : 1048576;
+    lgdirty  = 1;
+    lg       = new uint32 [lgmaxiid * 2 + 2];
 
     gkFragment  fr;
-
-    fr.type = GKFRAGMENT_STROBE;
-
-    for (uint32 iid=1; iid<=gkp->inf.numStrobe; iid++) {
-      getIndexStore(gkp->fsb, iid, &fr.fr.strobe);
-      sb[2*iid+0] = fr.gkFragment_getClearRegionBegin();
-      sb[2*iid+1] = fr.gkFragment_getClearRegionEnd();
+    gkStream   *gs = new gkStream(gkp,
+                                  gkp->inf.numShort + gkp->inf.numMedium + 1,
+                                  gkp->inf.numShort + gkp->inf.numMedium + gkp->inf.numLong,
+                                  GKFRAGMENT_INF);
+    while (gs->next(&fr)) {
+      lg[2*fr.tiid+0] = fr.gkFragment_getClearRegionBegin();
+      lg[2*fr.tiid+1] = fr.gkFragment_getClearRegionEnd();
     }
-  } else {
-    //  Nothing to configure.  Not told to create, and file doesn't exist.  We'll return the
-    //  invalid clear range (1,0) on any accesses.
+    delete gs;
   }
 
-  sbconfigured = 1;
+  lgconfigured = 1;
 }
 
 
 
 
 void
-gkClearRange::gkClearRange_makeSpacePacked(AS_IID tiid, uint32 bgn, uint32 end) {
+gkClearRange::gkClearRange_makeSpaceShort(AS_IID tiid, uint32 bgn, uint32 end) {
 
-  if (tiid <= pkmaxiid)
+  if (tiid <= smmaxiid)
     //  Already got space.
     return;
 
-  if ((bgn > end) && (pk == NULL))
+  if ((bgn > end) && (sm == NULL))
     //  Nobody has used this clear range yet, and we don't want it either.
     return;
 
-  uint32  newpkmaxiid = (pkmaxiid == 0) ? (1048576) : (pkmaxiid * 2);
-  uint8  *newpk       = NULL;
+  uint32  newsmmaxiid = (smmaxiid == 0) ? (1048576) : (smmaxiid * 2);
+  uint8  *newsm       = NULL;
 
-  while (newpkmaxiid < tiid)
-    newpkmaxiid *= 2;
+  while (newsmmaxiid < tiid)
+    newsmmaxiid *= 2;
 
-  newpk = new uint8 [newpkmaxiid * 2 + 2];
+  newsm = new uint8 [newsmmaxiid * 2 + 2];
 
-  if (pkmaxiid > 0)
-    memcpy(newpk, pk, sizeof(uint8) * pkmaxiid * 2 + 2);
+  if (smmaxiid > 0)
+    memcpy(newsm, sm, sizeof(uint8) * smmaxiid * 2 + 2);
 
-  for (uint32 i=pkmaxiid; i <= newpkmaxiid; i++) {
-    newpk[2*i+0] = 1;
-    newpk[2*i+1] = 0;
+  for (uint32 i=smmaxiid; i <= newsmmaxiid; i++) {
+    newsm[2*i+0] = 1;
+    newsm[2*i+1] = 0;
   }
 
-  delete [] pk;
-  pk       = newpk;
-  pkmaxiid = newpkmaxiid;
+  delete [] sm;
+  sm       = newsm;
+  smmaxiid = newsmmaxiid;
 
-  pkconfigured = 1;
+  smconfigured = 1;
 }
 
 
 void
-gkClearRange::gkClearRange_makeSpaceNormal(AS_IID tiid, uint32 bgn, uint32 end) {
+gkClearRange::gkClearRange_makeSpaceMedium(AS_IID tiid, uint32 bgn, uint32 end) {
 
-  if (tiid < nmmaxiid)
+  if (tiid < mdmaxiid)
     return;
 
-  if ((bgn > end) && (nm == NULL))
+  if ((bgn > end) && (md == NULL))
     return;
 
-  uint32  newnmmaxiid = (nmmaxiid == 0) ? (1048576) : (nmmaxiid * 2);
-  uint16  *newnm      = NULL;
+  uint32  newmdmaxiid = (mdmaxiid == 0) ? (1048576) : (mdmaxiid * 2);
+  uint16  *newmd      = NULL;
 
-  while (newnmmaxiid < tiid)
-    newnmmaxiid *= 2;
+  while (newmdmaxiid < tiid)
+    newmdmaxiid *= 2;
 
-  newnm = new uint16 [newnmmaxiid * 2 + 2];
+  newmd = new uint16 [newmdmaxiid * 2 + 2];
 
-  if (nmmaxiid > 0)
-    memcpy(newnm, nm, sizeof(uint16) * nmmaxiid * 2 + 2);
+  if (mdmaxiid > 0)
+    memcpy(newmd, md, sizeof(uint16) * mdmaxiid * 2 + 2);
 
-  for (uint32 i=nmmaxiid; i <= newnmmaxiid; i++) {
-    newnm[2*i+0] = 1;
-    newnm[2*i+1] = 0;
+  for (uint32 i=mdmaxiid; i <= newmdmaxiid; i++) {
+    newmd[2*i+0] = 1;
+    newmd[2*i+1] = 0;
   }
 
-  delete [] nm;
-  nm       = newnm;
-  nmmaxiid = newnmmaxiid;
+  delete [] md;
+  md       = newmd;
+  mdmaxiid = newmdmaxiid;
 
-  nmconfigured = 1;
+  mdconfigured = 1;
 }
 
 
 void
-gkClearRange::gkClearRange_makeSpaceStrobe(AS_IID tiid, uint32 bgn, uint32 end) {
+gkClearRange::gkClearRange_makeSpaceLong(AS_IID tiid, uint32 bgn, uint32 end) {
 
-  if (tiid < sbmaxiid)
+  if (tiid < lgmaxiid)
     return;
 
-  if ((bgn > end) && (sb == NULL))
+  if ((bgn > end) && (lg == NULL))
     return;
 
-  uint32  newsbmaxiid = (sbmaxiid == 0) ? (1048576) : (sbmaxiid * 2);
-  uint32  *newsb      = NULL;
+  uint32  newlgmaxiid = (lgmaxiid == 0) ? (1048576) : (lgmaxiid * 2);
+  uint32  *newlg      = NULL;
 
-  while (newsbmaxiid < tiid)
-    newsbmaxiid *= 2;
+  while (newlgmaxiid < tiid)
+    newlgmaxiid *= 2;
 
-  newsb = new uint32 [newsbmaxiid * 2 + 2];
+  newlg = new uint32 [newlgmaxiid * 2 + 2];
 
-  if (sbmaxiid > 0)
-    memcpy(newsb, sb, sizeof(uint32) * sbmaxiid * 2 + 2);
+  if (lgmaxiid > 0)
+    memcpy(newlg, lg, sizeof(uint32) * lgmaxiid * 2 + 2);
 
-  for (uint32 i=sbmaxiid; i <= newsbmaxiid; i++) {
-    newsb[2*i+0] = 1;
-    newsb[2*i+1] = 0;
+  for (uint32 i=lgmaxiid; i <= newlgmaxiid; i++) {
+    newlg[2*i+0] = 1;
+    newlg[2*i+1] = 0;
   }
 
-  delete [] sb;
-  sb       = newsb;
-  sbmaxiid = newsbmaxiid;
+  delete [] lg;
+  lg       = newlg;
+  lgmaxiid = newlgmaxiid;
 
-  sbconfigured = 1;
-}
-
-
-
-
-
-
-void
-gkStore::gkStore_enableClearRange(uint32 which) {
-  assert(partmap == NULL);
-  clearRange[which]->gkClearRange_enableCreate();
-}
-
-
-void
-gkStore::gkStore_purgeClearRange(uint32 which) {
-  assert(partmap == NULL);
-  clearRange[which]->gkClearRange_purge();
+  lgconfigured = 1;
 }

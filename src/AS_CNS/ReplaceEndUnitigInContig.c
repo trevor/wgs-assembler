@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: ReplaceEndUnitigInContig.c,v 1.9 2009-10-26 13:20:26 brianwalenz Exp $";
+static char *rcsid = "$Id: ReplaceEndUnitigInContig.c,v 1.4 2009-08-04 11:05:19 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,8 +31,6 @@ static char *rcsid = "$Id: ReplaceEndUnitigInContig.c,v 1.9 2009-10-26 13:20:26 
 #include "MultiAlignment_CNS_private.h"
 #include "MicroHetREZ.h"
 #include "AS_UTL_reverseComplement.h"
-
-#undef DEBUG_POSITIONS
 
 static
 void
@@ -69,10 +67,10 @@ PrintIUPInfo(FILE *print, int32 nfrags, IntUnitigPos *iups) {
 
 
 MultiAlignT *
-ReplaceEndUnitigInContig(uint32 contig_iid,
-                         uint32 unitig_iid,
-                         int extendingLeft,
-                         CNS_Options *opp) {
+ReplaceEndUnitigInContig( tSequenceDB *sequenceDBp,
+                                       gkStore *frag_store,
+                                       uint32 contig_iid, uint32 unitig_iid, int extendingLeft,
+                                       CNS_Options *opp) {
   int32 cid,tid; // local id of contig (cid), and unitig(tid)
   int32 aid,bid;
   int i,num_unitigs;
@@ -89,11 +87,18 @@ ReplaceEndUnitigInContig(uint32 contig_iid,
   Fragment *tfrag = NULL;
   static VA_TYPE(int32) *trace=NULL;
 
-  oma =  tigStore->loadMultiAlign(contig_iid, FALSE);
+  //  We need to reset the global sequenceDB pointer -- if we call
+  //  this from anything but consensus, the global pointer isn't set.
+  //
+  sequenceDB = sequenceDBp;
 
-  ResetStores(2 * GetNumchars(oma->consensus),
-              2,
-              2 * GetNumchars(oma->consensus));
+  USE_SDB    = 1;
+
+  gkpStore = frag_store;
+
+  oma =  loadMultiAlignTFromSequenceDB(sequenceDBp, contig_iid, FALSE);
+
+  ResetStores(2,GetNumchars(oma->consensus) + AS_READ_MAX_LEN);
 
   num_unitigs = GetNumIntUnitigPoss(oma->u_list);
   num_frags   = GetNumIntMultiPoss(oma->f_list);
@@ -110,7 +115,7 @@ ReplaceEndUnitigInContig(uint32 contig_iid,
                                contig_iid,
                                0,
                                0,
-                               AS_OTHER_UNITIG);
+                               AS_OTHER_UNITIG, NULL);
 
   fprintf(stderr,"ReplaceEndUnitigInContig()-- contig %d unitig %d isLeft(%d)\n",
           contig_iid,unitig_iid,extendingLeft);
@@ -136,7 +141,7 @@ ReplaceEndUnitigInContig(uint32 contig_iid,
   ma = CreateMANode(0);
 
   if ( trace == NULL )
-    trace = CreateVA_int32(AS_READ_MAX_NORMAL_LEN);
+    trace = CreateVA_int32(AS_READ_MAX_LEN);
   ResetVA_int32(trace);
 
   {
@@ -158,7 +163,7 @@ ReplaceEndUnitigInContig(uint32 contig_iid,
                                      id,
                                      complement,
                                      0,
-                                     AS_OTHER_UNITIG);
+                                     AS_OTHER_UNITIG, NULL);
         tfrag=GetFragment(fragmentStore,tid);
 
         if ( extendingLeft ) {
@@ -214,24 +219,17 @@ ReplaceEndUnitigInContig(uint32 contig_iid,
 
   // Now, want to generate a new MultiAlignT which is an appropriate adjustment of original
   cma = CreateMultiAlignT();
-
-  cma->maID = -1;
-  cma->data = oma->data;
-
   cma->consensus = CreateVA_char(GetMANodeLength(ma->lid)+1);
-  cma->quality   = CreateVA_char(GetMANodeLength(ma->lid)+1);
+  cma->quality = CreateVA_char(GetMANodeLength(ma->lid)+1);
 
   GetMANodeConsensus(ma->lid, cma->consensus, cma->quality);
-
   // no deltas required at this stage
   // merge the f_lists and u_lists by cloning and concating
-
   cma->f_list = Clone_VA(oma->f_list);
-  cma->u_list = Clone_VA(oma->u_list);
-  cma->v_list = Clone_VA(oma->v_list);
-
   cma->fdelta = CreateVA_int32(0);
+  cma->u_list = Clone_VA(oma->u_list);
   cma->udelta = CreateVA_int32(0);
+  cma->v_list = Clone_VA(oma->v_list);
 
   {
     CNS_AlignedContigElement *components;
@@ -328,6 +326,7 @@ ReplaceEndUnitigInContig(uint32 contig_iid,
         imp = GetIntMultiPos(cma->f_list,ifrag);
         imp->ident = aligned_component->idx.fragment.frgIdent;
         imp->contained = aligned_component->idx.fragment.frgContained;
+        imp->sourceInt = aligned_component->idx.fragment.frgSource;
         imp->position.bgn = bgn;
         imp->position.end = end;
 #ifdef DEBUG_POSITIONS

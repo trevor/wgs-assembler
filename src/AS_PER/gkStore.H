@@ -13,12 +13,10 @@ public:
   uint64    gkVersion;
 
   uint32    gkLibrarySize;
-  uint32    gkPackedFragmentSize;
-  uint32    gkNormalFragmentSize;
-  uint32    gkStrobeFragmentSize;
+  uint32    gkShortFragmentSize;
+  uint32    gkMediumFragmentSize;
+  uint32    gkLongFragmentSize;
   uint32    gkPlacementSize;
-
-  uint32    readMaxLenBits;
 
   //  Statistics on our load
 
@@ -48,16 +46,18 @@ public:
   uint32    plcLoaded;
   uint32    plcErrors;
   uint32    plcWarnings;
-
+  
   //  Counts of types of things we have loaded
 
   uint32    numRandom;
 
-  //  The IID space is broken into three classes.  See comments in AS_PER_gkStore_IID.C
+  //  The IID space is broken into three classes.  IIDs do NOT track
+  //  the order fragments are loaded.  All short reads are first, then
+  //  medium, then long.
 
-  uint32    numPacked;
-  uint32    numNormal;
-  uint32    numStrobe;
+  uint32    numShort;
+  uint32    numMedium;
+  uint32    numLong;
 
   friend class gkFragment;
   friend class gkStore;
@@ -69,38 +69,30 @@ class gkStore {
 private:
   gkStore(const char *path, int partnum);
 
-  void         gkStore_open(int writable) { gkStore_open(writable, 1); }
-  void         gkStore_open(int writable, int doNotUseUIDs);
+  void         gkStore_open(int writable);
   void         gkStore_create(void);
-
-  void         gkStore_clear(void);
-  
-  void         gkStore_construct(const char * path, int creatable, int writable, int doNotUseUIDs);
 
 public:
   gkStore();
   gkStore(const char *path, int creatable, int writable);
-  gkStore(const char *path, int creatable, int writable, int doNotUseUIDs);
   ~gkStore();
 
-  //  The 'name' of this gkpStore.
+  void         gkStore_clear(void);
+
+  void         gkStore_load(AS_IID firstElem, AS_IID lastElem, int flags);
+  void         gkStore_loadPartition(uint32 partition);
+
+  void         gkStore_delete(void);
+
   const char  *gkStore_path(void) { return(storePath); };
 
   ////////////////////////////////////////
   //
-  //  Operatons on the whole store.  Loading into memory, removing from disk.
+  //
   //
   ////////////////////////////////////////
 
-  void         gkStore_load(AS_IID firstElem, AS_IID lastElem, int flags);
-
-  void         gkStore_loadPartition(uint32 partition);
   void         gkStore_buildPartitions(short *partitionMap, uint32 maxPart);
-
-  void         gkStore_delete(void);
-
-  uint64       gkStore_metadataSize(void);
-  void         gkStore_metadataCaching(bool enable=true);
 
   ////////////////////////////////////////
   //
@@ -122,11 +114,6 @@ public:
   };
 
   void      gkStore_decodeTypeFromIID(AS_IID iid, uint32& type, uint32& tiid);
-  void      gkStore_addIIDtoTypeMap(AS_IID iid, uint32 type, uint32 tiid);
-  void      gkStore_computeRanges(AS_IID  bgnIID, AS_IID  endIID,
-                                  uint32 &bgnPK,  uint32 &endPK,  uint32 &valPK,
-                                  uint32 &bgnNM,  uint32 &endNM,  uint32 &valNM,
-                                  uint32 &bgnSB,  uint32 &endSB,  uint32 &valSB);
 
   void      gkStore_getFragmentData(gkStream *gst, gkFragment *fr, uint32 flags);
 
@@ -212,19 +199,20 @@ private:
   uint32                   isReadOnly;
   uint32                   isCreating;
 
-public:    //  Sigh, public needed for AS_GKP.
+public:
+  //  Sigh, needed for AS_GKP.
   gkStoreInfo              inf;
 
 private:
-  StoreStruct             *fpk;  //  Packed fragments
+  StoreStruct             *fsm;  //  Small fragments
 
-  StoreStruct             *fnm;  //  Normal fragments
-  StoreStruct             *snm;
-  StoreStruct             *qnm;
+  StoreStruct             *fmd;  //  Medium size fragments
+  StoreStruct             *smd;
+  StoreStruct             *qmd;
 
-  StoreStruct             *fsb;  //  Strobe fragments
-  StoreStruct             *ssb;
-  StoreStruct             *qsb;
+  StoreStruct             *flg;  //  Large fragments
+  StoreStruct             *slg;
+  StoreStruct             *qlg;
 
   StoreStruct             *lib;
 
@@ -234,7 +222,8 @@ private:
   StoreStruct             *plc;
   HashTable_AS            *FRGtoPLC;
 
-  //  Maps UIDs to IIDs; maps strings to UIDs.  The STR array holds ALL the string UIDs.
+  //  Maps UIDs to IIDs; maps strings to UIDs.  The STR array
+  //  holds ALL the string UIDs.
   //
   HashTable_AS            *UIDtoIID;
   HashTable_AS            *STRtoUID;
@@ -243,16 +232,12 @@ private:
   //
   uint64                  *frgUID;
 
-  //  Flag to indicate whether we are using UIDs. If this is set to true, UIDs will not be loaded
-  uint32                   doNotLoadUIDs;
-  
   //  Clear ranges
   //
   gkClearRange           **clearRange;
 
-  //  If this is defined (not NULL) then the store contains reads of mixed types, AND, it was
-  //  created 'out of order' (in order: packed first, then normal, then strobe).  See comments in
-  //  AS_PER_gkStore_IID.C
+  //  These are for use when building a gkpStore.  They map an IID
+  //  to a type and a tiid.
   //
   uint32                   IIDmax;
   uint8                   *IIDtoTYPE;
@@ -260,19 +245,19 @@ private:
 
   //  The rest are for a partitioned fragment store.
   //
-  //  We load all frg and qlt in this partition into memory.  The map converts an iid (global
-  //  fragment iid) into a pointer to the correct frg record, which we can then use to grab the
+  //  We load all frg and qlt in this partition into memory.  The map
+  //  converts an iid (global fragment iid) into a pointer to the
+  //  correct frg record, which we can then use to grab the
   //  encoded seq/qlt.
   //
   int32                    partnum;
 
-  StoreStruct             *partfpk;
-  StoreStruct             *partfnm, *partqnm;
-  StoreStruct             *partfsb, *partqsb;
+  StoreStruct             *partfsm;
+  StoreStruct             *partfmd, *partqmd;
+  StoreStruct             *partflg, *partqlg;
 
   HashTable_AS            *partmap;
 
   friend class gkStream;
   friend class gkFragment;  //  for clearRange
-  friend class gkClearRange;
 };

@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: dumpSingletons.c,v 1.34 2009-10-26 13:20:26 brianwalenz Exp $";
+const char *mainid = "$Id: dumpSingletons.c,v 1.28 2009-06-10 18:05:13 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,7 +72,7 @@ main( int argc, char **argv) {
   uint64       uidStart          = 1230000;
   UIDserver   *uids              = NULL;
 
-  GlobalData = new Globals_CGW();
+  GlobalData          = CreateGlobal_CGW();
 
   argc = AS_configure(argc, argv);
 
@@ -80,13 +80,11 @@ main( int argc, char **argv) {
   int arg=1;
   while (arg < argc) {
     if        (strcmp(argv[arg], "-p") == 0) {
-      ckptNum = GlobalData->setPrefix(argv[++arg]);
+      ckptNum = SetFileNamePrefix_CGW(GlobalData, argv[++arg]);
     } else if (strcmp(argv[arg], "-c") == 0) {
-      strcpy(GlobalData->outputPrefix, argv[++arg]);
+      strcpy(GlobalData->File_Name_Prefix, argv[++arg]);
     } else if (strcmp(argv[arg], "-g") == 0) {
-      strcpy(GlobalData->gkpStoreName, argv[++arg]);
-    } else if (strcmp(argv[arg], "-t") == 0) {
-      strcpy(GlobalData->tigStoreName, argv[++arg]);
+      strcpy(GlobalData->Gatekeeper_Store_Name, argv[++arg]);
     } else if (strcmp(argv[arg], "-n") == 0) {
       ckptNum = atoi(argv[++arg]);
     } else if (strcmp(argv[arg], "-U") == 0) {
@@ -100,8 +98,8 @@ main( int argc, char **argv) {
     arg++;
   }
 
-  if ((GlobalData->outputPrefix[0] == 0) ||
-      (GlobalData->gkpStoreName[0] == 0)) {
+  if ((GlobalData->File_Name_Prefix[0]      == 0) ||
+      (GlobalData->Gatekeeper_Store_Name[0] == 0)) {
     fprintf(stderr, "usage: %s [[-p prefix] | [-c name -g gkpstore -n ckptNum]] [-U] [-S]\n", argv[0]);
     fprintf(stderr, "  -p      Attempt to locate the last checkpoint in directory 7-CGW.\n");
     fprintf(stderr, "  -c      Look for checkpoints in 'name'\n");
@@ -114,26 +112,23 @@ main( int argc, char **argv) {
 
   uids = UIDserverInitialize(256, uidStart);
 
-  char *toprint = (char *)safe_malloc(sizeof(char) * (AS_READ_MAX_NORMAL_LEN + 51 + AS_READ_MAX_NORMAL_LEN + 2));
+  char *toprint = (char *)safe_malloc(sizeof(char) * (AS_READ_MAX_LEN + 51 + AS_READ_MAX_LEN + 2));
 
-  LoadScaffoldGraphFromCheckpoint(GlobalData->outputPrefix, ckptNum, FALSE);
+  LoadScaffoldGraphFromCheckpoint(GlobalData->File_Name_Prefix, ckptNum, FALSE);
 
   int ifrag;
   for (ifrag=0; ifrag < GetNumVA_CIFragT(ScaffoldGraph->CIFrags); ifrag++) {
     CIFragT *frag = GetCIFragT(ScaffoldGraph->CIFrags, ifrag);
     CIFragT *mate = NULL;
 
-    if (frag->flags.bits.isDeleted)
-      continue;
-
     assert(frag->cid != NULLINDEX);
-    assert((frag->flags.bits.hasMate == 0) || (frag->mate_iid != 0));
+    assert((frag->flags.bits.hasMate == 0) || (frag->mateOf != NULLINDEX));
 
     //  Fix for missing mates -- OBT used to not delete mate links, leaving
     //  dangling mates.  Somebody else seems to be doing this too.
     //
     if (frag->flags.bits.hasMate) {
-      mate = GetCIFragT(ScaffoldGraph->CIFrags, frag->mate_iid);
+      mate = GetCIFragT(ScaffoldGraph->CIFrags, frag->mateOf);
       if (mate == NULL)
         frag->flags.bits.hasMate = 0;
     }
@@ -149,7 +144,7 @@ main( int argc, char **argv) {
     if ((mate == NULL) ||
         (mate->flags.bits.isChaff == 0) ||
         (makeMiniScaffolds == 0)) {
-      AS_UID  fUID = getFragmentClear(frag->read_iid, 0, toprint);
+      AS_UID  fUID = getFragmentClear(frag->iid, 0, toprint);
 
       AS_UTL_writeFastA(stdout,
                         toprint, strlen(toprint),
@@ -158,7 +153,7 @@ main( int argc, char **argv) {
     } else if ((mate != NULL) &&
                (mate->flags.bits.isChaff == 1) &&
                (makeMiniScaffolds == 1) &&
-               (frag->read_iid < mate->read_iid)) {
+               (frag->iid < mate->iid)) {
 
       //  make sure the following chain of Ns is divisible by three;
       //  the exact length is arbitrary but Doug Rusch points out that
@@ -166,11 +161,11 @@ main( int argc, char **argv) {
       //  the phase of a protein ...  which helps in the
       //  auto-annotation of environmental samples
 
-      AS_UID  fUID = getFragmentClear(frag->read_iid, 0, toprint);
+      AS_UID  fUID = getFragmentClear(frag->iid, 0, toprint);
 
       strcat(toprint, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN");
 
-      AS_UID  mUID = getFragmentClear(mate->read_iid, 1, toprint + strlen(toprint));
+      AS_UID  mUID = getFragmentClear(mate->iid, 1, toprint + strlen(toprint));
 
       AS_UTL_writeFastA(stdout,
                         toprint, strlen(toprint),
@@ -180,8 +175,6 @@ main( int argc, char **argv) {
                         AS_UID_toString(mUID));
     }
   }
-
-  delete GlobalData;
 
   exit(0);
 }

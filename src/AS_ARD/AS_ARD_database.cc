@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: AS_ARD_database.cc,v 1.12 2009-09-29 18:45:41 brianwalenz Exp $";
+static const char *rcsid = "$Id: AS_ARD_database.cc,v 1.11 2009-07-30 10:42:55 brianwalenz Exp $";
 
 #include <iostream>
 #include <string>
@@ -273,16 +273,14 @@ bool AS_ARD_database::addVAR2DB(AS_UID ccoID, IntMultiVar * var) {
             var->position.bgn,
             var->position.end,
             var->num_reads,
-            var->num_alleles_confirmed,
+            var->num_conf_alleles,
             var->min_anchor_size,
             var->var_length,
-            var->var_id,
-            var->phased_id
+            var->curr_var_id,
+            var->phased_var_id
             );
 
-#if 0
-   //  Broken by bri.
-   std::string nra = var->num_reads;
+   std::string nra = var->nr_conf_alleles;
    std::string wgs = var->weights;
    std::string seq = var->var_seq;
 
@@ -295,15 +293,16 @@ bool AS_ARD_database::addVAR2DB(AS_UID ccoID, IntMultiVar * var) {
    std::size_t posInWgt = 0;
    std::size_t posInSeq = 0;
 
-   for (i = 0; i < var->num_alleles_confirmed; i++) {
+   for (i = 0; i < var->num_conf_alleles; i++) {
       std::size_t nraEnd = nra.find("/", posInNra) - posInNra;
       std::size_t wgtEnd = wgs.find("/", posInWgt) - posInWgt;
       std::size_t seqEnd = seq.find("/", posInSeq) - posInSeq;
 
-      result = result & addVARAllele2DB(varID,
-                                        atoi(nra.substr(posInNra, nraEnd).c_str()),
-                                        atoi(wgs.substr(posInWgt, wgtEnd).c_str()),
-                                        seq.substr(posInSeq, seqEnd));
+      result = result & addVARAllele2DB(
+                           varID,
+                           atoi(nra.substr(posInNra, nraEnd).c_str()),
+                           atoi(wgs.substr(posInWgt, wgtEnd).c_str()),
+                           seq.substr(posInSeq, seqEnd));
 
       posInNra += nraEnd+1;
       posInWgt += wgtEnd+1;
@@ -318,7 +317,6 @@ bool AS_ARD_database::addVAR2DB(AS_UID ccoID, IntMultiVar * var) {
       result = result & addVARAFG2DB(varID, AS_IID_fromString((char *)readIIDs.substr(pos, end).c_str(), NULL));
       pos += end + 1;
    }
-#endif
 
    return result;
 }

@@ -22,7 +22,7 @@
 #ifndef SCAFFOLD_GRAPH_H
 #define SCAFFOLD_GRAPH_H
 
-static const char *rcsid_SCAFFOLD_GRAPH_H = "$Id: ScaffoldGraph_CGW.h,v 1.40 2009-10-27 12:26:41 skoren Exp $";
+static const char *rcsid_SCAFFOLD_GRAPH_H = "$Id: ScaffoldGraph_CGW.h,v 1.35 2009-08-28 17:35:11 skoren Exp $";
 
 #include "AS_global.h"
 #include "AS_UTL_Var.h"
@@ -31,8 +31,7 @@ static const char *rcsid_SCAFFOLD_GRAPH_H = "$Id: ScaffoldGraph_CGW.h,v 1.40 200
 #include "InputDataTypes_CGW.h"
 #include "GraphCGW_T.h"
 #include "Globals_CGW.h"
-#include "MultiAlign.h"
-#include "MultiAlignStore.h"
+#include "AS_SDB_SequenceDB.h"
 #include "AS_OVS_overlapStore.h"
 #include "AS_CGW_dataTypes.h"
 
@@ -70,6 +69,14 @@ int isDeadCIScaffoldT(CIScaffoldT *scaffold);
 
 int RepeatRez(int repeatRezLevel, char *name);
 
+typedef struct {
+  /* For now, we just store the fragments CIFrag index */
+  unsigned int set:1;  // we've seen this fragment
+  unsigned int fragIndex:31;
+}InfoByIID;
+
+VA_DEF(InfoByIID);
+
 VA_DEF(ChunkInstanceT);
 VA_DEF(CIScaffoldT);
 VA_DEF(ContigT);
@@ -77,15 +84,17 @@ VA_DEF(CIEdgeT);
 VA_DEF(SEdgeT);
 
 typedef struct{
+  VA_TYPE(InfoByIID)      *iidToFragIndex;  // map from iid to fragment
   VA_TYPE(CIFragT)        *CIFrags;
   VA_TYPE(DistT)          *Dists;
   VA_TYPE(ChunkInstanceT) *ChunkInstances;  // CIs and Contigs
-  VA_TYPE(ContigT)        *Contigs;
+  VA_TYPE(ContigT) *Contigs;
   VA_TYPE(CIScaffoldT)    *CIScaffolds;
   VA_TYPE(CIEdgeT)        *CIEdges;
   VA_TYPE(CIEdgeT)        *ContigEdges;
   VA_TYPE(SEdgeT)         *SEdges;
   char                    name[256];
+  int32                   doRezOnContigs; // This should go away, just a hack to enable smooth transition to new code
   int32                   checkPointIteration; // Index of next checkpoint
   int32                   numContigs;  // Number of contigs...they may be interspersed
   int32                   numOriginalCIs;
@@ -96,15 +105,16 @@ typedef struct{
   GraphCGW_T             *CIGraph;
   GraphCGW_T             *ContigGraph;
   GraphCGW_T             *ScaffoldGraph;
-  gkStore                *gkpStore;
-  MultiAlignStore        *tigStore;
+  GraphCGW_T             *RezGraph;  // Graph used by scaffold building and  repeat rez...either a ref to ContigGraph or CIGraph
+  gkStore        *gkpStore;
+  tSequenceDB            *sequenceDB;
   OverlapStore           *frgOvlStore;
 }ScaffoldGraphT;
 
 
 
 /* Constructor */
-ScaffoldGraphT *CreateScaffoldGraph(char *name);
+ScaffoldGraphT *CreateScaffoldGraph(int rezOnContigs, char *name);
 void InsertRepeatCIsInScaffolds(ScaffoldGraphT *sgraph);
 void BuildCIEdges(ScaffoldGraphT *graph);
 void BuildSEdgesForScaffold(ScaffoldGraphT * graph,
@@ -285,8 +295,7 @@ typedef enum {
   RECOMPUTE_NO_GAPS = 3,
   RECOMPUTE_FAILED_REORDER_NEEDED = 4,
   RECOMPUTE_NOT_ENOUGH_CLONES = 5,
-  RECOMPUTE_CONTIGGED_CONTAINMENTS = 6,
-  RECOMPUTE_FAILED_CONTIG_DELETED  = 7
+  RECOMPUTE_CONTIGGED_CONTAINMENTS = 6
 }RecomputeOffsetsStatus;
 
 /*
@@ -415,7 +424,7 @@ void CheckCIScaffoldTLength(ScaffoldGraphT *sgraph, CIScaffoldT *scaffold);
 int CheckAllEdges(ScaffoldGraphT *sgraph, CDS_CID_t sid, CDS_CID_t cid);
 
 void CheckpointScaffoldGraph(const char *logicalname, const char *location);
-void LoadScaffoldGraphFromCheckpoint(char *name, int32 checkPointNum, int writable);
+void LoadScaffoldGraphFromCheckpoint(char *name, int32 checkPointNum, int readWrite);
 
 void ReportMemorySize(ScaffoldGraphT *graph, FILE *stream);
 
@@ -433,9 +442,10 @@ int GetConsensus(GraphCGW_T *graph, CDS_CID_t CIindex,
 // Return value is length of unitig or contig  sequence/quality (-1 if failure)
 // Consensus and quality are COPIED into the VAs
 
+// If this is a ChunkInstance, return its coverage stat
+// If this is an unscaffolded (singleton) contig, return its lone
+// ChunkInstance's coverage stat else, assert.
 int GetCoverageStat(ChunkInstanceT *CI);
-int GetNumInstances(ChunkInstanceT *CI);
-
 
 void CheckScaffoldOrder(CIScaffoldT *scaffold, ScaffoldGraphT *graph);
 

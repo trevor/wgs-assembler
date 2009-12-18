@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: GetAlignmentTrace.c,v 1.10 2009-12-01 01:25:36 brianwalenz Exp $";
+static char *rcsid = "$Id: GetAlignmentTrace.c,v 1.8.2.1 2009-12-18 17:43:12 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -32,8 +32,8 @@ static char *rcsid = "$Id: GetAlignmentTrace.c,v 1.10 2009-12-01 01:25:36 brianw
 #include "MicroHetREZ.h"
 #include "AS_UTL_reverseComplement.h"
 
-#define SHOW_ATTEMPT   2
-#define SHOW_ACCEPTED  3
+#undef SHOW_ACCEPTED
+#undef SHOW_ATTEMPT
 
 int    numScores = 0;
 double lScoreAve = 0.0;
@@ -251,6 +251,7 @@ ScoreOverlap(Overlap *O,
     bScore /= 5;
   }
 
+
   //  By design, we don't expect to have negative ahangs, so penalize the score if so (and if this
   //  is unexpected).
   //
@@ -335,6 +336,23 @@ ScoreOverlap(Overlap *O,
   }
 
 
+  //
+  //  HACK!  If we're merging, we pretty much need to succeed on anything.  Allow most anything that
+  //  is larger than expected.  Things smaller than expected are allowed above.
+  //
+#if 1
+  if ((alignment_context == GETALIGNTRACE_MERGE) &&
+      (O->length >= expected_length)) {
+    fprintf(stderr,"GetAlignmentTrace()-- Overlap ACCEPTED!  accept=%f lScore=%f (%d vs %d) aScore=%f (%d vs %d) bScore=%f (%d vs %d).  (MERGE, bigger overlap)\n",
+            acceptThreshold,
+            lScore, O->length, expected_length,
+            aScore, O->begpos, ahang_input,
+            bScore, O->endpos, bhang_input);
+    return(1);
+  }
+#endif
+
+
   //  BAD!
   //ReportOverlap(stderr,alignFunction,params,afrag->iid,afrag->type,bfrag->iid,bfrag->type,O,ahang_input);
   //Print_Overlap(stderr, aseq, bseq, O);
@@ -348,17 +366,6 @@ ScoreOverlap(Overlap *O,
   return(0);
 }
 
-int
-ScoreOverlap(Overlap *O,
-             int      expected_length,
-             int      ahang_input,
-             int      bhang_input,
-             double   maxerate,
-             double  *lScore_out,
-             double  *aScore_out,
-             double  *bScore_out) {
-   return ScoreOverlap(O, expected_length, ahang_input, bhang_input, maxerate, GETALIGNTRACE_MERGE, lScore_out, aScore_out, bScore_out);
-}
 
 //*********************************************************************************
 // Look for the required overlap between two fragments, and return trace
@@ -803,7 +810,7 @@ GetAlignmentTrace(int32                        afid,
 
     if (show_olap)
       fprintf(stderr,"GetAlignmentTrace()-- Overlap found between %d (%c) and %d (%c) expected hangs: a=%d b=%d erate=%f aligner=%s\n",
-              aiid, (afrag) ? afrag->type : 'C', biid, bfrag->type, ahang_input, bhang_input, input_erate, aligner);
+              aiid, (afrag) ? afrag->type : 'T', biid, bfrag->type, ahang_input, bhang_input, input_erate, aligner);
   }
 
   //
@@ -822,7 +829,7 @@ GetAlignmentTrace(int32                        afid,
     //
     assert(0);
 
-    ReportOverlap(stderr, alignFunction, params, aiid, (afrag) ? afrag->type : 'C', biid, bfrag->type, O, ahang_input);
+    ReportOverlap(stderr, alignFunction, params, aiid, (afrag) ? afrag->type : 'T', biid, bfrag->type, O, ahang_input);
     Print_Overlap(stderr, aseq, bseq, O);
     fprintf(stderr,"GetAlignmentTrace()-- Overlap rejected.  accept=%f lScore=%f (%d vs %d) aScore=%f (%d vs %d) bScore=%f (%d vs %d).\n",
             acceptThreshold,
@@ -833,13 +840,14 @@ GetAlignmentTrace(int32                        afid,
     return(FALSE);
   }
 
-  if (VERBOSE_MULTIALIGN_OUTPUT >= SHOW_ACCEPTED)
-    if ((lScore > 0.1) || (aScore > 0.1) || (bScore > 0.1))
-      fprintf(stderr,"GetAlignmentTrace()-- Overlap accepted.  accept=%f lScore=%f (%d vs %d) aScore=%f (%d vs %d) bScore=%f (%d vs %d).\n",
-              acceptThreshold,
-              lScore, O->length, expected_length,
-              aScore, O->begpos, ahang_input,
-              bScore, O->endpos, bhang_input);
+#ifdef SHOW_ACCEPTED
+  if ((lScore > 0.1) || (aScore > 0.1) || (bScore > 0.1))
+    fprintf(stderr,"GetAlignmentTrace()-- Overlap accepted.  accept=%f lScore=%f (%d vs %d) aScore=%f (%d vs %d) bScore=%f (%d vs %d).\n",
+            acceptThreshold,
+            lScore, O->length, expected_length,
+            aScore, O->begpos, ahang_input,
+            bScore, O->endpos, bhang_input);
+#endif
 
   //
   //  From this point on, we have a Good Overlap.
@@ -851,7 +859,7 @@ GetAlignmentTrace(int32                        afid,
   numScores++;
 
   if (show_olap) {
-    ReportOverlap(stderr, alignFunction, params, aiid, (afrag) ? afrag->type : 'C', biid, bfrag->type, O, ahang_input);
+    ReportOverlap(stderr, alignFunction, params, aiid, (afrag) ? afrag->type : 'T', biid, bfrag->type, O, ahang_input);
     Print_Overlap(stderr, NULL, NULL, O);  //  Replace with a,b to print the bases in the align
   }
 
@@ -888,20 +896,22 @@ GetAlignmentTraceDriver(Fragment                     *afrag,
   double AS_CNS_ERROR_RATE_SAVE = AS_CNS_ERROR_RATE;
   int32  aiid = (afrag) ? afrag->iid  : 0;
   int32  alid = (afrag) ? afrag->lid  : -1;
-  char   atyp = (afrag) ? afrag->type : 'C';
+  char   atyp = (afrag) ? afrag->type : 'T';
   int32  biid = (bfrag) ? bfrag->iid  : 0;
   int32  blid = (bfrag) ? bfrag->lid  : -1;
-  char   btyp = (bfrag) ? bfrag->type : 'C';
+  char   btyp = (bfrag) ? bfrag->type : 'T';
 
   for (; (AS_CNS_ERROR_RATE < AS_CNS_ERROR_RATE_SAVE + 0.03); AS_CNS_ERROR_RATE += 0.0025) {
 
     //  try with the default aligner
 
-    if (VERBOSE_MULTIALIGN_OUTPUT >= SHOW_ATTEMPT)
+#ifdef SHOW_ATTEMPT
+    if (VERBOSE_MULTIALIGN_OUTPUT)
       fprintf(stderr, "GetAlignmentTraceDriver()-- Attempting alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d and erate %1.4f (DP_Compare)\n",
               aiid, atyp, biid, btyp,
               *ahang,
               AS_CNS_ERROR_RATE);
+#endif
     if (GetAlignmentTrace(alid, aseq, blid, ahang, bhang, expected_length, trace, otype, DP_Compare, DONT_SHOW_OLAP, 0, alignment_context, AS_CNS_ERROR_RATE)) {
       AS_CNS_ERROR_RATE = AS_CNS_ERROR_RATE_SAVE;
       return(TRUE);
@@ -909,11 +919,13 @@ GetAlignmentTraceDriver(Fragment                     *afrag,
 
     // try again, perhaps with alternate overlapper
 
-    if (VERBOSE_MULTIALIGN_OUTPUT >= SHOW_ATTEMPT)
+#ifdef SHOW_ATTEMPT
+    if (VERBOSE_MULTIALIGN_OUTPUT)
       fprintf(stderr, "GetAlignmentTraceDriver()-- Attempting alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d erate %1.4f (Local_Overlap)\n",
               aiid, atyp, biid, btyp,
               *ahang,
               AS_CNS_ERROR_RATE);
+#endif
     if (GetAlignmentTrace(alid, aseq, blid, ahang, bhang, expected_length, trace, otype, Local_Overlap_AS_forCNS, DONT_SHOW_OLAP, 0, alignment_context, AS_CNS_ERROR_RATE)) {
       AS_CNS_ERROR_RATE = AS_CNS_ERROR_RATE_SAVE;
       return(TRUE);
@@ -922,11 +934,13 @@ GetAlignmentTraceDriver(Fragment                     *afrag,
     // try again, perhaps with dynamic programming, but only for unitigs (extend once we fix up MultiAlignContig)
 
     if (alignment_context == GETALIGNTRACE_UNITIG) {
-      if (VERBOSE_MULTIALIGN_OUTPUT >= SHOW_ATTEMPT)
+#ifdef SHOW_ATTEMPT
+      if (VERBOSE_MULTIALIGN_OUTPUT)
         fprintf(stderr, "GetAlignmentTraceDriver()-- Attempting alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d erate %1.4f (Optimal_Overlap)\n",
                 aiid, atyp, biid, btyp,
                 *ahang,
                 AS_CNS_ERROR_RATE);
+#endif
       if (GetAlignmentTrace(alid, aseq, blid, ahang, bhang, expected_length, trace, otype, Optimal_Overlap_AS_forCNS, DONT_SHOW_OLAP, 0, alignment_context, AS_CNS_ERROR_RATE)) {
         AS_CNS_ERROR_RATE = AS_CNS_ERROR_RATE_SAVE;
         return(TRUE);
@@ -936,12 +950,14 @@ GetAlignmentTraceDriver(Fragment                     *afrag,
     //  try again, perhaps allowing larger end gaps (contigs only)
 
     if ((alignment_context == GETALIGNTRACE_CONTIGU) && (max_gap > 0)) {
-      if (VERBOSE_MULTIALIGN_OUTPUT >= SHOW_ATTEMPT)
+#ifdef SHOW_ATTEMPT
+      if (VERBOSE_MULTIALIGN_OUTPUT)
         fprintf(stderr, "GetAlignmentTraceDriver()-- Attempting alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d erate %1.4f max_gap %d (Local_Overlap)\n",
                 aiid, atyp, biid, btyp,
                 *ahang,
                 AS_CNS_ERROR_RATE,
                 max_gap);
+#endif
       if (GetAlignmentTrace(alid, aseq,blid, ahang, bhang, expected_length, trace, otype, Local_Overlap_AS_forCNS, DONT_SHOW_OLAP, max_gap, alignment_context, AS_CNS_ERROR_RATE)) {
         AS_CNS_ERROR_RATE = AS_CNS_ERROR_RATE_SAVE;
         return(TRUE);
@@ -966,27 +982,30 @@ GetAlignmentTraceDriver(Fragment                     *afrag,
     int     oldVB = VERBOSE_MULTIALIGN_OUTPUT;
     double  oldAT = acceptThreshold;
 
-    VERBOSE_MULTIALIGN_OUTPUT = MAX(oldVB, 1);
+    VERBOSE_MULTIALIGN_OUTPUT = 1;
     acceptThreshold           = 1000.0;
 
-    if (VERBOSE_MULTIALIGN_OUTPUT >= SHOW_ATTEMPT)
-      fprintf(stderr, "GetAlignmentTraceDriver()-- Attemping alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d erate %1.4f max_gap %d (DP_Compare) LAST DITCH\n",
-              aiid, atyp, biid, btyp,
-              *ahang,
-              AS_CNS_ERROR_RATE,
-              max_gap);
+#ifdef SHOW_ATTEMPT
+    fprintf(stderr, "GetAlignmentTraceDriver()-- Attemping alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d erate %1.4f max_gap %d (DP_Compare) LAST DITCH\n",
+            aiid, atyp, biid, btyp,
+            *ahang,
+            AS_CNS_ERROR_RATE,
+            max_gap);
+#endif
+    
     if (GetAlignmentTrace(alid, aseq, blid, ahang, bhang, expected_length, trace, otype, DP_Compare, DONT_SHOW_OLAP, 0, alignment_context, AS_CNS_ERROR_RATE)) {
       VERBOSE_MULTIALIGN_OUTPUT = oldVB;
       acceptThreshold           = oldAT;
       return(TRUE);
     }
 
-    if (VERBOSE_MULTIALIGN_OUTPUT >= SHOW_ATTEMPT)
-      fprintf(stderr, "GetAlignmentTraceDriver()-- Attemping alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d erate %1.4f max_gap %d (Local_Overlap) LAST DITCH\n",
-              aiid, atyp, biid, btyp,
-              *ahang,
-              AS_CNS_ERROR_RATE,
-              max_gap);
+#ifdef SHOW_ATTEMPT
+    fprintf(stderr, "GetAlignmentTraceDriver()-- Attemping alignment of afrag %d (%c) and bfrag %d (%c) with ahang %d erate %1.4f max_gap %d (Local_Overlap) LAST DITCH\n",
+            aiid, atyp, biid, btyp,
+            *ahang,
+            AS_CNS_ERROR_RATE,
+            max_gap);
+#endif
     if (GetAlignmentTrace(alid, aseq, blid, ahang, bhang, expected_length, trace, otype, Local_Overlap_AS_forCNS, DONT_SHOW_OLAP, 0, alignment_context, AS_CNS_ERROR_RATE)) {
       VERBOSE_MULTIALIGN_OUTPUT = oldVB;
       acceptThreshold           = oldAT;

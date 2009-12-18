@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-const char *mainid = "$Id: dumpCloneMiddles.c,v 1.24 2009-09-12 22:35:57 brianwalenz Exp $";
+const char *mainid = "$Id: dumpCloneMiddles.c,v 1.22 2009-07-28 12:30:04 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,7 +80,7 @@ dumpCloneMiddle(int isScaffold, int id) {
 		     scaffold,
 		     si,
 		     InstrumenterVerbose2,
-		     stderr);
+		     GlobalData->stderrc);
 
   PrintScaffoldInstrumenterMateDetails(si,camfile,PRINTCELAMY);
   PrintExternalMateDetailsAndDists(ScaffoldGraph,si->bookkeeping.wExtMates,"\t",camfile,PRINTCELAMY);
@@ -125,14 +125,14 @@ main(int argc, char **argv) {
 
   argc = AS_configure(argc, argv);
 
-  GlobalData = new Globals_CGW();
+  GlobalData      = CreateGlobal_CGW();
 
   while (arg < argc) {
     if        (strcmp(argv[arg], "-c") == 0) {
-      strcpy(GlobalData->outputPrefix, argv[++arg]);
+      strcpy(GlobalData->File_Name_Prefix, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-g") == 0) {
-      strcpy(GlobalData->gkpStoreName, argv[++arg]);
+      strcpy(GlobalData->Gatekeeper_Store_Name, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-l") == 0) {
       minLen = atoi(argv[++arg]);
@@ -149,10 +149,10 @@ main(int argc, char **argv) {
       }
 
     } else if (strcmp(argv[arg], "-o") == 0) {
-      strcpy(GlobalData->ovlStoreName, argv[++arg]);
+      strcpy(GlobalData->OVL_Store_Name, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-p") == 0) {
-      ckptNum = GlobalData->setPrefix(argv[++arg]);
+      ckptNum = SetFileNamePrefix_CGW(GlobalData, argv[++arg]);
 
     } else if (strcmp(argv[arg], "-s") == 0) {
       specificScf = atoi(argv[++arg]);
@@ -172,13 +172,13 @@ main(int argc, char **argv) {
     arg++;
   }
 
-  if ((GlobalData->outputPrefix[0] == 0) ||
-      (GlobalData->gkpStoreName[0] == 0) ||
-      (GlobalData->ovlStoreName[0] == 0)) {
+  if ((GlobalData->File_Name_Prefix[0]      == 0) ||
+      (GlobalData->Gatekeeper_Store_Name[0] == 0) ||
+      (GlobalData->OVL_Store_Name[0]        == 0)) {
     fprintf(stderr, "At least one of -c, -f, -g, -o not supplied.\n");
-    fprintf(stderr, "'%s'\n", GlobalData->outputPrefix);
-    fprintf(stderr, "'%s'\n", GlobalData->gkpStoreName);
-    fprintf(stderr, "'%s'\n", GlobalData->ovlStoreName);
+    fprintf(stderr, "'%s'\n", GlobalData->File_Name_Prefix);
+    fprintf(stderr, "'%s'\n", GlobalData->Gatekeeper_Store_Name);
+    fprintf(stderr, "'%s'\n", GlobalData->OVL_Store_Name);
     err = 1;
   }
 
@@ -190,9 +190,9 @@ main(int argc, char **argv) {
   errno=0;
   mkdir(CMDIR, S_IRWXU | S_IRWXG | S_IRWXO);
 
-  LoadScaffoldGraphFromCheckpoint(GlobalData->outputPrefix, ckptNum, FALSE);
+  LoadScaffoldGraphFromCheckpoint(GlobalData->File_Name_Prefix, ckptNum, FALSE);
 
-  ScaffoldGraph->frgOvlStore = AS_OVS_openOverlapStore(GlobalData->ovlStoreName);
+  ScaffoldGraph->frgOvlStore = AS_OVS_openOverlapStore(GlobalData->OVL_Store_Name);
 
   si = CreateScaffoldInstrumenter(ScaffoldGraph, INST_OPT_ALL);
   if (si == NULL) {
@@ -229,8 +229,6 @@ main(int argc, char **argv) {
 
   DestroyScaffoldInstrumenter(si);
   AS_OVS_closeOverlapStore(ScaffoldGraph->frgOvlStore);
-
-  delete GlobalData;
 
   exit(0);
 }

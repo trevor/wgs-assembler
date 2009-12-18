@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: Array_CNS.c,v 1.24 2009-10-26 13:20:26 brianwalenz Exp $";
+static const char *rcsid = "$Id: Array_CNS.c,v 1.22 2009-06-10 18:05:13 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -34,6 +34,7 @@ static const char *rcsid = "$Id: Array_CNS.c,v 1.24 2009-10-26 13:20:26 brianwal
 #include "AS_UTL_Var.h"
 #include "AS_UTL_reverseComplement.h"
 #include "UtilsREZ.h"
+#include "MultiAlignStore_CNS.h"
 #include "MultiAlignment_CNS.h"
 #include "Array_CNS.h"
 
@@ -154,8 +155,8 @@ int
   Lane null_lane;
   int next_lane; Lane *free_lane,*lane; LaneNode *new_mlp; Lane space;
   int rc;
-  char seq[AS_READ_MAX_NORMAL_LEN+1];
-  char qv[AS_READ_MAX_NORMAL_LEN+1];
+  char seq[AS_READ_MAX_LEN+1];
+  char qv[AS_READ_MAX_LEN+1];
   gkFragment fsread;
 
   VA_TYPE(Lane) *Packed;

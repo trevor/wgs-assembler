@@ -22,7 +22,7 @@
 #ifndef AS_OVS_OVERLAPSTORE_H
 #define AS_OVS_OVERLAPSTORE_H
 
-static const char *rcsid_AS_OVS_OVERLAPSTORE_H = "$Id: AS_OVS_overlapStore.h,v 1.15 2009-12-01 22:25:20 brianwalenz Exp $";
+static const char *rcsid_AS_OVS_OVERLAPSTORE_H = "$Id: AS_OVS_overlapStore.h,v 1.13 2009-06-10 18:05:14 brianwalenz Exp $";
 
 #include <stdio.h>
 
@@ -39,7 +39,6 @@ typedef struct {
   uint64    largestIID;          //  largest frag iid in the store
   uint64    numOverlapsTotal;    //  number of overlaps in the store
   uint64    highestFileIndex;
-  uint64    maxReadLenInBits;    //  length of a fragment
 } OverlapStoreInfo;
 
 typedef struct {
@@ -83,11 +82,7 @@ void               AS_OVS_restoreBackup(OverlapStore *ovs);
 
 #define            AS_OVS_openOverlapStore(N)  AS_OVS_openOverlapStorePrivate((N), FALSE, FALSE)
 
-//  Read the next overlap from the store.  Return value is the number of overlaps read.
 int                AS_OVS_readOverlapFromStore(OverlapStore *ovs, OVSoverlap *overlap, uint32 type);
-
-//  Read ALL remaining overlaps for the current A_iid.  Return value is the number of overlaps read.
-int                AS_OVS_readOverlapsFromStore(OverlapStore *ovs, OVSoverlap *overlaps, uint32 maxOverlaps, uint32 type);
 
 void               AS_OVS_setRangeOverlapStore(OverlapStore *ovs, uint32 low, uint32 high);
 void               AS_OVS_resetRangeOverlapStore(OverlapStore *ovs);

@@ -22,7 +22,7 @@
 #ifndef INPUTDATATYPES_CGW_H
 #define INPUTDATATYPES_CGW_H
 
-static const char *rcsid_INPUTDATATYPES_CGW_H = "$Id: InputDataTypes_CGW.h,v 1.23 2009-09-14 16:09:04 brianwalenz Exp $";
+static const char *rcsid_INPUTDATATYPES_CGW_H = "$Id: InputDataTypes_CGW.h,v 1.20 2009-07-30 10:42:55 brianwalenz Exp $";
 
 #include "AS_global.h"
 #include "AS_MSG_pmesg.h"
@@ -32,35 +32,36 @@ typedef struct {
   double variance;
 }LengthT;
 
+// Do the arithmetic and stats on two unordered pairs of LengthTs
+// If resulting variance is negative assert
+void ComputeIntervalLength(LengthT *result,
+			   LengthT *aEndA, LengthT *bEndA,
+			   LengthT *aEndB, LengthT *bEndB);
+
+
 
 typedef enum {X_X = 'X', A_B = 'F', B_A = 'R'} FragOrient;
 typedef FragOrient ChunkOrient;
 typedef FragOrient NodeOrient;
 
 
-typedef enum {
-  AS_SINGLETON    = (int)'S',
-  AS_INTERCHUNK_A = (int)'A',
-  AS_INTERCHUNK_B = (int)'B',
-  AS_INTRACHUNK   = (int)'I',
-} LabelType;
-
-
 /* Fragment positions within a ChunkInstance */
 typedef struct {
-  CDS_CID_t read_iid;           // IID of this fragment
-  CDS_CID_t mate_iid;           // IID of the mate
+  CDS_CID_t iid;                // IID of this fragment, used to reference this frag via iidToFragIndex
+  CDS_CID_t mateOf;             // the index of the CIFragT of the mate.  Valid even if numLinks > 1
   CDS_CID_t dist;		// index of the DistT record
 
   CDS_CID_t cid;                // id of the unitig containing this fragment
   CDS_CID_t CIid;               // id of the chunk instance containing this fragment
-  CDS_CID_t contigID;           // id of the containing contig
-
   LengthT   offset5p;           // offset in containing chunk of suffix
   LengthT   offset3p;           // offset in containing chunk of prefix
 
+  CDS_CID_t contigID;           // id of the containing contig
   LengthT   contigOffset5p;     // offset in containing contig of suffix
   LengthT   contigOffset3p;     // offset in containing contig of prefix
+
+  char      type;               //  a FragType, 5 character values
+  char      label;              //  a LabelType, 5 character values
 
   //  This used to be a union of a struct and an int32; the int32 was
   //  never used, and BPW tried to remove the union....until he
@@ -73,12 +74,12 @@ typedef struct {
   uint32       isPlaced:1;                   // Fragments is in a contig that is in a scaffold
   uint32       isSingleton:1;                // Singleton unitig
   uint32       isChaff:1;                    // Must be isSingleton, and is not used either directly or indirectly (surrogate) in scaffold
-  uint32       isDeleted:1;                  // Frag exists in store, but marked deleted
   uint32       innieMate:1;                  // True for regular mate pairs, false for Outtie pairs
   uint32       hasMate:1;                    // True if we have a mate
 
+  LinkType     linkType:8;                   //  mostly unused
+
   uint32       edgeStatus:7;                 // See edgeStatus field in EdgeCGW_T
-  uint32       chunkLabel:8;                 // A LabelType
 
   MateStatType mateDetail:8;
   } bits;
@@ -90,7 +91,7 @@ VA_DEF(CIFragT);
 
 static FragOrient getCIFragOrient(CIFragT *frag){
   if(frag->offset3p.mean == frag->offset5p.mean){
-    fprintf(stderr,"* Frag %d in unitig %d has 3p=%g 5p=%g\n",frag->read_iid,frag->cid, frag->offset3p.mean, frag->offset5p.mean);
+    fprintf(stderr,"* Frag %d in unitig %d has 3p=%g 5p=%g\n",frag->iid,frag->cid, frag->offset3p.mean, frag->offset5p.mean);
     assert(0);
   }
   if(frag->offset3p.mean > frag->offset5p.mean)
@@ -100,7 +101,7 @@ static FragOrient getCIFragOrient(CIFragT *frag){
 
 static FragOrient GetContigFragOrient(CIFragT *frag){
   if(frag->contigOffset3p.mean == frag->contigOffset5p.mean){
-    fprintf(stderr,"* Frag %d in contig %d has 3p=%g 5p=%g\n",frag->read_iid,frag->contigID, frag->contigOffset3p.mean, frag->contigOffset5p.mean);
+    fprintf(stderr,"* Frag %d in contig %d has 3p=%g 5p=%g\n",frag->iid,frag->contigID, frag->contigOffset3p.mean, frag->contigOffset5p.mean);
     assert(0);
   }
   if(frag->contigOffset3p.mean > frag->contigOffset5p.mean)

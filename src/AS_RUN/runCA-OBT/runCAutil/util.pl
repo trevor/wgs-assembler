@@ -190,9 +190,6 @@ sub setDefaults () {
 
     #####  Stopping conditions
 
-    $global{"stopBefore"}                  = undef;
-    $synops{"stopBefore"}                  = "Tell runCA when to halt execution";
-
     $global{"stopAfter"}                   = undef;
     $synops{"stopAfter"}                   = "Tell runCA when to halt execution";
 
@@ -271,10 +268,10 @@ sub setDefaults () {
     $synops{"doOverlapTrimming"}           = "Enable the Overlap Based Trimming module";
 
     $global{"doDeDuplication"}             = 1;
-    $synops{"doDeDuplication"}             = "Enable the OBT duplication detection and cleaning module for 454 reads, enabled automatically";
+    $synops{"doDeDuplication"}             = "Enable the OBT duplication detection and cleaning module";
 
-    $global{"doChimeraDetection"}          = "normal";
-    $synops{"doChimeraDetection"}          = "Enable the OBT chimera detection and cleaning module; 'off', 'normal' or 'aggressive'";
+    $global{"doChimeraDetection"}          = 1;
+    $synops{"doChimeraDetection"}          = "Enable the OBT chimera detection and cleaning module";
 
     #####  Overlapper
 
@@ -341,9 +338,6 @@ sub setDefaults () {
     $global{"umdOverlapperFlags"}          = "-use-uncleaned-reads -trim-error-rate 0.03 -max-minimizer-cutoff 150";
     $synops{"umdOverlapperFlags"}          = "Options for the UMD overlapper";
 
-    $global{"saveOverlaps"}                = 0;
-    $synops{"saveOverlaps"}                = "Save intermediate overlap files";
-
     #####  Mers
 
     $global{"merylMemory"}                 = 800;
@@ -374,8 +368,8 @@ sub setDefaults () {
 
     #####  Unitigger & BOG Options
 
-    $global{"unitigger"}                   = undef;
-    $synops{"unitigger"}                   = "Which unitig algorithm to use; utg (if no SFF files) or bog (Best Overlap Graph, if SFF files)";
+    $global{"unitigger"}                   = "utg";
+    $synops{"unitigger"}                   = "Which unitig algorithm to use; utg or bog (Best Overlap Graph)";
 
     $global{"utgGenomeSize"}               = undef;
     $synops{"utgGenomeSize"}               = "An estimate of the size of the genome; decides if unitigs are unique or repeats";
@@ -393,6 +387,9 @@ sub setDefaults () {
     $synops{"bogBadMateDepth"}             = "EXPERT!";
 
     #####  Scaffolder Options
+
+    $global{"cgwOutputIntermediate"}       = 0;
+    $synops{"cgwOutputIntermediate"}       = "Output .cgw files for intermediate scaffolding (advanced)";
 
     $global{"cgwPurgeCheckpoints"}         = 1;
     $synops{"cgwPurgeCheckpoints"}         = "Remove cgw checkpoint files when a scaffolding step finishes successfully";
@@ -427,12 +424,6 @@ sub setDefaults () {
     $global{"extendClearRangesStepSize"}   = undef;
     $synops{"extendClearRangesStepSize"}   = "Batch N scaffolds per ECR run";
 
-    $global{"kickOutNonOvlContigs"}        = 0;
-    $synops{"kickOutNonOvlContigs"}        = "Allow kicking out a contig placed in a scaffold by mate pairs that has no overlaps to both its left and right neighbor contigs. EXPERT!\n";
-
-    $global{"doUnjiggleWhenMerging"}        = 0;
-    $synops{"doUnjiggleWhenMerging"}        = "after inserting rocks/stones try shifting contig positions back to their original location when computing overlaps to see if they overlap with the rock/stone and allow them to merge if they do. EXPERT!\n";
-    
     #####  Consensus Options
 
     $global{"cnsPartitions"}               = 128;
@@ -443,9 +434,6 @@ sub setDefaults () {
 
     $global{"cnsConcurrency"}              = 2;
     $synops{"cnsConcurrency"}              = "If not SGE, number of consensus jobs to run at the same time";
-
-    $global{"cnsPhasing"}                  = 0;
-    $synops{"cnsPhasing"}                  = "Options for consensus phasing of SNPs\n\t0 - Do not phase SNPs to be consistent.\n\t1 - If two SNPs are joined by reads, phase them to be consistent.";
 
     $global{"consensus"}                   = "cns";
     $synops{"consensus"}                   = "Which consensus algorithm to use; currently only 'cns' is supported";
@@ -553,26 +541,15 @@ sub setParametersFromFile ($@) {
         my $bin = "$FindBin::RealBin/spec";
 
         if (-e $specFile && ! -d $specFile) {
-            print STDERR "#\n";
-            print STDERR "#  Reading options from '$specFile'\n";
-            print STDERR "#\n";
             open(F, "< $specFile") or caFailure("Couldn't open '$specFile'", undef);
         } elsif (-e "$bin/$specFile") {
-            print STDERR "#\n";
-            print STDERR "#  Reading options from '$bin/$specFile'\n";
-            print STDERR "#\n";
             open(F, "< $bin/$specFile") or caFailure("Couldn't open '$bin/$specFile'", undef);
         } elsif (-e "$bin/$specFile.specFile") {
-            print STDERR "#\n";
-            print STDERR "#  Reading options from '$bin/$specFile.specFile'\n";
-            print STDERR "#\n";
             open(F, "< $bin/$specFile.specFile") or caFailure("Couldn't open '$bin/$specFile.specFile'", undef);
         } else {
             caFailure("specFile '$specFile' or '$bin/$specFile' or '$bin/$specFile.specFile' not found", undef);
         }
         while (<F>) {
-            print STDERR $_;
-
             s/^\s+//;
             s/\s+$//;
 
@@ -581,6 +558,7 @@ sub setParametersFromFile ($@) {
 
             if (m/\s*(\w*)\s*=([^#]*)#*.*$/) {
                 my ($var, $val) = ($1, $2);
+                print STDERR $_,"\n"; # echo the spec file
                 $var =~ s/^\s+//; $var =~ s/\s+$//;
                 $val =~ s/^\s+//; $val =~ s/\s+$//;
                 undef $val if ($val eq "undef");
@@ -605,15 +583,7 @@ sub setParametersFromFile ($@) {
 sub setParametersFromCommandLine(@) {
     my @specOpts = @_;
 
-    if (scalar(@specOpts) > 0) {
-        print STDERR "#\n";
-        print STDERR "#  Reading options from the command line.\n";
-        print STDERR "#\n";
-    }
-
     foreach my $s (@specOpts) {
-        print STDERR "$s\n";
-
         if ($s =~ m/\s*(\w*)\s*=(.*)/) {
             my ($var, $val) = ($1, $2);
             $var =~ s/^\s+//; $var =~ s/\s+$//;
@@ -628,17 +598,6 @@ sub setParametersFromCommandLine(@) {
 
 sub setParameters () {
 
-    #  Update obsolete usages.
-    #
-    if (getGlobal("doChimeraDetection") eq "1") {
-        print STDERR "WARNING: 'doChimeraDetection=1' is obsolete; use 'doChimeraDetection=normal' in the future.\n";
-        setGlobal("doChimeraDetection", "normal");
-    }
-    if (getGlobal("doChimeraDetection") eq "0") {
-        print STDERR "WARNING: 'doChimeraDetection=0' is obsolete; use 'doChimeraDetection=off' in the future.\n";
-        setGlobal("doChimeraDetection", "off");
-    }
-
     #  Fiddle with filenames to make them absolute paths.
     #
     makeAbsolute("vectorIntersect");
@@ -646,26 +605,21 @@ sub setParameters () {
 
     #  Adjust case on some of them
     #
-    fixCase("doChimeraDetection");
     fixCase("obtOverlapper");
     fixCase("ovlOverlapper");
     fixCase("unitigger");
     fixCase("vectorTrimmer");
-    fixCase("stopBefore");
-    fixCase("stopAfter");
+    #fixCase("stopAfter");
     fixCase("consensus");
     fixCase("cleanup");
 
-    if ((getGlobal("doChimeraDetection") ne "off") && (getGlobal("doChimeraDetection") ne "normal") && (getGlobal("doChimeraDetection") ne "aggressive")) {
-        caFailure("invalid doChimeraDetection specified (" . getGlobal("doChimeraDetection") . "); must be 'off', 'normal', or 'aggressive'", undef);
-    }
     if ((getGlobal("obtOverlapper") ne "mer") && (getGlobal("obtOverlapper") ne "ovl")) {
         caFailure("invalid obtOverlapper specified (" . getGlobal("obtOverlapper") . "); must be 'mer' or 'ovl'", undef);
     }
     if ((getGlobal("ovlOverlapper") ne "mer") && (getGlobal("ovlOverlapper") ne "ovl")) {
         caFailure("invalid ovlOverlapper specified (" . getGlobal("ovlOverlapper") . "); must be 'mer' or 'ovl'", undef);
     }
-    if (defined(getGlobal("unitigger")) && (getGlobal("unitigger") ne "utg") && (getGlobal("unitigger") ne "bog")) {
+    if ((getGlobal("unitigger") ne "utg") && (getGlobal("unitigger") ne "bog")) {
         caFailure("invalid unitigger specified (" . getGlobal("unitigger") . "); must be 'utg' or 'bog'", undef);
     }
     if ((getGlobal("vectorTrimmer") ne "ca") && (getGlobal("vectorTrimmer") ne "figaro")) {
@@ -674,80 +628,12 @@ sub setParameters () {
     if ((getGlobal("consensus") ne "cns") && (getGlobal("consensus") ne "seqan")) {
         caFailure("invalid consensus specified (" . getGlobal("consensus") . "); must be 'cns' or 'seqan'", undef);
     }
-    if ((getGlobal("cnsPhasing") ne "0") && (getGlobal("cnsPhasing") ne "1")) {
-       caFailure("invalid cnsPhasing specified (" . getGlobal("cnsPhasing") . "); must be '0' or '1'", undef);
-    }
     if ((getGlobal("cleanup") ne "none") &&
         (getGlobal("cleanup") ne "light") &&
         (getGlobal("cleanup") ne "heavy") &&
         (getGlobal("cleanup") ne "aggressive")) {
         caFailure("invalid cleaup specified (" . getGlobal("cleanup") . "); must be 'none', 'light', 'heavy' or 'aggressive'", undef);
     }
-
-    if (defined(getGlobal("stopBefore"))) {
-        my $ok = 0;
-        my $st = getGlobal("stopBefore");
-        $st =~ tr/A-Z/a-z/;
-
-        my $failureString = "Invalid stopBefore specified (" . getGlobal("stopBefore") . "); must be one of:\n";
-
-        my @stopBefore = ("meryl",
-                          "initialTrimming",
-                          "deDuplication",
-                          "mergeTrimming",
-                          "chimeraDetection",
-                          "unitigger",
-                          "scaffolder",
-                          "CGW",
-                          "eCR",
-                          "extendClearRanges",
-                          "eCRPartition",
-                          "extendClearRangesPartition",
-                          "terminator");
-
-        foreach my $sb (@stopBefore) {
-            $failureString .= "    '$sb'\n";
-            $sb =~ tr/A-Z/a-z/;
-            if ($st eq $sb) {
-                $ok++;
-                setGlobal('stopBefore', $st);
-            }
-        }
-
-        caFailure($failureString, undef) if ($ok == 0);
-    }
-
-
-    if (defined(getGlobal("stopAfter"))) {
-        my $ok = 0;
-        my $st = getGlobal("stopAfter");
-        $st =~ tr/A-Z/a-z/;
-
-        my $failureString = "Invalid stopAfter specified (" . getGlobal("stopAfter") . "); must be one of:\n";
-
-        my @stopAfter = ("initialStoreBuilding",
-                         "overlapper",
-                         "OBT",
-                         "overlapBasedTrimming",
-                         "unitigger",
-                         "utgcns",
-                         "consensusAfterUnitigger",
-                         "scaffolder",
-                         "ctgcns",
-                         "consensusAfterScaffolder");
-
-        foreach my $sa (@stopAfter) {
-            $failureString .= "    '$sa'\n";
-            $sa =~ tr/A-Z/a-z/;
-            if ($st eq $sa) {
-                $ok++;
-                setGlobal('stopAfter', $st);
-            }
-        }
-
-        caFailure($failureString, undef) if ($ok == 0);
-    }
-
 
     #  PIck a nice looking set of binaries, and check them.
     #
@@ -759,8 +645,7 @@ sub setParameters () {
         caFailure("can't find 'overlap' program in $bin.  Possibly incomplete installation", undef)    if (! -x "$bin/overlap");
         caFailure("can't find 'unitigger' program in $bin.  Possibly incomplete installation", undef)  if (! -x "$bin/unitigger");
         caFailure("can't find 'cgw' program in $bin.  Possibly incomplete installation", undef)        if (! -x "$bin/cgw");
-        caFailure("can't find 'utgcns' program in $bin.  Possibly incomplete installation", undef)     if (! -x "$bin/utgcns");
-        caFailure("can't find 'ctgcns' program in $bin.  Possibly incomplete installation", undef)     if (! -x "$bin/ctgcns");
+        caFailure("can't find 'consensus' program in $bin.  Possibly incomplete installation", undef)  if (! -x "$bin/consensus");
         caFailure("can't find 'terminator' program in $bin.  Possibly incomplete installation", undef) if (! -x "$bin/terminator");
 
         if ((getGlobal("obtOverlapper") eq "mer") || (getGlobal("ovlOverlapper") eq "mer")) {
@@ -977,20 +862,8 @@ sub merylVersion () {
     return($ver);
 }
 
-sub stopBefore ($$) {
-    my $stopBefore = shift @_;  $stopBefore =~ tr/A-Z/a-z/;
-    my $cmd        = shift @_;
-    if (defined($stopBefore) &&
-        defined(getGlobal('stopBefore')) &&
-        (getGlobal('stopBefore') eq $stopBefore)) {
-        print STDERR "Stop requested before '$stopBefore'.\n";
-        print STDERR "Command:\n$cmd\n" if (defined($cmd));
-        exit(0);
-    }
-}
-
 sub stopAfter ($) {
-    my $stopAfter = shift @_;  $stopAfter =~ tr/A-Z/a-z/;
+    my $stopAfter = shift @_;
     if (defined($stopAfter) &&
         defined(getGlobal('stopAfter')) &&
         (getGlobal('stopAfter') eq $stopAfter)) {
@@ -1051,6 +924,9 @@ sub submitScript ($) {
     $waitTag = "-hold_jid \"$waitTag\"" if (defined($waitTag));
 
     my $qcmd = "qsub $sge $sgeScript -cwd -N \"runCA_${asm}\" -j y -o $output $waitTag $script";
+
+    print STDERR "DEBUG:\n$qcmd\n";
+    system('pwd');
 
     system($qcmd) and caFailure("Failed to submit script.\n");
 

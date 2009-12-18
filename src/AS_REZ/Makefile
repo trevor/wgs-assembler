@@ -32,14 +32,14 @@ LIBSOURCES = ConsistencyChecksREZ.C \
              UtilsREZ.C \
              MicroHetREZ.C
 
-SOURCES = $(LIBSOURCES)
+SOURCES = MicroHetIUM.C $(LIBSOURCES)
 
 OBJECTS    = $(SOURCES:.C=.o)
 LIBOBJECTS = $(LIBSOURCES:.C=.o)
 
 LIBRARIES  = libAS_REZ.a libCA.a
 
-CXX_PROGS =
+CXX_PROGS = MicroHetIUM
 
 include $(LOCAL_WORK)/src/c_make.as
 
@@ -49,3 +49,6 @@ all: $(OBJECTS) $(LIBRARIES) $(CXX_PROGS)
 libAS_REZ.a: $(LIBOBJECTS)
 
 libCA.a: $(LIBOBJECTS)
+
+
+MicroHetIUM:           MicroHetIUM.o libCA.a
