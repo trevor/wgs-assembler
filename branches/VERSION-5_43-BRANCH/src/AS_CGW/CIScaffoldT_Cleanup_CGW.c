@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: CIScaffoldT_Cleanup_CGW.c,v 1.55 2009-08-28 17:35:10 skoren Exp $";
+static char *rcsid = "$Id: CIScaffoldT_Cleanup_CGW.c,v 1.55.2.1 2009-12-18 17:43:12 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1354,7 +1354,7 @@ int CleanupFailedMergesInScaffolds(ScaffoldGraphT *sgraph){
 
     //  A little aggressive to do this every scaffold.  Hopefully
     //  won't kill performance.
-    clearCacheSequenceDB(sgraph->sequenceDB);
+    //clearCacheSequenceDB(sgraph->sequenceDB);
   }
 
   RecycleDeletedGraphElements(sgraph->RezGraph);

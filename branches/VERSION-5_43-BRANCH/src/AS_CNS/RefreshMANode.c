@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char *rcsid = "$Id: RefreshMANode.c,v 1.2 2009-06-10 18:05:13 brianwalenz Exp $";
+static char *rcsid = "$Id: RefreshMANode.c,v 1.2.2.1 2009-12-18 17:43:12 brianwalenz Exp $";
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -504,7 +504,8 @@ PhaseWithPrevVreg(int32 nca, Allele *alleles, Read *reads, int32 **allele_map,
       safe_free(check);
     } /* if (prev_nca == nca) */
 
-  return is_phased;
+  //return is_phased;
+  return 0;
 }
 
 
