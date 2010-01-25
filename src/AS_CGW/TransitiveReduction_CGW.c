@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: TransitiveReduction_CGW.c,v 1.31 2010-01-13 00:51:58 brianwalenz Exp $";
+static char *rcsid = "$Id: TransitiveReduction_CGW.c,v 1.31.2.1 2010-01-25 17:35:07 brianwalenz Exp $";
 
 //#define INSTRUMENT_CGW
 //#define INSTRUMENT_SMOOTHED
@@ -95,9 +95,13 @@ TransitiveEdgeOrientation(ChunkOrientationType leftOrient,
 //
 //  The values below (15, 50^4, 50) are complete gueses.
 //
+//int AS_CGW_MAX_FTEP_RECURSE_DEPTH   = 15;
+//int AS_CGW_MAX_FTEP_RECURSE_SIZE    = 50 * 50 * 50 * 50;
+//int AS_CGW_MAX_FTEP_OUTGOING_EDGES  = 50;
+
 int AS_CGW_MAX_FTEP_RECURSE_DEPTH   = 15;
-int AS_CGW_MAX_FTEP_RECURSE_SIZE    = 50 * 50 * 50 * 50;
-int AS_CGW_MAX_FTEP_OUTGOING_EDGES  = 50;
+int AS_CGW_MAX_FTEP_RECURSE_SIZE    = 1000000;
+int AS_CGW_MAX_FTEP_OUTGOING_EDGES  = 30;
 
 //  Count the number of possible outgoing edges 
 static
