@@ -212,18 +212,15 @@ sub createOverlapJobs($) {
     #
     if (getGlobal("useGrid") && getGlobal("ovlOnGrid")) {
         my $sge        = getGlobal("sge");
-        my $sgeName    = getGlobal("sgeName");
         my $sgeOverlap = getGlobal("sgeOverlap");
 
-        $sgeName = "_$sgeName" if (defined($sgeName));
-
         my $SGE;
-        $SGE  = "qsub $sge $sgeOverlap -cwd -N ovl_$asm$sgeName \\\n";
+        $SGE  = "qsub $sge $sgeOverlap -cwd -N ovl_$asm \\\n";
         $SGE .= "  -t 1-$jobs \\\n";
         $SGE .= "  -j y -o $wrk/$outDir/overlap.\\\$TASK_ID.out \\\n";
         $SGE .= "  $wrk/$outDir/overlap.sh\n";
 
-	submitBatchJobs($SGE, "ovl_$asm$sgeName");
+	submitBatchJobs($SGE, "ovl_$asm");
         exit(0);
     } else {
         for (my $i=1; $i<=$jobs; $i++) {

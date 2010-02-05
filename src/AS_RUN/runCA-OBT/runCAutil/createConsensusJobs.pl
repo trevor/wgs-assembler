@@ -103,18 +103,15 @@ sub createPostScaffolderConsensusJobs () {
 
     if (getGlobal("cnsOnGrid") && getGlobal("useGrid")) {
         my $sge          = getGlobal("sge");
-        my $sgeName      = getGlobal("sgeName");
         my $sgeConsensus = getGlobal("sgeConsensus");
 
-        $sgeName = "_$sgeName" if (defined($sgeName));
-
         my $SGE;
-        $SGE  = "qsub $sge $sgeConsensus -cwd -N ctg_$asm$sgeName ";
+        $SGE  = "qsub $sge $sgeConsensus -cwd -N ctg_$asm ";
         $SGE .= "-t 1-$jobs ";
         $SGE .= "-j y -o /dev/null ";
         $SGE .= "$wrk/8-consensus/consensus.sh\n";
 
-        submitBatchJobs($SGE, "ctg_$asm$sgeName");
+        submitBatchJobs($SGE, "ctg_$asm");
         exit(0);
     } else {
         for (my $i=1; $i<=$jobs; $i++) {

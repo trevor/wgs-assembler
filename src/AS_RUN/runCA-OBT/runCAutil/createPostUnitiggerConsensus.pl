@@ -85,18 +85,15 @@ sub createPostUnitiggerConsensusJobs (@) {
 
     if (getGlobal("useGrid") && getGlobal("cnsOnGrid")) {
         my $sge          = getGlobal("sge");
-        my $sgeName      = getGlobal("sgeName");
         my $sgeConsensus = getGlobal("sgeConsensus");
 
-        $sgeName = "_$sgeName" if (defined($sgeName));
-
         my $SGE;
-        $SGE  = "qsub $sge $sgeConsensus -cwd -N utg_$asm$sgeName ";
+        $SGE  = "qsub $sge $sgeConsensus -cwd -N utg_$asm ";
         $SGE .= "-t 1-$jobs ";
         $SGE .= "-j y -o /dev/null ";
         $SGE .= "$wrk/5-consensus/consensus.sh\n";
 
-        submitBatchJobs($SGE, "utg_$asm$sgeName");
+        submitBatchJobs($SGE, "utg_$asm");
         exit(0);
     } else {
         for (my $i=1; $i<=$jobs; $i++) {

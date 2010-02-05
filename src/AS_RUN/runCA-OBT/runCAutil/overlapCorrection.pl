@@ -69,18 +69,15 @@ sub overlapCorrection {
             #  Run the correction job on the grid.
 
             my $sge                   = getGlobal("sge");
-            my $sgeName               = getGlobal("sgeName");
             my $sgeFragmentCorrection = getGlobal("sgeFragmentCorrection");
 
-            $sgeName = "_$sgeName" if (defined($sgeName));
-
             my $SGE;
-            $SGE  = "qsub $sge $sgeFragmentCorrection -cwd -N frg_$asm$sgeName ";
+            $SGE  = "qsub $sge $sgeFragmentCorrection -cwd -N frg_$asm ";
             $SGE .= "-t 1-$jobs ";
             $SGE .= " -j y -o $wrk/3-overlapcorrection/\\\$TASK_ID.err ";
             $SGE .= "$wrk/3-overlapcorrection/frgcorr.sh\n";
 
-            submitBatchJobs($SGE, "frg_$asm$sgeName");
+            submitBatchJobs($SGE, "frg_$asm");
             exit(0);
         } else {
             #  Run the correction job right here, right now.
@@ -206,18 +203,15 @@ sub overlapCorrection {
             #  Run the correction job on the grid.
 
             my $sge                   = getGlobal("sge");
-            my $sgeName               = getGlobal("sgeName");
             my $sgeOverlapCorrection  = getGlobal("sgeOverlapCorrection");
 
-            $sgeName = "_$sgeName" if (defined($sgeName));
-
             my $SGE;
-            $SGE  = "qsub $sge $sgeOverlapCorrection -cwd -N ovc_$asm$sgeName ";
+            $SGE  = "qsub $sge $sgeOverlapCorrection -cwd -N ovc_$asm ";
             $SGE .= "-t 1-$jobs ";
             $SGE .= " -j y -o $wrk/3-overlapcorrection/\\\$TASK_ID.err ";
             $SGE .= "$wrk/3-overlapcorrection/ovlcorr.sh\n";
 
-            submitBatchJobs($SGE, "ovc_$asm$sgeName");
+            submitBatchJobs($SGE, "ovc_$asm");
             exit(0);
         } else {
             #  Run the correction job right here, right now.
