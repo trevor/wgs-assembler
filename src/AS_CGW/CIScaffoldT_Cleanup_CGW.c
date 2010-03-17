@@ -18,7 +18,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
-static char *rcsid = "$Id: CIScaffoldT_Cleanup_CGW.c,v 1.64 2010-01-17 03:10:10 brianwalenz Exp $";
+static char *rcsid = "$Id: CIScaffoldT_Cleanup_CGW.c,v 1.64.4.1 2010-03-17 18:43:35 skoren Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1539,25 +1539,28 @@ int CleanupAScaffold(ScaffoldGraphT *graph, CIScaffoldT *scaffold,
          fprintf(stderr, "CleanupAScaffold() Processing total multialign of %g\n",(fabs(contig.maxCI->offsetBEnd.mean - contig.maxCI->offsetAEnd.mean) + fabs(currCI->offsetBEnd.mean - currCI->offsetAEnd.mean))); 
 
          actual = IntervalsOverlap(contig.minOffset.mean, contig.maxOffset.mean, currCI->offsetAEnd.mean, currCI->offsetBEnd.mean, -15000);
-                  
-         int32 expected_ahang = (GetNodeOrient(currCI) == A_B ? currCI->offsetAEnd.mean : currCI->offsetBEnd.mean);
-         expected_ahang -= (GetNodeOrient(contig.maxCI) == A_B ? contig.maxCI->offsetAEnd.mean : contig.maxCI->offsetBEnd.mean);
-         int32 expected_bhang = (GetNodeOrient(currCI) == A_B ? currCI->offsetBEnd.mean : currCI->offsetAEnd.mean);
-         expected_bhang -= (GetNodeOrient(contig.maxCI) == A_B ? contig.maxCI->offsetBEnd.mean : contig.maxCI->offsetAEnd.mean);
+         if (actual >= 0) {         
+            int32 expected_ahang = (GetNodeOrient(currCI) == A_B ? currCI->offsetAEnd.mean : currCI->offsetBEnd.mean);
+            expected_ahang -= (GetNodeOrient(contig.maxCI) == A_B ? contig.maxCI->offsetAEnd.mean : contig.maxCI->offsetBEnd.mean);
+            int32 expected_bhang = (GetNodeOrient(currCI) == A_B ? currCI->offsetBEnd.mean : currCI->offsetAEnd.mean);
+            expected_bhang -= (GetNodeOrient(contig.maxCI) == A_B ? contig.maxCI->offsetBEnd.mean : contig.maxCI->offsetAEnd.mean);
 
-         float inferredVar = (GetNodeOrient(contig.maxCI) == A_B ? contig.maxCI->offsetBEnd.variance : contig.maxCI->offsetAEnd.variance);
-         inferredVar += (GetNodeOrient(currCI) == A_B ? currCI->offsetAEnd.variance : currCI->offsetBEnd.variance);
+            float maxVar = (GetNodeOrient(contig.maxCI) == A_B ? contig.maxCI->offsetBEnd.variance : contig.maxCI->offsetAEnd.variance);
+            float currVar = (GetNodeOrient(currCI) == A_B ? currCI->offsetAEnd.variance : currCI->offsetBEnd.variance);
+            float inferredVar = (maxVar >= 0 ? maxVar : 0);
+            inferredVar += (currVar >= 0 ? currVar : 0);
 
-         int32 minOverlap = MAX(CGW_MISSED_OVERLAP, (actual - (3.0 * sqrt(inferredVar))));
-         int32 maxOverlap = (actual + (3.0 * sqrt(inferredVar)));
-         int32 minAhang = contig.maxCI->bpLength.mean - maxOverlap;
-         int32 maxAhang = contig.maxCI->bpLength.mean - minOverlap;
-         ChunkOrientationType orient = GetChunkPairOrientation(GetNodeOrient(contig.maxCI), GetNodeOrient(currCI));
+            int32 minOverlap = MAX(CGW_MISSED_OVERLAP, (actual - (3.0 * sqrt(inferredVar))));
+            int32 maxOverlap = (actual + (3.0 * sqrt(inferredVar)));
+            int32 minAhang = contig.maxCI->bpLength.mean - maxOverlap;
+            int32 maxAhang = contig.maxCI->bpLength.mean - minOverlap;
+           ChunkOrientationType orient = GetChunkPairOrientation(GetNodeOrient(contig.maxCI), GetNodeOrient(currCI));
 
-         Overlap* ovl = OverlapContigs(contig.maxCI, currCI, &orient, minAhang, maxAhang, FALSE, TRUE, TRUE);
-         if (ovl != NULL && ScoreOverlap(ovl, actual, expected_ahang, expected_bhang, AS_CGW_ERROR_RATE, NULL, NULL, NULL) != 0) {
-            failed = FALSE;
-            fprintf(stderr, "CleanupAScaffold() Undoing jiggling for %d worked.\n", currCI->id);
+           Overlap* ovl = OverlapContigs(contig.maxCI, currCI, &orient, minAhang, maxAhang, FALSE, TRUE, TRUE);
+            if (ovl != NULL && ScoreOverlap(ovl, actual, expected_ahang, expected_bhang, AS_CGW_ERROR_RATE, NULL, NULL, NULL) != 0) {
+               failed = FALSE;
+               fprintf(stderr, "CleanupAScaffold() Undoing jiggling for %d worked.\n", currCI->id);
+            }
          }
 
          if (failed) {
