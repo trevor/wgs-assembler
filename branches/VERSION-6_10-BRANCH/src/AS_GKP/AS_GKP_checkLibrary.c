@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static char const *rcsid = "$Id: AS_GKP_checkLibrary.c,v 1.34 2010-02-17 01:32:58 brianwalenz Exp $";
+static char const *rcsid = "$Id: AS_GKP_checkLibrary.c,v 1.34.2.1 2010-04-29 15:53:55 brianwalenz Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -128,6 +128,7 @@ Check_LibraryMesg(LibraryMesg      *lib_mesg,
     if (iid) {
       AS_GKP_reportError(AS_GKP_LIB_EXISTS,
                          AS_UID_toString(lib_mesg->eaccession), iid);
+      checkLibraryForIlluminaPointers(lib_mesg);
       gkpStore->inf.libErrors++;
       return(1);
     }
