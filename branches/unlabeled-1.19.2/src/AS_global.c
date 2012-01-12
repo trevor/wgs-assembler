@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *************************************************************************/
 
-static const char *rcsid = "$Id: AS_global.c,v 1.19 2011-08-30 23:09:51 mkotelbajcvi Exp $";
+static const char *rcsid = "$Id: AS_global.c,v 1.19.2.1 2012-01-12 22:02:03 brianwalenz Exp $";
 
 #include "AS_global.h"
 
@@ -46,7 +46,7 @@ uint32 AS_OVERLAP_MIN_LEN  = 40;
 
 extern
 const char *mainid;
-const char *releaseid = "CVS TIP";
+const char *releaseid = "7.0";
 
 //  We take argc and argv, so, maybe, eventually, we'll want to parse
 //  something out of there.  We return argc in case what we parse we
