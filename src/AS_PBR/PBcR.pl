@@ -1193,8 +1193,8 @@ if (! -e "$JELLYFISH/jellyfish") {
    }
 }
 
-if (! -e "$BLASR/blasr") {
-   if (-e "$CA/blasr") {
+if (! -e "$BLASR/blasr" || ! -e "$BLASR/sawriter") {
+   if (-e "$CA/blasr" && -e "$CA/sawriter") {
       $BLASR = $CA;
    } else {
       # try to use path
@@ -1205,7 +1205,7 @@ if (! -e "$BLASR/blasr") {
       $BLASR = join '/', @t;  #  path to the assembler
    }
    # if we really can't find it just give up
-   if (! -e "$BLASR/blasr") {
+   if (! -e "$BLASR/blasr" || ! -e "$BLASR/sawriter") {
       die "BLASR binaries: blasr not found in $ENV{PATH}. Please download it from http://pacificbiosciences.github.com/DevNet/ and add it to your path.\n" if (defined(getGlobal("blasr")) || (defined(getGlobal("longReads")) && getGlobal("longReads") == 1 && ! -e $MHAP_OVL));
    }
 
