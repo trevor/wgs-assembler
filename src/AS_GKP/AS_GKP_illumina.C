@@ -115,6 +115,7 @@ processSeq(char       *N,
   //  Complicated, but fast, parsing of the 'snam' to find clear ranges.
 
   char   *tok = strtok(fr->snam, " \t");
+  char   *tol = tok;
 
   uint32   clrL=0, clrR=slen;  //  Defined range, whole read
   uint32   clvL=1, clvR=0;     //  Undefined range
@@ -125,43 +126,62 @@ processSeq(char       *N,
   while (tok != NULL) {
     if (((tok[0] == 'c') || (tok[0] == 'C')) &&
         ((tok[1] == 'l') || (tok[1] == 'L')) &&
-        ((tok[2] == 'r') || (tok[2] == 'R'))) {
-      clrL = atoi(tok + 4);
+        ((tok[2] == 'r') || (tok[2] == 'R')) &&
+        ((tok[3] == '='))) {
       while ((*tok) && (*tok != ','))
         tok++;
-      clrR = atoi(tok + 1);
+      if ((*tok) && (*(tok+1))) {
+        clrL = atoi(tol + 4);
+        clrR = atoi(tok + 1);
+        fprintf(stderr, "%s -- clr %d,%d\n", fr->snam, clrL, clrR);
+      }
     }
     if (((tok[0] == 'c') || (tok[0] == 'C')) &&
         ((tok[1] == 'l') || (tok[1] == 'L')) &&
-        ((tok[2] == 'v') || (tok[2] == 'V'))) {
-      clvL = atoi(tok + 4);
+        ((tok[2] == 'v') || (tok[2] == 'V')) &&
+        ((tok[3] == '='))) {
       while ((*tok) && (*tok != ','))
         tok++;
-      clvR = atoi(tok + 1);
+      if ((*tok) && (*(tok+1))) {
+        clvL = atoi(tol + 4);
+        clvR = atoi(tok + 1);
+        fprintf(stderr, "%s -- clv %d,%d\n", fr->snam, clvL, clvR);
+      }
     }
     if (((tok[0] == 'm') || (tok[0] == 'M')) &&
         ((tok[1] == 'a') || (tok[1] == 'A')) &&
-        ((tok[2] == 'x') || (tok[2] == 'X'))) {
-      clmL = atoi(tok + 4);
+        ((tok[2] == 'x') || (tok[2] == 'X')) &&
+        ((tok[3] == '='))) {
       while ((*tok) && (*tok != ','))
         tok++;
-      clmR = atoi(tok + 1);
+      if ((*tok) && (*(tok+1))) {
+        clmL = atoi(tol + 4);
+        clmR = atoi(tok + 1);
+        fprintf(stderr, "%s -- clm %d,%d\n", fr->snam, clmL, clmR);
+      }
     }
     if (((tok[0] == 't') || (tok[0] == 'T')) &&
         ((tok[1] == 'n') || (tok[1] == 'N')) &&
-        ((tok[2] == 't') || (tok[2] == 'T'))) {
-      tntL = atoi(tok + 4);
+        ((tok[2] == 't') || (tok[2] == 'T')) &&
+        ((tok[3] == '='))) {
       while ((*tok) && (*tok != ','))
         tok++;
-      tntR = atoi(tok + 1);
+      if ((*tok) && (*(tok+1))) {
+        tntL = atoi(tol + 4);
+        tntR = atoi(tok + 1);
+        fprintf(stderr, "%s -- tnt %d,%d\n", fr->snam, tntL, tntR);
+      }
     }
     if (((tok[0] == 'r') || (tok[0] == 'R')) &&
         ((tok[1] == 'n') || (tok[1] == 'N')) &&
-        ((tok[2] == 'd') || (tok[2] == 'D'))) {
+        ((tok[2] == 'd') || (tok[2] == 'D')) &&
+        ((tok[3] == '='))) {
       rnd = tok[4];
+      fprintf(stderr, "%s -- rnd %d\n", fr->snam, rnd);
     }
 
     tok = strtok(NULL, " \t");
+    tol = tok;
   }
 
   if (clrR > slen) clrR = slen;    if (clrL > clrR) clrL = clrR;
