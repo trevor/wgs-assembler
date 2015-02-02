@@ -64,6 +64,7 @@ AS_UTL_safeWrite(FILE *file, const void *buffer, const char *desc, size_t size, 
       fprintf(stderr, "safeWrite()-- Write failure on %s: %s\n", desc, strerror(errno));
       fprintf(stderr, "safeWrite()-- Wanted to write "F_SIZE_T" objects (size="F_SIZE_T"), wrote "F_SIZE_T".\n",
               towrite, size, written);
+      exit(1);
       assert(errno == 0);
     }
 
