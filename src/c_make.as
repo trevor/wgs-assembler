@@ -144,20 +144,27 @@ endif
 ifeq ($(OSTYPE), Darwin)
   ARCH_CFLAGS      = -D_THREAD_SAFE
 
+  CLANG = $(shell echo `${CXX} --version 2>&1 | grep -c clang`)
+  #$(info CXX $(CXX) CLANG $(CLANG))
+
   #  For gnu gcc/g++
   #
-  ARCH_CFLAGS  += -D_GLIBCXX_PARALLEL -fopenmp
-  ARCH_LDFLAGS += -D_GLIBCXX_PARALLEL -fopenmp
+  ifeq ($(CLANG), 0)
+    ARCH_CFLAGS  += -D_GLIBCXX_PARALLEL -fopenmp
+    ARCH_LDFLAGS += -D_GLIBCXX_PARALLEL -fopenmp
+  endif
 
   #  For clang/clang++
   #
   #  Bogart, CGW and possibly others, will not compile with clang because OpenMP is missing.
   #  If you must use clang, add the symbol below.
   #
-  #CC  = clang 
-  #CXX = clang++
-  #ARCH_CFLAGS     += -DBROKEN_CLANG_OpenMP
-
+  ifeq ($(CLANG), 1)
+    CC  = clang 
+    CXX = clang++
+    ARCH_CFLAGS     += -DBROKEN_CLANG_OpenMP
+  endif
+  
   ifeq ($(BUILDDEBUG), 1)
     ARCH_CFLAGS   += -g -Wall
   else
