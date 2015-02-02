@@ -357,13 +357,17 @@ Optimal_Overlap_AS_forCNS(char *a, char *b,
                           double erate, double thresh, int minlen,
                           CompareOptions what) {
 
-  char     h_alignA[AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2] = {0};
-  char     h_alignB[AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2] = {0};
-  int      h_trace[AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2]  = {0};
+  static char     h_alignA[AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2];
+  static char     h_alignB[AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2];
+  static int      h_trace [AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2];
 
   static ALNoverlap   o;
 
   alignLinker_s   al;
+
+  memset(h_alignA, 0, sizeof(char) * (AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2));
+  memset(h_alignB, 0, sizeof(char) * (AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2));
+  memset(h_trace,  0, sizeof(int)  * (AS_READ_MAX_NORMAL_LEN + AS_READ_MAX_NORMAL_LEN + 2));
 
   if (VERBOSE_MULTIALIGN_OUTPUT >= 3)
     fprintf(stderr, "Optimal_Overlap_AS_forCNS()--  Begins\n");
