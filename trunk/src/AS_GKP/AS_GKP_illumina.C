@@ -45,7 +45,7 @@ static char const *rcsid = "$Id$";
 static int *isValidACGTN = NULL;
 
 #define NAME_MAX_LEN  2048
-#define BASE_MAX_LEN  AS_READ_MAX_NORMAL_LEN
+#define BASE_MAX_LEN  16 * 1024 * 1024
 
 class ilFragment {
  public:
