@@ -1170,8 +1170,18 @@ sub setParameters () {
     $ENV{'AS_CGW_ERROR_RATE'} = $cgwER;
     $ENV{'AS_CNS_ERROR_RATE'} = $cnsER;
 
+    #  Various minimums and maximums.
+
     $ENV{'AS_READ_MIN_LEN'}    = getGlobal("frgMinLen");
     $ENV{'AS_OVERLAP_MIN_LEN'} = getGlobal("ovlMinLen");
+
+    if ((getGlobal("obtMerSize") > 31) ||
+        (getGlobal("ovlMerSize") > 31)) {
+        my $obt = getGlobal("obtMerSize");
+        my $ovl = getGlobal("ovlMerSize");
+
+        caFailure("obtMerSize (set to $obt) or ovlMerSize (set to $ovl) cannot exceed 31 (note that 'merSize' sets both)", undef);
+    }
 }
 
 sub logVersion() {
