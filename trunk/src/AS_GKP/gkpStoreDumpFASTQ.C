@@ -31,7 +31,15 @@ const char *mainid = "$Id$";
 
 class libInfo {
 public:
-  libInfo(char *outPrefix, char *libName) {
+  libInfo(char *outPrefix, char *libNameIn) {
+    char   libName[FILENAME_MAX];
+
+    strcpy(libName, libNameIn);
+
+    for (uint32 ii=0; libName[ii]; ii++)
+      if (libName[ii] == '/')
+        libName[ii] = '_';
+
     sprintf(aname, "%s.%s.1.fastq",       outPrefix, libName);
     sprintf(bname, "%s.%s.2.fastq",       outPrefix, libName);
     sprintf(pname, "%s.%s.paired.fastq",  outPrefix, libName);
@@ -149,11 +157,11 @@ main(int argc, char **argv) {
   AS_IID    numFrags    = gkp->gkStore_getNumFragments();
   AS_IID    numLibs     = gkp->gkStore_getNumLibraries();
 
-  libInfo **lib         = new libInfo * [numLibs];
+  libInfo **lib         = new libInfo * [numLibs+1];
 
   lib[0] = new libInfo(outPrefix, "legacy");
 
-  for (uint32 i=1; i<numLibs; i++)
+  for (uint32 i=1; i < numLibs+1; i++)
     lib[i] = new libInfo(outPrefix, gkp->gkStore_getLibrary(i)->libraryName);
 
   if (bgnIID < 1)
