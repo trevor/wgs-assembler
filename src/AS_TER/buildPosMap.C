@@ -156,9 +156,16 @@ processMDI(SnapMateDistMesg *mdi, char *prefix) {
   double  bgn   = mdi->min;
   double  width = (double)(mdi->max - mdi->min) / mdi->num_buckets;
 
+  char  S[FILENAME_MAX];
   char  N[FILENAME_MAX];
 
-  sprintf(N, "%s.posmap.libraries.%s", prefix, AS_UID_toString(mdi->erefines));
+  sprintf(S, "posmap.libraries.%s", AS_UID_toString(mdi->erefines));
+
+  for (uint32 ii=0; S[ii]; ii++)
+    if (S[ii] == '/')
+      S[ii] = '_';
+
+  sprintf(N, "%s.%s", prefix, S);
 
   errno = 0;
   FILE *F = fopen(N, "w");

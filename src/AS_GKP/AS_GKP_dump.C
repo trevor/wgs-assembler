@@ -53,6 +53,7 @@ public:
 class dumpFile {
 public:
   dumpFile(gkStore *gkp, char *prefix, char *extension) {
+    char   libName[FILENAME_MAX];
 
     sprintf(_mono._N[0], "%s.%s",         prefix, extension);
     sprintf(_mono._N[1], "%s.1.%s",       prefix, extension);
@@ -63,11 +64,17 @@ public:
     _lib.resize(gkp->gkStore_getNumLibraries() + 1);
 
     for (uint32 ll=0; ll<=gkp->gkStore_getNumLibraries(); ll++) {
-      sprintf(_lib[ll]._N[0], "%s.%03u.%s.%s",         prefix, ll, gkp->gkStore_getLibrary(ll)->libraryName, extension);
-      sprintf(_lib[ll]._N[1], "%s.%03u.%s.1.%s",       prefix, ll, gkp->gkStore_getLibrary(ll)->libraryName, extension);
-      sprintf(_lib[ll]._N[2], "%s.%03u.%s.2.%s",       prefix, ll, gkp->gkStore_getLibrary(ll)->libraryName, extension);
-      sprintf(_lib[ll]._N[3], "%s.%03u.%s.paired.%s",  prefix, ll, gkp->gkStore_getLibrary(ll)->libraryName, extension);
-      sprintf(_lib[ll]._N[4], "%s.%03u.%s.unmated.%s", prefix, ll, gkp->gkStore_getLibrary(ll)->libraryName, extension);
+      strcpy(libName, gkp->gkStore_getLibrary(ll)->libraryName);
+
+      for (uint32 ii=0; libName[ii]; ii++)
+        if (libName[ii] == '/')
+          libName[ii] = '_';
+
+      sprintf(_lib[ll]._N[0], "%s.%03u.%s.%s",         prefix, ll, libName, extension);
+      sprintf(_lib[ll]._N[1], "%s.%03u.%s.1.%s",       prefix, ll, libName, extension);
+      sprintf(_lib[ll]._N[2], "%s.%03u.%s.2.%s",       prefix, ll, libName, extension);
+      sprintf(_lib[ll]._N[3], "%s.%03u.%s.paired.%s",  prefix, ll, libName, extension);
+      sprintf(_lib[ll]._N[4], "%s.%03u.%s.unmated.%s", prefix, ll, libName, extension);
     }
   };
 
