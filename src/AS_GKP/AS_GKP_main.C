@@ -693,6 +693,9 @@ main(int argc, char **argv) {
     arg++;
   }
 
+  if (begIID > endIID)
+    fprintf(stderr, "ERROR: incorrect range: -b (%d) must be less than -e (%d).\n", begIID, endIID), exit(1);
+
   if ((err) || (gkpStoreName == NULL) || (firstFileArg == 0)) {
     usage(progName, hlp);
     exit(1);
