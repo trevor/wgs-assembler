@@ -2539,7 +2539,7 @@ if (! -e "$wrk/temp$libraryname/runPartition.sh") {
    print F "   fi\n";
    print F "   fi\n";
    print F "   \n";
-   print F "   numLays=`cat $wrkDir/temp$libraryname/$asm" . ".\$jobid.lay |grep \"{LAY\" |wc -l`\n";
+   print F "   numLays=`cat $wrkDir/temp$libraryname/$asm" . ".\$jobid.lay |grep -c -m 1 \"{LAY\"`\n";
    print F "   if test \$numLays = 0 ; then\n";
    print F "      touch $wrk/temp$libraryname/\$jobid.fasta\n";
    print F "      touch $wrk/temp$libraryname/\$jobid.qual\n";
