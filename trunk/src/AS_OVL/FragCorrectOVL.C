@@ -1573,7 +1573,7 @@ Parse_Command_Line(int argc, char **argv) {
 //    6,710,890 to handle 80% error at   4m overlap
 //  Bigger means we can assign more than one Edit_Array[] in one allocation.
 
-uint32  EDIT_SPACE_SIZE  = 1 * 1024 * 1024;
+uint32  EDIT_SPACE_SIZE  = 16 * 1024 * 1024;
 
 static
 void
