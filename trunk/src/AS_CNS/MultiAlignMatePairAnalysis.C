@@ -402,6 +402,7 @@ matePairAnalysis::writeUpdate(char *prefix) {
 void
 matePairAnalysis::drawPlots(char *prefix) {
   char   datName[FILENAME_MAX];
+  char   libName[FILENAME_MAX];
 
   if (prefix[strlen(prefix)-1] == '/')
     prefix[strlen(prefix)-1] = 0;
@@ -422,8 +423,15 @@ matePairAnalysis::drawPlots(char *prefix) {
       if (data->dist.size() == 0)
         continue;
 
+      strcpy(libName, ld->library->libraryName);
+
+      for (uint32 ii=0; libName[ii]; ii++)
+        if (libName[ii] == '/')
+          libName[ii] = '_';
+
       sprintf(datName, "%s.%03d.%s.%s.dat",
-              prefix, li, AS_READ_ORIENT_NAMES[oi], ld->library->libraryName);
+              prefix, li, AS_READ_ORIENT_NAMES[oi], libName);
+
       errno = 0;
       FILE *dat = fopen(datName, "w");
       if (errno)
