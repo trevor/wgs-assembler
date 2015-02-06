@@ -47,8 +47,7 @@ static const char *rcsid_OLAPFROMSEEDS_H_INCLUDED = "$Id$";
 #define  USE_NEW_STUFF  1
 
 #include  "AS_global.H"
-
-#include  "AS_OVL_delcher.H"
+#include  "AS_UTL_reverseComplement.H"
 #include  "AS_PER_gkpStore.H"
 #include  "AS_OVS_overlapStore.H"
 #include  "SharedOVL.H"

@@ -28,7 +28,7 @@
 const char *mainid = "$Id$";
 
 #include  "AS_global.H"
-#include  "AS_OVL_delcher.H"
+#include  "AS_UTL_reverseComplement.H"
 #include  "AS_PER_gkpStore.H"
 #include  "FragCorrectOVL.H"
 #include  "AS_OVS_overlapStore.H"
@@ -347,6 +347,7 @@ static void  Threaded_Stream_Old_Frags
 static void  Usage
     (char * command);
 
+int Verbose_Level = 0;
 
 int  main
     (int argc, char * argv [])
@@ -420,7 +421,10 @@ int  main
        }
 
    fprintf (stderr, "Before Output_Corrections  Num_Frags = %d\n", Num_Frags);
-   fp = File_Open (Correction_Filename, "wb");
+   errno = 0;
+   fp = fopen(Correction_Filename, "wb");
+   if (errno)
+     fprintf(stderr, "Failed to open '%s': %s\n", Correction_Filename, strerror(errno)), exit(1);
    Output_Corrections (fp);
    fclose (fp);
 
@@ -2036,7 +2040,10 @@ static void  Read_Olaps
         olap_size = 1000;
         Olap = (Olap_Info_t*) safe_malloc (olap_size * sizeof (Olap_Info_t));
 
-        fp = File_Open (Olap_Path, "r");
+        errno = 0;
+        fp = fopen(Olap_Path, "r");
+        if (errno)
+          fprintf(stderr, "Failed to open '%s': %s\n", Olap_Path, strerror(errno)), exit(1);
 
         while  (fscanf (fp, "%d %d %d %d %s %lf",
                         & a_iid, & b_iid, & a_hang, & b_hang,
