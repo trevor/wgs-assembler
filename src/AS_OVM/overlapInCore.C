@@ -260,10 +260,13 @@ Initialize_Work_Area(Work_Area_t * WA, int id) {
 
   allocated += 3 * MAX_ERRORS * sizeof(int);
 
-  WA -> Edit_Space = (int *)safe_malloc ((MAX_ERRORS + 4) * MAX_ERRORS * sizeof (int));
-  WA -> Edit_Array = (int **)safe_malloc (MAX_ERRORS * sizeof (int *));
+  WA -> Edit_Space_Lazy = (int **)safe_malloc (MAX_ERRORS * sizeof (int *));
+  WA -> Edit_Array_Lazy = (int **)safe_malloc (MAX_ERRORS * sizeof (int *));
 
-  allocated += (MAX_ERRORS + 4) * MAX_ERRORS * sizeof (int) + MAX_ERRORS * sizeof (int *);
+  memset(WA->Edit_Space_Lazy, 0, MAX_ERRORS * sizeof(int *));
+  memset(WA->Edit_Array_Lazy, 0, MAX_ERRORS * sizeof(int *));
+
+  allocated += 2 * MAX_ERRORS * sizeof (int *);
 
   WA -> String_Olap_Size = INIT_STRING_OLAP_SIZE;
   WA -> String_Olap_Space = (String_Olap_t *) safe_malloc (WA -> String_Olap_Size * sizeof (String_Olap_t));
@@ -272,14 +275,6 @@ Initialize_Work_Area(Work_Area_t * WA, int id) {
 
   allocated += WA -> String_Olap_Size * sizeof (String_Olap_t);
   allocated += WA -> Match_Node_Size * sizeof (Match_Node_t);
-
-  int32 Offset = 2;
-  int32 Del = 6;
-  for  (int32 i=0;  i<MAX_ERRORS;  i++) {
-    WA -> Edit_Array [i] = WA -> Edit_Space + Offset;
-    Offset += Del;
-    Del += 2;
-  }
 
   WA -> status = 0;
   WA -> thread_id = id;

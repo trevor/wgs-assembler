@@ -304,8 +304,10 @@ typedef  struct Work_Area {
   int    Right_Delta_Len;
   int  * Right_Delta;
   int  * Delta_Stack;
-  int  * Edit_Space;
-  int  ** Edit_Array;
+
+  int  ** Edit_Space_Lazy;
+  int  ** Edit_Array_Lazy;
+
   int  * Edit_Match_Limit;
   int  * Error_Bound;
   String_Olap_t  * String_Olap_Space;
