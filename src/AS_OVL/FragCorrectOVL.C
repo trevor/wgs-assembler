@@ -208,8 +208,8 @@ typedef  struct
    Frag_List_t  * frag_list;
    char  rev_seq [AS_READ_MAX_NORMAL_LEN + 1];
    int  rev_id;
-   int  ** edit_array;
-   int  * edit_space;
+   int  ** Edit_Array_Lazy;
+   int  ** Edit_Space_Lazy;
   }  Thread_Work_Area_t;
 
 
@@ -220,15 +220,10 @@ static char  * Correction_Filename = DEFAULT_CORRECTION_FILENAME;
     // Name of file to which correction information is sent
 static int  Degree_Threshold = DEFAULT_DEGREE_THRESHOLD;
     // Set keep flag on end of fragment if number of olaps < this value
-static int  * Edit_Array [AS_READ_MAX_NORMAL_LEN+1];
-    // Use for alignment calculation.  Points into  Edit_Space .
-    // (only MAX_ERRORS needed)
 static int  Edit_Match_Limit [AS_READ_MAX_NORMAL_LEN+1] = {0};
     // This array [e] is the minimum value of  Edit_Array [e] [d]
     // to be worth pursuing in edit-distance computations between guides
     // (only MAX_ERRORS needed)
-static int *Edit_Space = NULL;
-    // Memory used by alignment calculation
 static int  End_Exclude_Len = DEFAULT_END_EXCLUDE_LEN;
     // Length of ends of exact-match regions not used in preventing
     // sequence correction
@@ -1196,18 +1191,6 @@ static void  Initialize_Globals
    int  i, offset, del;
    int  e, start;
 
-   // only (MAX_ERRORS + 4) * MAX_ERRORS needed
-   Edit_Space = (int32 *)safe_malloc(sizeof(int32) * (AS_READ_MAX_NORMAL_LEN + 4) * AS_READ_MAX_NORMAL_LEN);
-
-   offset = 2;
-   del = 6;
-   for  (i = 0;  i < MAX_ERRORS;  i ++)
-     {
-       Edit_Array [i] = Edit_Space + offset;
-       offset += del;
-       del += 2;
-     }
-
    for  (i = 0;  i <= ERRORS_FOR_FREE;  i ++)
      Edit_Match_Limit [i] = 0;
 
@@ -1248,19 +1231,11 @@ static void  Init_Thread_Work_Area
    wa -> thread_id = id;
    strcpy (wa -> rev_seq, "acgt");
 
-   wa -> edit_array = (int **) safe_malloc(MAX_ERRORS * sizeof(int *));
-   wa -> edit_space = (int *) safe_malloc((MAX_ERRORS + 4) * MAX_ERRORS * sizeof(int));
+   wa -> Edit_Array_Lazy = (int **) safe_malloc(MAX_ERRORS * sizeof(int *));
+   wa -> Edit_Space_Lazy = (int **) safe_malloc(MAX_ERRORS * sizeof(int *));
 
-   offset = 2;
-   del = 6;
-   for  (i = 0;  i < MAX_ERRORS;  i ++)
-     {
-      wa -> edit_array [i] = wa -> edit_space + offset;
-      offset += del;
-      del += 2;
-     }
-
-   return;
+   memset(wa->Edit_Array_Lazy, 0, sizeof(int *) * MAX_ERRORS);
+   memset(wa->Edit_Space_Lazy, 0, sizeof(int *) * MAX_ERRORS);
   }
 
 
@@ -1587,6 +1562,76 @@ Parse_Command_Line(int argc, char **argv) {
 
 
 
+//  Allocate another block of 64mb for edits
+
+//  Needs to be at least:
+//       52,432 to handle 40% error at  64k overlap
+//      104,860 to handle 80% error at  64k overlap
+//      209,718 to handle 40% error at 256k overlap
+//      419,434 to handle 80% error at 256k overlap
+//    3,355,446 to handle 40% error at   4m overlap
+//    6,710,890 to handle 80% error at   4m overlap
+//  Bigger means we can assign more than one Edit_Array[] in one allocation.
+
+uint32  EDIT_SPACE_SIZE  = 1 * 1024 * 1024;
+
+static
+void
+Allocate_More_Edit_Space(Thread_Work_Area_t *WA) {
+
+  //  Determine the last allocated block, and the last assigned block
+
+  int32  b = 0;  //  Last edit array assigned
+  int32  e = 0;  //  Last edit array assigned more space
+  int32  a = 0;  //  Last allocated block
+
+  while (WA->Edit_Array_Lazy[b] != NULL)
+    b++;
+
+  while (WA->Edit_Space_Lazy[a] != NULL)
+    a++;
+
+  //  Fill in the edit space array.  Well, not quite yet.  First, decide the minimum size.
+  //
+  //  Element [0] can access from [-2] to [2] = 5 elements.
+  //  Element [1] can access from [-3] to [3] = 7 elements.
+  //
+  //  Element [e] can access from [-2-e] to [2+e] = 5 + e * 2 elements
+  //
+  //  So, our offset for this new block needs to put [e][0] at offset...
+
+  int32 Offset = 2 + b;
+  int32 Del    = 6 + b * 2;
+  int32 Size   = EDIT_SPACE_SIZE;
+
+  while (Size < Offset + Del)
+    Size *= 2;
+
+  //  Allocate another block
+
+  WA->Edit_Space_Lazy[a] = new int [Size];
+
+  //  And, now, fill in the edit space array.
+
+  e = b;
+
+  while (Offset + Del < Size) {
+    WA->Edit_Array_Lazy[e++] = WA->Edit_Space_Lazy[a] + Offset;
+
+    Offset += Del;
+    Del    += 2;
+  }
+
+  if (e == b)
+    fprintf(stderr, "Allocate_More_Edit_Space()-- ERROR: couldn't allocate enough space for even one more entry!  e=%d\n", e);
+  assert(e != b);
+
+  //fprintf(stderr, "WorkArea %d allocates space %d of size %d for array %d through %d\n", WA->thread_id, a, Size, b, e-1);
+}
+
+
+
+
 static int  Prefix_Edit_Dist
     (char A [], int m, char T [], int n, int Error_Limit,
      int * A_End, int * T_End, int * Match_To_End,
@@ -1608,9 +1653,6 @@ static int  Prefix_Edit_Dist
   {
    double  Score, Max_Score;
    int  Max_Score_Len, Max_Score_Best_d, Max_Score_Best_e;
-#if 0
-   int Tail_Len;
-#endif
    int  Best_d, Best_e, Longest, Row;
    int  Left, Right;
    int  d, e, j, shorter;
@@ -1623,7 +1665,10 @@ static int  Prefix_Edit_Dist
    for  (Row = 0;  Row < shorter && A [Row] == T [Row];  Row ++)
      ;
 
-   wa -> edit_array [0] [0] = Row;
+   if (wa->Edit_Array_Lazy[0] == NULL)
+     Allocate_More_Edit_Space(wa);
+
+   wa -> Edit_Array_Lazy [0] [0] = Row;
 
    if  (Row == shorter)                              // Exact match
        {
@@ -1639,42 +1684,46 @@ static int  Prefix_Edit_Dist
      {
       Left = OVL_Max_int (Left - 1, -e);
       Right = OVL_Min_int (Right + 1, e);
-      wa -> edit_array [e - 1] [Left] = -2;
-      wa -> edit_array [e - 1] [Left - 1] = -2;
-      wa -> edit_array [e - 1] [Right] = -2;
-      wa -> edit_array [e - 1] [Right + 1] = -2;
+
+      if (wa->Edit_Array_Lazy[e] == NULL)
+        Allocate_More_Edit_Space(wa);
+
+      wa -> Edit_Array_Lazy [e - 1] [Left] = -2;
+      wa -> Edit_Array_Lazy [e - 1] [Left - 1] = -2;
+      wa -> Edit_Array_Lazy [e - 1] [Right] = -2;
+      wa -> Edit_Array_Lazy [e - 1] [Right + 1] = -2;
 
       for  (d = Left;  d <= Right;  d ++)
         {
-         Row = 1 + wa -> edit_array [e - 1] [d];
-         if  ((j = wa -> edit_array [e - 1] [d - 1]) > Row)
+         Row = 1 + wa -> Edit_Array_Lazy [e - 1] [d];
+         if  ((j = wa -> Edit_Array_Lazy [e - 1] [d - 1]) > Row)
              Row = j;
-         if  ((j = 1 + wa -> edit_array [e - 1] [d + 1]) > Row)
+         if  ((j = 1 + wa -> Edit_Array_Lazy [e - 1] [d + 1]) > Row)
              Row = j;
          while  (Row < m && Row + d < n
                   && A [Row] == T [Row + d])
            Row ++;
 
-         wa -> edit_array [e] [d] = Row;
+         wa -> Edit_Array_Lazy [e] [d] = Row;
 
          if  (Row == m || Row + d == n)
              {
 #if  1
               // Force last error to be mismatch rather than insertion
               if  (Row == m
-                     && 1 + wa -> edit_array [e - 1] [d + 1]
-                          == wa -> edit_array [e] [d]
+                     && 1 + wa -> Edit_Array_Lazy [e - 1] [d + 1]
+                          == wa -> Edit_Array_Lazy [e] [d]
                      && d < Right)
                   {
                    d ++;
-                   wa -> edit_array [e] [d] = wa -> edit_array [e] [d - 1];
+                   wa -> Edit_Array_Lazy [e] [d] = wa -> Edit_Array_Lazy [e] [d - 1];
                   }
 #endif
               (* A_End) = Row;           // One past last align position
               (* T_End) = Row + d;
 
               Compute_Delta
-                  (Delta, Delta_Len, wa -> edit_array, e, d, Row);
+                  (Delta, Delta_Len, wa -> Edit_Array_Lazy, e, d, Row);
 
 #if  0
               //  Check for branch point here caused by uneven
@@ -1701,28 +1750,28 @@ static int  Prefix_Edit_Dist
         }
 
       while  (Left <= Right && Left < 0
-                  && wa -> edit_array [e] [Left] < Edit_Match_Limit [e])
+                  && wa -> Edit_Array_Lazy [e] [Left] < Edit_Match_Limit [e])
         Left ++;
       if  (Left >= 0)
           while  (Left <= Right
-                    && wa -> edit_array [e] [Left] + Left < Edit_Match_Limit [e])
+                    && wa -> Edit_Array_Lazy [e] [Left] + Left < Edit_Match_Limit [e])
             Left ++;
       if  (Left > Right)
           break;
       while  (Right > 0
-                  && wa -> edit_array [e] [Right] + Right < Edit_Match_Limit [e])
+                  && wa -> Edit_Array_Lazy [e] [Right] + Right < Edit_Match_Limit [e])
         Right --;
       if  (Right <= 0)
-          while  (wa -> edit_array [e] [Right] < Edit_Match_Limit [e])
+          while  (wa -> Edit_Array_Lazy [e] [Right] < Edit_Match_Limit [e])
             Right --;
       assert (Left <= Right);
 
       for  (d = Left;  d <= Right;  d ++)
-        if  (wa -> edit_array [e] [d] > Longest)
+        if  (wa -> Edit_Array_Lazy [e] [d] > Longest)
             {
              Best_d = d;
              Best_e = e;
-             Longest = wa -> edit_array [e] [d];
+             Longest = wa -> Edit_Array_Lazy [e] [d];
             }
 #if  1
       Score = Longest * BRANCH_PT_MATCH_VALUE - e;
@@ -1739,7 +1788,7 @@ static int  Prefix_Edit_Dist
      }
 
    Compute_Delta
-       (Delta, Delta_Len, wa -> edit_array, Max_Score_Best_e,
+       (Delta, Delta_Len, wa -> Edit_Array_Lazy, Max_Score_Best_e,
         Max_Score_Best_d, Max_Score_Len);
 
    (* A_End) = Max_Score_Len;
