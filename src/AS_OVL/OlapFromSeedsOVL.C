@@ -44,6 +44,8 @@ const char *mainid = "$Id$";
 
 #include "OlapFromSeedsOVL.H"
 
+int Verbose_Level = 0;  //  Shared with SharedOVL.C
+
 int  main
     (int argc, char * argv [])
 
@@ -99,7 +101,10 @@ int  main
         Show_Votes (stdout);
 
       fprintf (stderr, "Before Output_Corrections  Num_Frags = %d\n", Num_Frags);
-      fp = File_Open (Correction_Filename, "wb");
+      errno = 0;
+      fp = fopen(Correction_Filename, "wb");
+      if (errno)
+        fprintf(stderr, "Failed to open '%s': %s\n", Correction_Filename, strerror(errno)), exit(1);
       Output_Corrections (fp);
       fclose (fp);
      }
@@ -635,9 +640,12 @@ static void  Analyze_Diffs
 // Eventually needs to be multi-threaded, probably in the same way that
 // original votes were done, i.e., thread p does frag i iff (i % num_threads === p)
 
-   if (Doing_Corrections)
-     fp = File_Open (Correction_Filename, "wb");
-
+   if (Doing_Corrections) {
+     errno = 0;
+     fp = fopen(Correction_Filename, "wb");
+     if (errno)
+       fprintf(stderr, "Failed to open '%s': %s\n", Correction_Filename, strerror(errno)), exit(1);
+   }
    fprintf (stderr, "Start analyzing multi-alignments  Num_Frags = %d\n", Num_Frags);
    for (int32 i = 0; i < Num_Frags; i ++)
      Analyze_Frag (fp, i);
@@ -776,21 +784,12 @@ if (0)
    for (i = 0; i < n; i ++)
      if (! Frag [sub] . diff_list [i] . disregard)
        {
-//**ALD
-if (0)
-  {
-   printf ("Set_New_Homopoly_Votes for i=%d b_iid=%d\n", i,
-        Frag [sub] . diff_list [i] . b_iid);
-   if (Frag [sub] . diff_list [i] . b_iid == 421078)
-     Global_Debug_Flag = TRUE;
-  }
         if (mod_dp [i] . is_homopoly_type)
 //          Set_Homopoly_Votes_From_Diffs (sub, Frag [sub] . diff_list + i);
           Set_New_Homopoly_Votes (vote, mod_seq, mod_len, mod_dp + i);
         else
 //          Set_Votes_From_Diffs (sub, Frag [sub] . diff_list + i);
           Set_New_Standard_Votes (vote, mod_seq, mod_len, mod_dp + i);
- Global_Debug_Flag = FALSE;
        }
 
 //**ALD
@@ -2823,7 +2822,12 @@ static void  Initialize_Globals
    switch (OVL_Output_Type)
      {
       case TEXT_FILE :
-        OVL_Output_fp = File_Open (OVL_Output_Path, "w");
+        {
+          errno = 0;
+          OVL_Output_fp = fopen(OVL_Output_Path, "w");
+          if (errno)
+            fprintf(stderr, "Failed to open '%s': %s\n", OVL_Output_Path, strerror(errno)), exit(1);
+        }
         break;
       case BINARY_FILE :
         Binary_OVL_Output_fp = AS_OVS_createBinaryOverlapFile (OVL_Output_Path, FALSE);
@@ -4357,7 +4361,11 @@ static void  Read_Seeds
       olap_size = 1000;
       Olap = (Olap_Info_t *) safe_malloc (olap_size * sizeof (Olap_Info_t));
 
-      fp = File_Open (Olap_Path, "r");
+      errno = 0;
+      fp = fopen(Olap_Path, "r");
+      if (errno)
+        fprintf(stderr, "Failed to open '%s': %s\n", Olap_Path, strerror(errno)), exit(1);
+
 
       while (fgets (line, MAX_LINE, fp) != NULL)
         {
@@ -4900,11 +4908,6 @@ static void  Set_New_Standard_Votes
    int  first_j, last_j;
    int  hp_len = 0;      // length of current homopoly run
    int  j, k, m;
-
-//**ALD
-if (Global_Debug_Flag)
-  printf ("a_lo/hi=%d/%d  b_lo/hi=%d/%d\n", dp -> a_lo, dp -> a_hi,
-       dp -> b_lo, dp -> b_hi);
 
    j = dp -> a_lo;
 

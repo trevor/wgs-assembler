@@ -44,9 +44,7 @@
 
 static const char *rcsid_SHAREDOVL_H_INCLUDED = "$Id$";
 
-
-#include "AS_OVL_delcher.H"
-
+#include "AS_global.H"
 
 // Constants
 

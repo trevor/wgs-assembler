@@ -37,7 +37,6 @@ const char *mainid = "$Id$";
 
 #include  "AS_global.H"
 
-#include  "AS_OVL_delcher.H"
 #include  "AS_PER_gkpStore.H"
 #include  "AS_MSG_pmesg.H"
 #include  "AS_UTL_reverseComplement.H"
@@ -305,6 +304,7 @@ static int  Union
 static void  Usage
     (char * command);
 
+int Verbose_Level = 0;
 
 
 int  main
@@ -709,7 +709,10 @@ static void  Correct_Frags
    int  correcting = FALSE;
    AS_IID iid = 0;
 
-   fp = File_Open (Correct_File_Path, "rb");
+   errno = 0;
+   fp = fopen(Correct_File_Path, "rb");
+   if (errno)
+     fprintf(stderr, "Failed to open '%s': %s\n", Correct_File_Path, strerror(errno)), exit(1);
 
    while  (fread (& msg, sizeof (Correction_Output_t), 1, fp) == 1)
      {
@@ -896,18 +899,22 @@ static void  Dump_Erate_File
    uint16  * erate = NULL;
    int  i;
 
-   fp = File_Open (path, "wb");
+   errno = 0;
+   fp = fopen(path, "wb");
+   if (errno)
+     fprintf(stderr, "Failed to open '%s': %s\n", path, strerror(errno)), exit(1);
 
    header [0] = lo_id;
    header [1] = hi_id;
-   Safe_fwrite (header, sizeof (int32), 2, fp);
-	Safe_fwrite (&num,   sizeof (uint64), 1, fp);
+
+   AS_UTL_safeWrite(fp,  header, "header", sizeof (int32),  2);
+   AS_UTL_safeWrite(fp, &num,    "num",    sizeof (uint64), 1);
 
    erate = (uint16 *) safe_malloc (num * sizeof(uint16));
    for  (i = 0;  i < num;  i ++)
      erate [i] = olap [i] . corr_erate;
 
-   Safe_fwrite (erate, sizeof (uint16), num, fp);
+   AS_UTL_safeWrite(fp, erate, "erate", sizeof (uint16), num);
 
    safe_free(erate);
 
@@ -1507,7 +1514,12 @@ static void  Parse_Command_Line
           break;
 
         case  'o' :
-          OVL_fp = File_Open (optarg, "w");
+          {
+            errno = 0;
+            OVL_fp = fopen(optarg, "w");
+            if (errno)
+              fprintf(stderr, "Failed to open '%s': %s\n", optarg, strerror(errno)), exit(1);
+          }
           break;
 
         case  'q' :
@@ -1525,7 +1537,12 @@ static void  Parse_Command_Line
           break;
 
         case  'X' :
-          Delete_fp = File_Open (optarg, "w");
+          {
+            errno = 0;
+            Delete_fp = fopen(optarg, "w");
+            if (errno)
+              fprintf(stderr, "Failed to open '%s': %s\n", optarg, strerror(errno)), exit(1);
+          }
           break;
 
         case  '?' :
@@ -2078,7 +2095,10 @@ static void  Read_Olaps
                              & Olap, & Num_Olaps);
      else
        {
-        fp = File_Open (Olap_Path, "r");
+        errno = 0;
+        fp = fopen(Olap_Path, "r");
+        if (errno)
+          fprintf(stderr, "Failed to open '%s': %s\n", Olap_Path, strerror(errno)), exit(1);
 
         olap_size = 1000;
         Olap = (Olap_Info_t *) safe_malloc
@@ -2156,7 +2176,10 @@ static void  Redo_Olaps
    gkpStore = new gkStore (gkpStore_Path, FALSE, FALSE);
    Frag_Stream = new gkStream (gkpStore, lo_frag, hi_frag, GKFRAGMENT_SEQ);
 
-   fp = File_Open (Correct_File_Path, "rb");
+   errno = 0;
+   fp = fopen(Correct_File_Path, "rb");
+   if (errno)
+     fprintf(stderr, "Failed to open '%s': %s\n", Correct_File_Path, strerror(errno)), exit(1);
 
    Correction_t *correct = new Correction_t [AS_READ_MAX_NORMAL_LEN];
    Adjust_t     *adjust  = new Adjust_t     [AS_READ_MAX_NORMAL_LEN];

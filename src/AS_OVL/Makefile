@@ -62,7 +62,7 @@ ifdef UMD_OVL
   AS_SCRIPTS = runUMDOverlapper overlapPipeline dataWorkReduced
 endif
 
-AS_OVL_CMN_SRCS = AS_OVL_delcher.C SharedOVL.C
+AS_OVL_CMN_SRCS = SharedOVL.C
 AS_OVL_CMN_OBJS = $(AS_OVL_CMN_SRCS:.C=.o)
 
 SEED_OLAP_SRCS = OlapFromSeedsOVL.C
@@ -106,17 +106,17 @@ endif
 all:    $(OBJECTS) $(CXX_PROGS) $(SCRIPTS)
 	@test -n nop
 
-show-corrects:  ShowCorrectsOVL.o AS_OVL_delcher.o $(LIBS)
-update-erates:  UpdateEratesOVL.o AS_OVL_delcher.o $(LIBS)
-force-erates:   ForceEratesOVL.o  AS_OVL_delcher.o $(LIBS)
-cat-corrects:   CatCorrectsOVL.o  AS_OVL_delcher.o $(LIBS)
-cat-erates:     CatEratesOVL.o    AS_OVL_delcher.o $(LIBS)
-correct-frags:  FragCorrectOVL.o  AS_OVL_delcher.o $(LIBS)
-correct-olaps:  CorrectOlapsOVL.o AS_OVL_delcher.o $(LIBS)
+show-corrects:  ShowCorrectsOVL.o $(LIBS)
+update-erates:  UpdateEratesOVL.o $(LIBS)
+force-erates:   ForceEratesOVL.o  $(LIBS)
+cat-corrects:   CatCorrectsOVL.o  $(LIBS)
+cat-erates:     CatEratesOVL.o    $(LIBS)
+correct-frags:  FragCorrectOVL.o  $(LIBS)
+correct-olaps:  CorrectOlapsOVL.o $(LIBS)
 
 overlap_partition: overlap_partition.o $(LIBS)
 
-olap-from-seeds:  OlapFromSeedsOVL.o AS_OVL_delcher.o SharedOVL.o $(LIBS)
+olap-from-seeds:  OlapFromSeedsOVL.o SharedOVL.o $(LIBS)
 
 
 runUMDOverlapper: $(UMD_OVL)/runUMDOverlapper.perl

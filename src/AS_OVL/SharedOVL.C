@@ -23,7 +23,7 @@ static const char *rcsid = "$Id$";
 
 #include  "SharedOVL.H"
 
-
+extern int Verbose_Level;  //  In OlapFromSeedsOVL.C
 
 void  Fix_Homopoly_Substitution
   (const char * a_string, const char * b_string, int delta [], const HP_LV_Cell_t * cell,
@@ -1471,7 +1471,6 @@ int  Rev_Homopoly_Match_Start
 //**ALD
 if (0 && best_end_score < MAX_HOMOPOLY_SCORE)
   {
-   printf ("Global_Debug_Flag=%d\n", Global_Debug_Flag);
    printf ("Rev_Homopoly_Match_Start:  best_end_e=%d  best_end_d=%d"
         "  best_end_score=%d\n", best_end_e, best_end_d, best_end_score);
    Show_Homopoly_Match_Array (stdout, edit_array, e);
