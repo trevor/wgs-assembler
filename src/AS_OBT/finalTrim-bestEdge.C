@@ -122,7 +122,7 @@ bestEdge(OVSoverlap  *ovl,
 
     assert(iid == ovl[i].a_iid);
 
-    if ((ovl->dat.obt.erate > errorRate) &&
+    if ((ovl[i].dat.obt.erate > errorRate) &&
         (tend - tbgn) * AS_OVS_decodeQuality(ovl[i].dat.obt.erate) > errorLimit)
       //  Overlap is crappy.
       continue;
