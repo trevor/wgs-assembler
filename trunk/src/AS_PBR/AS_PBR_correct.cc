@@ -304,6 +304,9 @@ void *  correctFragments(void *ptr) {
                  if (waGlobal->verboseLevel >= VERBOSE_DEVELOPER) fprintf(stderr, "Fragment %d (%d) versus %d (%d) with error rate %f is bad, skipping it\n", aid, alen, bid, blen, AS_OVS_decodeQuality(olap.dat.ovl.corr_erate));
                 continue;
             }
+            if (olapLength(olap, alen, blen) < waGlobal->minLength) {
+               continue;
+            }
 
             // non contained overlap, dont use these fragments for correction, if close then ok
             if (olap.dat.ovl.type == AS_OVS_TYPE_OVL && (olap.dat.ovl.a_hang < 0 || olap.dat.ovl.b_hang > 0)) {

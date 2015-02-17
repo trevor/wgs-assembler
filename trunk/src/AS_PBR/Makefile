@@ -146,7 +146,7 @@ PBcR: PBcR.pl
 	@cp $< $(LOCAL_BIN)/$@
 	@chmod 775 $(LOCAL_BIN)/$@
 	@rm -f $(LOCAL_BIN)/pacBioToCA
-	@ln -s $(LOCAL_BIN)/$@ $(LOCAL_BIN)/pacBioToCA
+	@ln -s $@ $(LOCAL_BIN)/pacBioToCA
 
 convertToPBCNS: convertToPBCNS.pl
 	@cp $< $(LOCAL_BIN)/$@

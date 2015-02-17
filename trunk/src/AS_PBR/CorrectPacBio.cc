@@ -185,6 +185,9 @@ main (int argc, char * argv []) {
         } else if (strcmp(argv[arg], "-L") == 0) {
             thread_globals.allowLong = TRUE;
 
+        } else if (strcmp(argv[arg], "-l") == 0) {
+            thread_globals.minLength = atoi(argv[++arg]);
+
         } else if (strcmp(argv[arg], "-e") == 0) {
             thread_globals.erate = atof(argv[++arg]);
 
@@ -208,6 +211,12 @@ main (int argc, char * argv []) {
             else if (cutoff >= MAX_COV_HIST) {thread_globals.covCutoff = MAX_COV_HIST - 1; }
             else { thread_globals.covCutoff = cutoff; }
             fprintf(stderr, "The cutoff is set to be %d\n", thread_globals.covCutoff);
+
+        } else if (strcmp(argv[arg], "-CM") == 0){
+            int32 cutoff = atoi(argv[++arg]);
+            if (cutoff <= 0) { thread_globals.maxCoverage = 0; }
+            else if (cutoff >= MAX_COV_HIST) {thread_globals.maxCoverage = MAX_COV_HIST - 1; }
+            else { thread_globals.maxCoverage = cutoff; }
 
         } else if (strcmp(argv[arg], "-M") == 0) {
             int32 maxGap = atoi(argv[++arg]);
