@@ -154,6 +154,9 @@ void computeRepeatThreshold(PBRThreadGlobals &thread_globals, AS_IID firstFrag) 
         }
         delete[] covHist;
         thread_globals.covCutoff = MAX(thread_globals.covCutoff, MIN((int)(floor(mean*NUM_SD)), (int)(floor(mean + NUM_SD*sd))));
+        if (thread_globals.maxCoverage != 0 && thread_globals.covCutoff > thread_globals.maxCoverage) {
+           thread_globals.covCutoff = thread_globals.maxCoverage;
+        }
         if (thread_globals.verboseLevel >= VERBOSE_OFF) fprintf(stderr, "Picking cutoff as %d mean would be %f +- %f (%d)\n", thread_globals.covCutoff, mean, sd, (int)(ceil(mean + NUM_SD*sd)));
     }
 }

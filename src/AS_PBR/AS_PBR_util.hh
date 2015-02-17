@@ -124,6 +124,7 @@ struct PBRThreadGlobals {
 
    // read-only variables for thread
    uint16 covCutoff;
+   uint16 maxCoverage;
    uint16 maxUncorrectedGap;
 
    // read-only fragment information
@@ -192,7 +193,7 @@ static uint32 olapLengthOVL(OVSoverlap ovl, uint32 alen, uint32 blen) {
 
 static uint32 olapLengthOBT(OVSoverlap ovl, uint32 alen, uint32 blen) {
    uint32 aovl = ovl.dat.obt.a_end - ovl.dat.obt.a_beg;
-   uint32 bend = ovl.dat.obt.b_end_hi >> 9 | ovl.dat.obt.b_end_lo;
+   uint32 bend = ovl.dat.obt.b_end_hi << 9 | ovl.dat.obt.b_end_lo;
    uint32 bbgn = MIN(ovl.dat.obt.b_beg, bend);
    bend = MAX(ovl.dat.obt.b_beg, bend);
 

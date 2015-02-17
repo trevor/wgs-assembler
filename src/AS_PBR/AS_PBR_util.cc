@@ -107,20 +107,23 @@ void convertOverlapToPosition(const OVSoverlap& olap, SeqInterval &pos, SeqInter
 		   }
 		}
 	} else if (olap.dat.ovl.type == AS_OVS_TYPE_OBT) {
+		uint32 bend =  olap.dat.obt.b_end_hi << 9 | olap.dat.obt.b_end_lo;
 		if (forB) {
-			fprintf(stderr, "Error, OBT is not currently supported in this mode\n");
-			exit(1);
-		}
-	   pos.bgn = olap.dat.obt.a_beg;
-	   pos.end = olap.dat.obt.a_end;
+			pos.bgn = olap.dat.obt.b_beg;
+			pos.end = bend;
+			if (!olap.dat.obt.fwd) {
+				pos.bgn = bend;
+				pos.end = olap.dat.obt.b_beg;
+			}
+			bClr.bgn = olap.dat.obt.a_beg;
+			bClr.end = olap.dat.obt.a_end;	
+		} else {
+	   		pos.bgn = olap.dat.obt.a_beg;
+	   		pos.end = olap.dat.obt.a_end;
 
-	   if (!olap.dat.obt.fwd) {
-		  pos.bgn = olap.dat.obt.a_end;
-		  pos.end = olap.dat.obt.a_beg;
-	   }
-	   uint32 bend = olap.dat.obt.b_end_hi << 9 | olap.dat.obt.b_end_lo;
-	   bClr.bgn = MIN(olap.dat.obt.b_beg, bend);
-	   bClr.end = MAX(olap.dat.obt.b_beg, bend);
+	   		bClr.bgn = MIN(olap.dat.obt.b_beg, bend);
+	   		bClr.end = MAX(olap.dat.obt.b_beg, bend);
+		}
 	}
 
 	// update end points if necessary

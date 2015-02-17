@@ -584,6 +584,7 @@ void outputResults(PBRThreadGlobals *waGlobal, uint32 part, OUTPUT_TYPE outputTy
                          fprintf(outFile, "%d %s_%d_%d %s %d %d %d", iter->ident, waGlobal->libName, layRecord.iid, readSubID, "+", readLen, iter->position.bgn, iter->position.bgn + qlen);
                          fprintf(outFile, " %.*s %.*s\n", bClr.end - bClr.bgn, qseq+bClr.bgn, length, seq+iter->position.bgn); 
                        } else { 
+if (waGlobal->verboseLevel >= VERBOSE_DEBUG) fprintf(stderr, "Output match for %d %d of length %d. It matches %d-%d and %d-%d\n", layRecord.iid, iter->ident, length, iter->position.bgn, iter->position.end, bClr.bgn, bClr.end); 
                           fprintf(outFile, "%d %.*s\n", iter->ident, bClr.end - bClr.bgn, qseq+bClr.bgn);
                        }
                    } else {
