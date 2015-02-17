@@ -57,7 +57,7 @@ my $TAB_SIZE = 8;
 
 my %global;
 
-my @nonCAOptions = ("QV", "genomeSize", "shortReads", "longReads", "ovlMemory", "assemble", "assembleCoverage","mhapPrecompute", "mhap", "secret", "localStaging", "pbcns", "bankPath","libraryname", "specFile", "length", "coverageCutoff", "maxCoverage", "falconcns", "maxGap", "maxUncorrectedGap", "samFOFN", "blasr", "bowtie", "threads", "repeats", "fastqFile", "partitions", "submitToGrid", "sgeCorrection", "consensusConcurrency", "cleanup","asmOBT", "asmOvlErrorRate","asmUtgErrorRate","javaPath", "pythonPath", "asmCns", "asmMerSize", "asmCnsErrorRate","asmCgwErrorRate","asmObtErrorRate","asmObtErrorLimit");
+my @nonCAOptions = ("QV", "genomeSize", "shortReads", "longReads", "ovlMemory", "assemble", "assembleCoverage","sensitive","onlyContained", "mhapPrecompute", "mhapVersion", "mhap", "secret", "localStaging", "pbcns", "bankPath","libraryname", "specFile", "length", "coverageCutoff", "maxCoverage", "falconcns", "maxGap", "maxUncorrectedGap", "samFOFN", "blasr", "bowtie", "threads", "repeats", "fastqFile", "partitions", "submitToGrid", "sgeCorrection", "consensusConcurrency", "cleanup","asmOBT", "asmOvlErrorRate","asmUtgErrorRate","javaPath", "pythonPath", "asmCns", "asmMerSize", "asmCnsErrorRate","asmCgwErrorRate","asmObtErrorRate","asmObtErrorLimit");
 
 my $commandLineOptions = "";
 
@@ -255,8 +255,8 @@ sub setDefaults() {
     $global{"longReads"} = undef;
     $global{"QV"} = 54.5;
     $global{"libraryname"} = undef;
-    $global{"falconcns"} = 0;
-    $global{"pbcns"} = 1;
+    $global{"falconcns"} = 1;
+    $global{"pbcns"} = 0;
     $global{"bankPath"} = undef;
     $global{"specFile"} = undef;
     $global{"length"} = 500;
@@ -271,7 +271,10 @@ sub setDefaults() {
     $global{"samFOFN"} = undef;
     $global{"blasr"} = undef;
     $global{"bowtie"} = undef;
+    $global{"onlyContained"} = 0;
+    $global{"sensitive"} = 0;
     $global{"mhap"} = undef;
+    $global{"mhapVersion"} = "1.5b1";
     $global{"mhapPrecompute"} = 1;
     $global{"merSize"} = 16;
     $global{"doOverlapBasedTrimming"} = 0;  # should this be defaulted to true or false?
@@ -284,14 +287,14 @@ sub setDefaults() {
     $global{"assembleCoverage"} = 25;
     $global{"unitigger"} = "bogart";
     $global{"asmOvlErrorRate"} = 0.03;
-    $global{"asmUtgErrorRate"} = 0.013;
+    $global{"asmUtgErrorRate"} = 0.025;
     $global{"asmCgwErrorRate"} = 0.10;
     $global{"asmCnsErrorRate"} = 0.10;
     $global{"asmOBT"} = 1;
     $global{"utgGraphErrorLimit"} = 0;
-    $global{"utgGraphErrorRate"} = 0.013;
+    $global{"utgGraphErrorRate"} = 0.025;
     $global{"utgMergeErrorLimit"} = 0;
-    $global{"utgMergeErrorRate"} = 0.02;
+    $global{"utgMergeErrorRate"} = 0.025;
     $global{"asmObtErrorRate"} = 0.03;
     $global{"asmObtErrorLimit"} =4.5;
     $global{"doFragmentCorrection"}=1;
@@ -1009,9 +1012,6 @@ while (scalar(@cmdArgs) > 0) {
     } elsif ($arg eq "-longReads") {
         setGlobal("longReads", 1);
 
-    } elsif ($arg eq "-pbCNS") {
-        setGlobal("falconcns", 1);
-
     } elsif ($arg eq "-coverageCutoff") {
         setGlobal("coverageCutoff", shift @cmdArgs);
         if (getGlobal("coverageCutoff") < 0) { setGlobal("coverageCutoff", 0); }
@@ -1059,8 +1059,16 @@ while (scalar(@cmdArgs) > 0) {
     } elsif ($arg eq "-sgeCorrection") {
        setGlobal("sgeCorrection", shift @cmdArgs);
 
+    } elsif ($arg eq "-sensitive") {
+       setGlobal("sensitive", 1);
+
     } elsif ($arg eq "-noclean") {
        setGlobal("cleanup", 0);
+
+    } elsif ($arg eq "-pbCNS") {
+        print STDERR "Warning: parameter -pbCNS has been deprecated, it is the default behavior.\n";
+        setGlobal("falconcns", 1);
+        setGlobal("pbcns", 0);
     
     } else {
        print STDERR "Unknown parameter " + $err + "\n";
@@ -1122,7 +1130,11 @@ if ($limit - $MIN_FILES_WITHOUT_PARTITIONS <= $FILES_PER_PARTITION*getGlobal("pa
    print STDERR "Warning: file handle limit of $limit prevents using requested partitions. Reset partitions to " . getGlobal("partitions") . " and " . getGlobal("threads") . " threads. If you want more partitions, reset the limit using ulimit -Sn and try again.\n";
 }
 if (getGlobal("threads") > getGlobal("partitions")) {
-   setGlobal("threads", getGlobal("partitions") - 1);
+   my $nThreads = getGlobal("partitions") - 1;
+   if ($nThreads <= 0) {
+      $nThreads = 1;
+   }
+   setGlobal("threads", $nThreads);
    print STDERR "Warning: number of partitions should be > # threads. Adjusted threads to be ". getGlobal("threads") . "\n";
 }
 
@@ -1138,7 +1150,8 @@ my $AMOS = "$CA/../../../AMOS/bin/";
 my $BLASR = "$CA/../../../smrtanalysis/current/analysis/bin/";
 my $FALCON = "$CA/../../../FALCON-0.1.2/bin/";
 my $BOWTIE = "$CA/../../../bowtie2/";
-my $MHAP_OVL = "$CA/../lib/java/mhap-0.1-ob.jar";
+my $MHAP_VERSION = getGlobal("mhapVersion");
+my $MHAP_OVL = "$CA/../lib/java/mhap-$MHAP_VERSION.jar";
 my $JELLYFISH = "$CA/../../../jellyfish/bin/";
 my $wrk = makeAbsolute("");
 my $asm = "asm";
@@ -1439,6 +1452,10 @@ if (! -e "$wrk/temp$libraryname/$asm.toerase.out") {
 open(F, "cat $wrk/temp$libraryname/$asm.seedlength |awk '{print \$NF}' |") or die ("Couldn't open seed length file", undef);
 $seedLength = <F>;
 chomp $seedLength;
+
+if ($seedLength < getGlobal("merSize")) {
+   $seedLength = getGlobal("merSize")+1;
+}
 close(F);
 
 # compute the number of bases left after our filtering gateeeker to be corrected
@@ -1492,17 +1509,21 @@ if ($genomeSize != 0 && floor($totalCorrectingWith / $genomeSize) > $MAX_CORRECT
 }
 if ($genomeSize != 0 && defined(getGlobal("longReads")) && getGlobal("longReads") != 0 && ($totalCorrectingWith / $genomeSize) < $MIN_SELF_CORRECTION) {
    print STDERR "Warning: performing self-correction with a total of " .floor($totalCorrectingWith / $genomeSize) . ". For best performance, at least $MIN_SELF_CORRECTION is recommended.\n";
+   setGlobal("sensitive", 1);
 }
 
 if (defined($longReads) && $longReads == 1) {
    my $merSize = getGlobal("merSize");
+
+   if (defined(getGlobal("sensitive")) && getGlobal("sensitive") == 1){
+      setGlobal("falconcns", 0);
+      setGlobal("pbcns", 1);
+      setGlobal("mhap", "--weighted -k $merSize --num-hashes 768 --num-min-matches 2 --threshold 0.04 --filter-threshold 0.000005");
+   }
    if ( -e $MHAP_OVL && !defined(getGlobal("blasr"))) {
       if (!defined(getGlobal("mhap"))) {
          print STDERR "Warning: enabling MHAP overlapper to align long reads to long reads.\n";
-         setGlobal("mhap", "-k $merSize --num-hashes 512 --num-min-matches 3 --threshold 0.04");
-      }
-      if ($totalCorrectingWith > $MAX_TO_PRECOMPUTE) {
-         setGlobal("mhapPrecompute", undef);
+         setGlobal("mhap", "--weighted -k $merSize --num-hashes 512 --num-min-matches 3 --threshold 0.04 --filter-threshold 0.000005");
       }
       # check java version and stop if not found or too old
       if (defined(getGlobal("javaPath")) && ! -e $javaPath) {
@@ -1527,8 +1548,8 @@ if (defined($longReads) && $longReads == 1) {
             my $v = $vArray[2];
             $v =~ s/\"//g;
             @vArray = split '\.', $v;
-            if ($vArray[0] == 1 && $vArray[1] < 7) {
-               die "Error: java version 1.7 or newer is required for MHAP and found version $v. Please update and try again.\n";
+            if ($vArray[0] == 1 && $vArray[1] < 8) {
+               die "Error: java version 1.8 or newer is required for MHAP and found version $v. Please update and try again.\n";
             }
          }
       }
@@ -1557,7 +1578,7 @@ if (defined($longReads) && $longReads == 1) {
 }
 
 if (-e $MHAP_OVL && defined(getGlobal("mhap"))) {
-   $MHAP_OVL="\$bin/../lib/java/mhap-0.1-ob.jar";
+   $MHAP_OVL="\$bin/../lib/java/mhap-$MHAP_VERSION.jar";
 }
 
 my $cutoffSpecified = 0;
@@ -1608,8 +1629,8 @@ if (!defined(getGlobal("bowtie")) && $cutoffSpecified == 0 && !(defined(getGloba
 
 my $inMer = getGlobal("merSize");
 my $inFile = 0;
-if ( -e "$wrk/*.$inMer.ignore" ) {
-    my $inFile = `ls $wrk/*.$inMer.ignore |wc -l |awk '{print \$1}'`;
+if (glob("$wrk/*.$inMer.ignore" )) {
+    $inFile = `ls $wrk/*.$inMer.ignore |wc -l |awk '{print \$1}'`;
 }
 chomp $inFile;
 if ($inFile == 0 && !-e "$wrk/temp$libraryname/$asm.ignore" &&  -e "$JELLYFISH/jellyfish" && defined(getGlobal("mhap"))) {
@@ -1707,8 +1728,8 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
                   last;
                 }
             }
-            my $loadFactor = 5000;
-            if ($numHashes < 786) { $loadFactor = $loadFactor * 2; }
+            my $loadFactor = 12500;
+            if ($numHashes <= 786) { $loadFactor = $loadFactor * 2; }
             $ovlRefBlockSize = floor($memFactor * $loadFactor);
          }
          $ovlRefBlockLength = undef; 
@@ -2026,7 +2047,7 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
             print F "\$bin/gatekeeper -dumpfragments -tabular \$job $wrk/temp$libraryname/$asm.gkpStore |awk '{print \$1\"\\t\"\$2}' > $wrk/temp$libraryname/1-overlapper/\$name\$id.eidToIID\n";
             print F "\$bin/gatekeeper -dumpfragments -tabular \$job $wrk/temp$libraryname/$asm.gkpStore |awk '{print \$2\"\\t\"\$10}' > $wrk/temp$libraryname/1-overlapper/\$name\$id.iidToLen\n";
          } elsif (!defined(getGlobal("localStaging")) && defined(getGlobal("mhapPrecompute"))) {
-            print F "/usr/bin/time $javaPath -XX:+UseG1GC -server -Xmx" . $ovlMemory . "g -jar $MHAP_OVL FastAlignMain " . getGlobal("mhap") . " --min-store-length " . ($seedLength-1) . " --num-threads $ovlThreads" . " $ignore -p $wrkDir/temp$libraryname/1-overlapper/\$name\$id.fasta -q $wrkDir/temp$libraryname/1-overlapper/ > $wrk/temp$libraryname/1-overlapper/\$jobid.hash.err 2>&1\n";
+            print F "/usr/bin/time $javaPath -server -Xmx" . $ovlMemory . "g -jar $MHAP_OVL " . getGlobal("mhap") . " --min-store-length " . ($seedLength-1) . " --num-threads $ovlThreads" . " $ignore -p $wrkDir/temp$libraryname/1-overlapper/\$name\$id.fasta -q $wrkDir/temp$libraryname/1-overlapper/ > $wrk/temp$libraryname/1-overlapper/\$jobid.hash.err 2>&1\n";
             print F "rm -f $wrkDir/temp$libraryname/1-overlapper/\$name\$id.fasta\n";
          }
          # remove qual files they are not currently used
@@ -2245,8 +2266,14 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
          print F "      tail $wrk/temp$libraryname/1-overlapper/\$jobid.out && exit\n";
          print F "   fi\n";
       } elsif (defined(getGlobal("mhap"))) {
-         my $javaCmd = "/usr/bin/time $javaPath -server -Xmx" . $ovlMemory . "g -jar $MHAP_OVL FastAlignMain " . getGlobal("mhap") . " --min-store-length " . ($seedLength-1) . " --num-threads $ovlThreads" . " $ignore ";
-         my $convertCmd = "awk -v REF_OFFSET=\$refOffset -v OFFSET=\$hashStart '{if (\$5 == 0 && \$9 == 0) { ORI=\"N\"; } if (\$5 == 0 && \$9 == 1) { ORI=\"I\"; } if (\$8 <= \$12 && (\$7-\$6) / \$8 > 0.9) print \$1+OFFSET+REF_OFFSET\"\\t\"\$2+OFFSET\"\\t\"ORI\"\\t\"(-1*\$10)\"\\t\"(\$12-\$11)\"\\t\"\$3/5\"\\t\"\$3/5; else if (\$8 > \$12 && (\$11 - \$10) / \$12 > 0.9) print \$1+OFFSET+REF_OFFSET\"\\t\"\$2+OFFSET\"\\t\"ORI\"\\t\"\$6\"\\t\"(-1*(\$8-\$7))\"\\t\"\$3/5\"\\t\"\$3/5; }' | \$bin/convertOverlap -ovl > $wrk/temp$libraryname/1-overlapper/\$bat/\$job.ovb";
+         my $javaCmd = "/usr/bin/time $javaPath -server -Xmx" . $ovlMemory . "g -jar $MHAP_OVL " . getGlobal("mhap") . " --min-store-length " . ($seedLength-1) . " --num-threads $ovlThreads" . " $ignore ";
+         my $convertCmd = "";
+
+         if ((defined(getGlobal("onlyContained")) && getGlobal("onlyContained") == 1) || !defined($longReads) || $longReads == 0) {
+            $convertCmd = "awk -v REF_OFFSET=\$refOffset -v OFFSET=\$hashStart  '{if (\$5 == 0 && \$9 == 0) { ORI=\"N\"; } if (\$5 == 0 && \$9 == 1) { ORI=\"I\"; } if (\$8 <= \$12 && (\$7-\$6) / \$8 > 0.9) { if (ORI == \"N\") { print \$1+OFFSET+REF_OFFSET\"\\t\"\$2+OFFSET\"\\t\"ORI\"\\t\"(-1*\$10)\"\\t\"(\$12-\$11)\"\\t\"\$3/5\"\\t\"\$3/5; } else { print \$1+OFFSET+REF_OFFSET\"\\t\"\$2+OFFSET\"\\t\"ORI\"\\t\"(-1*(\$12-\$11))\"\\t\"\$10\"\\t\"\$3/5\"\\t\"\$3/5;} } else if (\$8 > \$12 && (\$11 - \$10) / \$12 > 0.9) { print \$1+OFFSET+REF_OFFSET\"\\t\"\$2+OFFSET\"\\t\"ORI\"\\t\"\$6\"\\t\"(-1*(\$8-\$7))\"\\t\"\$3/5\"\\t\"\$3/5; }}' | \$bin/convertOverlap -ovl > $wrk/temp$libraryname/1-overlapper/\$bat/\$job.ovb";
+        } else {
+           $convertCmd = "awk -v REF_OFFSET=\$refOffset -v OFFSET=\$hashStart  '{if (\$5 == 0 && \$9 == 0) {  print \$1+OFFSET+REF_OFFSET\"\\t\"\$2+OFFSET\"\\tf\\t\"\$6\"\\t\"\$7\"\\t\"\$10\"\\t\"\$11\"\\t\"\$3/5; } if (\$5 == 0 && \$9 == 1) { print \$1+OFFSET+REF_OFFSET\"\\t\"\$2+OFFSET\"\\tr\\t\"\$6\"\\t\"\$7\"\\t\"(\$11)\"\\t\"(\$10)\"\\t\"\$3/5; }}' | \$bin/convertOverlap -obt > $wrk/temp$libraryname/1-overlapper/\$bat/\$job.ovb";
+         }
          print F " startIndex=`perl -w -e \"use POSIX; print floor(\$start/$ovlRefBlockSize)\"`\n";
          print F " endIndex=`perl -w -e \"use POSIX; print ceil(\$end/$ovlRefBlockSize)\"`\n";
          if (defined(getGlobal("localStaging"))) {
@@ -2419,6 +2446,10 @@ if (! -e "$wrk/temp$libraryname/$asm.layout.success") {
    print F "   \$bin/correctPacBio \\\n";
    if (defined($longReads) && $longReads == 1) {
    print F "      -L \\\n";
+   print F "      -l $length \\\n";
+   if ((!defined(getGlobal("onlyContained")) || getGlobal("onlyContained") == 0) && $genomeSize != 0 && getGlobal("maxCoverage") != 0) {
+   print F "      -CM " . getGlobal("maxCoverage") . "\\\n";
+   }
    }
    print F "      -C $coverage \\\n";
    print F "      -M $maxUncorrectedGap \\\n";
@@ -2458,7 +2489,7 @@ if (! -e "$wrk/temp$libraryname/runPartition.sh") {
    if (defined(getGlobal("falconcns")) && getGlobal("falconcns") == 1) {
      setGlobal("pbcns", 0);
      $cnsType = " -consensus falcon -pythonPath $FALCON";
-     $coverage += 2;
+     #$coverage += 2;
    }
    my $falconcns = getGlobal("falconcns");
    my $pbcns = getGlobal("pbcns");
@@ -2517,7 +2548,7 @@ if (! -e "$wrk/temp$libraryname/runPartition.sh") {
    }
    print F "      -G $wrk/temp$libraryname/$asm.gkpStore \\\n";
    if (defined($falconcns) && $falconcns == 1) {
-   print F " 2> $wrk/temp$libraryname/\$jobid.lay.err | $FALCON/falcon_sense --max_n_read 500 --trim --min_idt 0.50 --output_multi --local_match_count_threshold 3 --min_cov $coverage --n_core $threads > $wrk/temp$libraryname/\$jobid.fasta  2> $wrk/temp$libraryname/\$jobid.cns.err\n";
+   print F " 2> $wrk/temp$libraryname/\$jobid.lay.err | $FALCON/falcon_sense --max_n_read 200 --min_idt 0.70 --output_multi --local_match_count_threshold 2 --min_cov $coverage --n_core $threads > $wrk/temp$libraryname/\$jobid.fasta  2> $wrk/temp$libraryname/\$jobid.cns.err\n";
    print F " if [ \$? -ge 0 ]; then\n";
    print F "   touch $wrk/temp$libraryname/\$jobid.success\n";
    print F " fi\n";
@@ -2770,65 +2801,75 @@ if (defined(getGlobal("assemble")) && getGlobal("assemble") == 1) {
 
       my $asmCoverage = getGlobal("assembleCoverage");
       my $totalToAsm = int $asmCoverage * $genomeSize;
-      runCommand("$wrk", "$CA/gatekeeper -T -F -o $libraryname.gkpStore $libraryname.frg");
       my $average = 0;
       my $total = 0;
-      open(F, "$CA/gatekeeper -dumpfragments -tabular $libraryname.gkpStore |") or die("Couldn't open gatekeeper store", undef);
+
+      open(F, "$CA/fastqAnalyze $libraryname.fastq -stats |head |") or die ("Couldn't open corrected sequences", undef);
       while (<F>) {
          s/^\s+//;
          s/\s+$//;
 
          my @array = split '\s+';
-         if ($array[9] >= $length) {
-            $average += $array[9];
-            $total++;
+         if ($array[0] eq "bases") {
+            $total = int($array[1]);
          }
-     }
+         if ($array[0] eq "average") {
+            $average = int($array[1]);
+         }
+      }
      close(F);
-     my $totalBP = $average;
-     $average /= $total;
-
-     # should use a formula, maybe 40% rounded to next 500
-     my $frgLen = 3000;
-     if ($average < $frgLen) {
-        $frgLen = $average / 2;
-     }
 
      if (defined(getGlobal("falconcns")) && getGlobal("falconcns") == 1) {
         setGlobal("asmUtgErrorRate", getGlobal("asmUtgErrorRate") * $FALCON_ERATE_ADJUST);
         setGlobal("utgGraphErrorRate", getGlobal("utgGraphErrorRate") * $FALCON_ERATE_ADJUST);
      }
 
-     my $ovlLen = 80;
-     print STDERR "Assembling with average $average and using ovl is $ovlLen\n";
-     runCommand("$wrk", "$CA/gatekeeper -dumpfrg -longestlength 0 $totalToAsm $libraryname.gkpStore > $libraryname.longest$asmCoverage.frg");
-     runCommand("$wrk", "$CA/gatekeeper -dumpfasta $wrk/$libraryname.longest$asmCoverage -longestlength 0 $totalToAsm $libraryname.gkpStore");
-     runCommand("$wrk", "cat $wrk/$libraryname.longest$asmCoverage.fasta |awk '{if (match(\$1, \">\")) { print \$1; } else { print \$0; } }' > tmp.fasta");
-     runCommand("$wrk", "mv tmp.fasta $wrk/$libraryname.longest$asmCoverage.fasta");
-     runCommand("$wrk", "rm -rf $libraryname.gkpStore*");
+     # should use a formula, maybe 40% rounded to next 500
+     my $frgLen = 3000;
+     my $ovlLen = 500;
+     my $batOptions = "-RS -NS -CS";
+     if ($average < $frgLen) {
+        $frgLen = $average / 2;
+        $ovlLen = $average / 6;
+        if ($ovlLen < 40) { $ovlLen = 40; }
+     }
+
+     print STDERR "Assembling with average $average (min frag $frgLen) and using ovl is $ovlLen\n";
+     if ($total > $totalToAsm) {
+        runCommand("$wrk", "ln -s $libraryname.fastq $libraryname.u.fastq");
+        runCommand("$wrk", "$CA/fastqSample -U -I $libraryname -O $libraryname.longest$asmCoverage -c $asmCoverage -g $genomeSize -max");
+        runCommand("$wrk", "mv $libraryname.longest$asmCoverage.u.fastq $libraryname.longest$asmCoverage.fastq");
+        runCommand("$wrk", "$CA/fastqToCA -libraryname $libraryname -technology pacbio-corrected -type sanger -reads $wrk/$libraryname.longest$asmCoverage.fastq > $wrk/$libraryname.longest$asmCoverage.frg");
+     } else {
+        runCommand("$wrk", "ln -s $libraryname.frg $libraryname.longest$asmCoverage.frg");
+        runCommand("$wrk", "ln -s $libraryname.fastq $libraryname.longest$asmCoverage.fastq");
+     }
+     my $ovlPartCmd = "";
+     my $ovlRefBlockSize    = getGlobal("ovlRefBlockSize");
+     my $ovlRefBlockLength  = getGlobal("ovlRefBlockLength");
+     if ($ovlRefBlockLength > 0) {
+        $ovlPartCmd = "ovlRefBlockLength=$ovlRefBlockLength ovlRefBlockSize=0";
+     } elsif ($ovlRefBlockSize > 0) {
+        $ovlPartCmd = "ovlRefBlockSize=$ovlRefBlockSize ovlRefBlockLength=0";
+     }
+     $cmd  =    "-s $specFile ";
+     $cmd .=    "-p $asm -d $libraryname $ovlPartCmd ";
+     $cmd .=    "useGrid=" .getGlobal("useGrid") . " scriptOnGrid=" . getGlobal("scriptOnGrid") . " unitigger=" . getGlobal("unitigger") . " ";
+     $cmd .=    "ovlErrorRate=" . getGlobal("asmOvlErrorRate") . " utgErrorRate=" . getGlobal("asmUtgErrorRate") . " cgwErrorRate=" . getGlobal("asmCgwErrorRate") . " cnsErrorRate=" . getGlobal("asmCnsErrorRate") . " ";
+     $cmd .=    "utgGraphErrorLimit=" . getGlobal("utgGraphErrorLimit") . " utgGraphErrorRate=" . getGlobal("utgGraphErrorRate") . " utgMergeErrorLimit=" . getGlobal("utgMergeErrorLimit") . " utgMergeErrorRate=" . getGlobal("utgMergeErrorRate") . " ";
+     $cmd .=    "frgCorrBatchSize=100000 doOverlapBasedTrimming=" . getGlobal("asmOBT") . " obtErrorRate=" . getGlobal("asmObtErrorRate") . " obtErrorLimit=" . getGlobal("asmObtErrorLimit") . " frgMinLen=$frgLen ovlMinLen=$ovlLen \"batOptions=$batOptions\" ";
+     $cmd .=    "consensus=" . getGlobal("asmCns") . " merSize=" . getGlobal("asmMerSize") . " cnsMaxCoverage=1 cnsReuseUnitigs=1 ";
+     $cmd .=    "sgeName=\"" . getGlobal("sgeName") . "\" " if defined(getGlobal("sgeName"));
+     $cmd .=    "sgePropagateHold=\"pBcR_$asm$sgeName\" ";
+     $cmd .=    " $libraryname.longest$asmCoverage.frg ";
 
      # don't assemble if we don't have enough data
      if ($totalBP < $MIN_COVERAGE_TO_ASM * $genomeSize) {
-        print STDERR "Error: after correction only " . ($totalBP / $genomeSize) . "X for genome $genomeSize. Not performing automated assembly\n";
+        print STDERR "Warning: after correction only " . ($totalBP / $genomeSize) . "X for genome $genomeSize. Not performing automated assembly. \n";
+        print STDERR "\tTo manually launch an assembly run: \n\n";
+        print STDERR "$CA/runCA $cmd";
+        print STDERR "\n\n";
      } else {
-        my $ovlPartCmd = "";
-        my $ovlRefBlockSize    = getGlobal("ovlRefBlockSize");
-        my $ovlRefBlockLength  = getGlobal("ovlRefBlockLength");
-        if ($ovlRefBlockLength > 0) {
-           $ovlPartCmd = "ovlRefBlockLength=$ovlRefBlockLength ovlRefBlockSize=0";
-        } elsif ($ovlRefBlockSize > 0) {
-           $ovlPartCmd = "ovlRefBlockSize=$ovlRefBlockSize ovlRefBlockLength=0";
-        }
-        $cmd  =    "-s $specFile ";
-        $cmd .=    "-p $asm -d $libraryname $ovlPartCmd ";
-        $cmd .=    "useGrid=" .getGlobal("useGrid") . " scriptOnGrid=" . getGlobal("scriptOnGrid") . " unitigger=" . getGlobal("unitigger") . " ";
-        $cmd .=    "ovlErrorRate=" . getGlobal("asmOvlErrorRate") . " utgErrorRate=" . getGlobal("asmUtgErrorRate") . " cgwErrorRate=" . getGlobal("asmCgwErrorRate") . " cnsErrorRate=" . getGlobal("asmCnsErrorRate") . " ";
-        $cmd .=    "utgGraphErrorLimit=" . getGlobal("utgGraphErrorLimit") . " utgGraphErrorRate=" . getGlobal("utgGraphErrorRate") . " utgMergeErrorLimit=" . getGlobal("utgMergeErrorLimit") . " utgMergeErrorRate=" . getGlobal("utgMergeErrorRate") . " ";
-        $cmd .=    "frgCorrBatchSize=100000 doOverlapBasedTrimming=" . getGlobal("asmOBT") . " obtErrorRate=" . getGlobal("asmObtErrorRate") . " obtErrorLimit=" . getGlobal("asmObtErrorLimit") . " frgMinLen=$frgLen ovlMinLen=$ovlLen ";
-        $cmd .=    "consensus=" . getGlobal("asmCns") . " merSize=" . getGlobal("asmMerSize") . " cnsMaxCoverage=1 cnsReuseUnitigs=1 ";
-        $cmd .=    "sgeName=\"" . getGlobal("sgeName") . "\" " if defined(getGlobal("sgeName"));
-        $cmd .=    "sgePropagateHold=\"pBcR_$asm$sgeName\" ";
-        $cmd .=    " $libraryname.longest$asmCoverage.frg ";
         if ($submitToGrid == 1) {
            submitRunCAHelper("$wrk", $asm, $cmd, "runCA_asm_$asm$sgeName", 0);
         } else {
