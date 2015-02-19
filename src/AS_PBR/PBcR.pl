@@ -2927,8 +2927,8 @@ if (defined(getGlobal("assemble")) && getGlobal("assemble") == 1) {
      $cmd .=    "utgGraphErrorLimit=" . getGlobal("utgGraphErrorLimit") . " utgGraphErrorRate=" . getGlobal("utgGraphErrorRate") . " utgMergeErrorLimit=" . getGlobal("utgMergeErrorLimit") . " utgMergeErrorRate=" . getGlobal("utgMergeErrorRate") . " ";
      $cmd .=    "frgCorrBatchSize=100000 doOverlapBasedTrimming=" . getGlobal("asmOBT") . " obtErrorRate=" . getGlobal("asmObtErrorRate") . " obtErrorLimit=" . getGlobal("asmObtErrorLimit") . " frgMinLen=$frgLen ovlMinLen=$ovlLen \"batOptions=$batOptions\" ";
      $cmd .=    "consensus=" . getGlobal("asmCns") . " merSize=" . getGlobal("asmMerSize") . " cnsMaxCoverage=1 cnsReuseUnitigs=1 ";
-     $cmd .=    "gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
-     $cmd .=    "gridPropagateHold=\"pBcR_$asm$gridName\" ";
+     $cmd .=    "gridJobName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
+     $cmd .=    "gridEnginePropagateHold=\"pBcR_$asm$gridName\" ";
      $cmd .=    " $libraryname.longest$asmCoverage.frg ";
 
      # don't assemble if we don't have enough data
