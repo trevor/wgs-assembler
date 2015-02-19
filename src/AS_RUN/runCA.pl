@@ -261,7 +261,7 @@ sub setGlobal ($$) {
         setGlobal("gridEngineHoldOption",         "-W depend=afterany:\"WAIT_TAG\"");
         setGlobal("gridEngineHoldOptionNoArray",  undef);
         setGlobal("gridEngineSyncOption",         "");
-        setGlobal("gridEngineNameOption",         "-N");
+        setGlobal("gridEngineNameOption",         "-d `pwd` -N");
         setGlobal("gridEngineArrayOption",        "-t ARRAY_JOBS");
         setGlobal("gridEngineArrayName",          "ARRAY_NAME\[ARRAY_JOBS\]");
         setGlobal("gridEngineOutputOption",       "-j oe -o");
