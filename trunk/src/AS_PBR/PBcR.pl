@@ -1748,8 +1748,8 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
       $cmd .=    "obtHashLibrary=$minCorrectLib-$maxCorrectLib ";
       $cmd .=    "obtRefLibrary=$minCorrectLib-$maxCorrectLib ";
       $cmd .=    "obtCheckLibrary=0 ";
-      $cmd .=    "gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
-      $cmd .=    "gridPropagateHold=\"pBcR_$asm$gridName\" "; 
+      $cmd .=    "gridJobName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
+      $cmd .=    "gridEnginePropagateHold=\"pBcR_$asm$gridName\" "; 
       $cmd .=    "stopAfter=overlapBasedTrimming";
       if ($submitToGrid == 1) {
          submitRunCA("$wrk/temp$libraryname", $asm, $cmd, "runCA_obt_$asm$gridName");
@@ -2489,8 +2489,8 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
    $cmd .=    "obtHashLibrary=$minCorrectLib-$maxCorrectLib ";
    $cmd .=    "obtRefLibrary=$minCorrectLib-$maxCorrectLib ";
    $cmd .=    "obtCheckLibrary=0 ";
-   $cmd .=    "gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
-   $cmd .=    "gridPropagateHold=\"pBcR_$asm$gridName\" "; 
+   $cmd .=    "gridJobName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
+   $cmd .=    "gridEnginePropagateHold=\"pBcR_$asm$gridName\" "; 
    $cmd .=    "stopAfter=overlapper";
    if ($submitToGrid == 1) {
       submitRunCA("$wrk/temp$libraryname", $asm, $cmd, "runCA_ovl_$asm$gridName");      
