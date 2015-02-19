@@ -257,7 +257,7 @@ sub setGlobal ($$) {
     }
 
     if (($var eq "gridEngine") && ($val eq "PBS")) {
-        setGlobal("gridEngineSubmitCommand",      "/usr/local/bin/qsub");
+        setGlobal("gridEngineSubmitCommand",      "qsub");
         setGlobal("gridEngineHoldOption",         "-W depend=afterany:\"WAIT_TAG\"");
         setGlobal("gridEngineHoldOptionNoArray",  undef);
         setGlobal("gridEngineSyncOption",         "");
@@ -265,7 +265,7 @@ sub setGlobal ($$) {
         setGlobal("gridEngineArrayOption",        "-t ARRAY_JOBS");
         setGlobal("gridEngineArrayName",          "ARRAY_NAME\[ARRAY_JOBS\]");
         setGlobal("gridEngineOutputOption",       "-j oe -o");
-        setGlobal("gridEnginePropagateCommand",   "/usr/local/bin/qalter -W depend=afterany:\"WAIT_TAG\"");
+        setGlobal("gridEnginePropagateCommand",   "qalter -W depend=afterany:\"WAIT_TAG\"");
         setGlobal("gridEngineNameToJobIDCommand", undef);
         setGlobal("gridEngineNameToJobIDCommandNoArray", undef);
         setGlobal("gridEngineTaskID",             "PBS_TASKNUM");
