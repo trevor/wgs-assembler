@@ -81,23 +81,22 @@ alignLinker(char           *alignA,
   int32 lenA = strlen(stringA);
   int32 lenB = strlen(stringB);
 
-  memset(a, 0, sizeof(alignLinker_s));
-
-  dpActions  ACT;
-
-  uint32     SCO[4][AS_READ_MAX_NORMAL_LEN * 2];
-
-  memset(SCO, 0, sizeof(uint32) * AS_READ_MAX_NORMAL_LEN * 2);
-
-  uint32    *lastCol = SCO[0];
-  uint32    *thisCol = SCO[1];
-  uint32    *iFinal  = SCO[2];
-  uint32    *jFinal  = SCO[3];
-
   if ((lenA > AS_READ_MAX_NORMAL_LEN) || (lenB > AS_READ_MAX_NORMAL_LEN)) {
     fprintf(stderr, "alignLinker()-- Reads too long.  %d or %d > %d\n", lenA, lenB, AS_READ_MAX_NORMAL_LEN);
     return;
   }
+
+  memset(a, 0, sizeof(alignLinker_s));
+
+  dpActions  ACT;
+  uint32    *SCOspace = new uint32 [4 * AS_READ_MAX_NORMAL_LEN * 2];
+
+  memset(SCOspace, 0, sizeof(uint32) * AS_READ_MAX_NORMAL_LEN * 2);
+
+  uint32    *lastCol = SCOspace + 0 * AS_READ_MAX_NORMAL_LEN * 2;
+  uint32    *thisCol = SCOspace + 1 * AS_READ_MAX_NORMAL_LEN * 2;
+  uint32    *iFinal  = SCOspace + 2 * AS_READ_MAX_NORMAL_LEN * 2;
+  uint32    *jFinal  = SCOspace + 3 * AS_READ_MAX_NORMAL_LEN * 2;
 
   //  Definition of the box we want to do dynamic programming in.
   int32 ibgn = 1;
@@ -283,6 +282,13 @@ alignLinker(char           *alignA,
     //  Not sure what this is for.
     //M[endI][endJ].score = 0;
   }
+
+  delete [] SCOspace;
+
+  lastCol = NULL;
+  thisCol = NULL;
+  iFinal  = NULL;
+  jFinal  = NULL;
 
   //fprintf(stderr, "FINAL  curI %u curJ %u\n", curI, curJ);
 
