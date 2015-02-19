@@ -130,7 +130,7 @@ sub setGlobal ($$) {
         setGlobal("gridEngineHoldOption",         "-W depend=afterany:\"WAIT_TAG\"");
         setGlobal("gridEngineHoldOptionNoArray",  undef);
         setGlobal("gridEngineSyncOption",         "");
-        setGlobal("gridEngineNameOption",         "-N");
+        setGlobal("gridEngineNameOption",         "-d `pwd` -N");
         setGlobal("gridEngineArrayOption",        "-t ARRAY_JOBS");
         setGlobal("gridEngineArrayName",          "ARRAY_NAME\[ARRAY_JOBS\]");
         setGlobal("gridEngineOutputOption",       "-j oe -o");
@@ -1534,6 +1534,24 @@ if (defined(getGlobal("longReads")) && getGlobal("longReads") != 0) {
    $totalCorrectingWith = $totalInputBP;
 }
 
+# since gkpStore loses the info on deleted fragments, pull it back up to make sure we got all bases for coverages
+if ( ! -e "$wrk/temp$libraryname/$asm.totalInputBP") {
+   open(F, "> $wrk/temp$libraryname/$asm.totalInputBP");
+   printf(F "%d\t%d\n", $totalCorrectingWith, $totalInputBP);
+   close(F);
+} else {
+   open(F, "<  $wrk/temp$libraryname/$asm.totalInputBP");
+   while (<F>) {
+      s/^\s+//;
+      s/\s+$//;
+
+      my @array = split '\s+';
+      $totalCorrectingWith = int($array[0]);
+      $totalInputBP = int($array[1]);
+   }
+   close(F); 
+} 
+
 # check that we have good data
 if ($genomeSize != 0) {
     print STDERR "Running with " . ($totalBP / $genomeSize) . "X (for genome size $genomeSize) of $libraryname sequences ($totalBP bp).\n";
@@ -2854,7 +2872,7 @@ if (defined(getGlobal("assemble")) && getGlobal("assemble") == 1) {
       my $average = 0;
       my $total = 0;
 
-      open(F, "$CA/fastqAnalyze $libraryname.fastq -stats |head |") or die ("Couldn't open corrected sequences", undef);
+      open(F, "$CA/fastqAnalyze $libraryname.fastq -stats 2>/dev/null |head |") or die ("Couldn't open corrected sequences", undef);
       while (<F>) {
          s/^\s+//;
          s/\s+$//;
