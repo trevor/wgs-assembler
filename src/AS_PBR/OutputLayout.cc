@@ -81,6 +81,7 @@ main (int argc, char * argv []) {
     // initialize default parameters
     thread_globals.globalRepeats     = TRUE;
     thread_globals.minLength         = 500;
+    thread_globals.maxCoverage = 0;
     thread_globals.maxUncorrectedGap = 0;
     thread_globals.hasMates                     = false;
     thread_globals.verboseLevel 			  = VERBOSE_OFF;

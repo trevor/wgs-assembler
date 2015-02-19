@@ -143,6 +143,8 @@ main (int argc, char * argv []) {
 
     // initialize default parameters
     thread_globals.numThreads        = 2;
+    thread_globals.minLength	     = 0;
+    thread_globals.maxCoverage = 0;
     thread_globals.maxErate          = 0.25;
     thread_globals.erate             = 0.15;
     thread_globals.elimit            = 4.5;
