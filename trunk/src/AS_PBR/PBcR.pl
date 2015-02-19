@@ -57,7 +57,7 @@ my $TAB_SIZE = 8;
 
 my %global;
 
-my @nonCAOptions = ("QV", "genomeSize", "shortReads", "longReads", "ovlMemory", "assemble", "assembleCoverage","sensitive","onlyContained", "mhapPrecompute", "mhapVersion", "mhap", "secret", "localStaging", "pbcns", "bankPath","libraryname", "specFile", "length", "coverageCutoff", "maxCoverage", "falconcns", "maxGap", "maxUncorrectedGap", "samFOFN", "blasr", "bowtie", "threads", "repeats", "fastqFile", "partitions", "submitToGrid", "sgeCorrection", "consensusConcurrency", "cleanup","asmOBT", "asmOvlErrorRate","asmUtgErrorRate","javaPath", "pythonPath", "asmCns", "asmMerSize", "asmCnsErrorRate","asmCgwErrorRate","asmObtErrorRate","asmObtErrorLimit");
+my @nonCAOptions = ("QV", "genomeSize", "shortReads", "longReads", "ovlMemory", "assemble", "assembleCoverage","sensitive","onlyContained", "mhapPrecompute", "mhapVersion", "mhap", "secret", "localStaging", "pbcns", "bankPath","libraryname", "specFile", "length", "coverageCutoff", "maxCoverage", "falconcns", "maxGap", "maxUncorrectedGap", "samFOFN", "blasr", "bowtie", "threads", "repeats", "fastqFile", "partitions", "submitToGrid", "gridOptionsCorrection", "consensusConcurrency", "cleanup","asmOBT", "asmOvlErrorRate","asmUtgErrorRate","javaPath", "pythonPath", "asmCns", "asmMerSize", "asmCnsErrorRate","asmCgwErrorRate","asmObtErrorRate","asmObtErrorLimit");
 
 my $commandLineOptions = "";
 
@@ -77,6 +77,38 @@ sub setGlobal ($$) {
 
     $val = undef  if ($val eq "");
 
+    #  CA 8.3 added support for LSF, and renamed the grid* options to 'gridEngine', and the sge*
+    #  options to 'grid'.
+
+    $var = "gridEngine"                    if ($var eq "gridEngine");  #  This one didn't change, but left here for completeness
+    $var = "gridEngineSubmitCommand"       if ($var eq "gridSubmitCommand");
+    $var = "gridEngineHoldOption"          if ($var eq "gridHoldOption");
+    $var = "gridEngineHoldOptionNoArray"   if ($var eq "gridHoldOptionNoArray");
+    $var = "gridEngineSyncOption"          if ($var eq "gridSyncOption");
+    $var = "gridEngineNameOption"          if ($var eq "gridNameOption");
+    $var = "gridEngineArrayOption"         if ($var eq "gridArrayOption");
+    $var = "gridEngineArrayName"           if ($var eq "gridArrayName");
+    $var = "gridEngineOutputOption"        if ($var eq "gridOutputOption");
+    $var = "gridEnginePropagateCommand"    if ($var eq "gridPropagateCommand");
+    $var = "gridEngineNameToJobIDCommand"  if ($var eq "gridNameToJobIDCommand");
+    $var = "gridEngineTaskID"              if ($var eq "gridTaskID");
+    $var = "gridEngineArraySubmitID"       if ($var eq "gridArraySubmitID");
+    $var = "gridEngineJobID"               if ($var eq "gridJobID");
+
+    $var = "gridOptions"                   if ($var eq "sge");
+    $var = "gridJobName"                   if ($var eq "sgeName");
+    $var = "gridOptionsScript"             if ($var eq "sgeScript");
+    $var = "gridOptionsMerTrim"            if ($var eq "sgeMerTrim");
+    $var = "gridOptionsOverlap"            if ($var eq "sgeOverlap");
+    $var = "gridOptionsMerOverlapSeed"     if ($var eq "sgeMerOverlapSeed");
+    $var = "gridOptionsMerOverlapExtend"   if ($var eq "sgeMerOverlapExtend");
+    $var = "gridOptionsConsensus"          if ($var eq "sgeConsensus");
+    $var = "gridOptionsFragmentCorrection" if ($var eq "sgeFragmentCorrection");
+    $var = "gridOptionsOverlapCorrection"  if ($var eq "sgeOverlapCorrection");
+
+    $var = "gridOptionsCorrection"         if ($var eq "sgeCorrection");
+
+
     $global{$var} = $val;
     $val =~ s/\\\"/\"/g;
     $val =~ s/\"/\\\"/g;
@@ -92,38 +124,56 @@ sub setGlobal ($$) {
        setGlobal("cnsErrorRate", $val);
        setGlobal("ovlErrorRate", $val);
     }
+
+    if (($var eq "gridEngine") && ($val eq "PBS")) {
+        setGlobal("gridEngineSubmitCommand",      "qsub");
+        setGlobal("gridEngineHoldOption",         "-W depend=afterany:\"WAIT_TAG\"");
+        setGlobal("gridEngineHoldOptionNoArray",  undef);
+        setGlobal("gridEngineSyncOption",         "");
+        setGlobal("gridEngineNameOption",         "-N");
+        setGlobal("gridEngineArrayOption",        "-t ARRAY_JOBS");
+        setGlobal("gridEngineArrayName",          "ARRAY_NAME\[ARRAY_JOBS\]");
+        setGlobal("gridEngineOutputOption",       "-j oe -o");
+        setGlobal("gridEnginePropagateCommand",   "qalter -W depend=afterany:\"WAIT_TAG\"");
+        setGlobal("gridEngineNameToJobIDCommand", undef);
+        setGlobal("gridEngineNameToJobIDCommandNoArray", undef);
+        setGlobal("gridEngineTaskID",             "PBS_TASKNUM");
+        setGlobal("gridEngineArraySubmitID",      "\\\$PBS_TASKNUM");
+        setGlobal("gridEngineJobID",              "PBS_JOBID");
+    }
+
     if (($var eq "gridEngine") && ($val eq "SGE")) {
-        setGlobal("gridSubmitCommand",      "qsub");
-        setGlobal("gridHoldOption",         "-hold_jid \"WAIT_TAG\"");
-        setGlobal("gridHoldOptionNoArray",  undef);
-        setGlobal("gridSyncOption",         "-sync y");
-        setGlobal("gridNameOption",         "-cwd -N");
-        setGlobal("gridArrayOption",        "-t ARRAY_JOBS");
-        setGlobal("gridArrayName",          "ARRAY_NAME");
-        setGlobal("gridOutputOption",       "-j y -o");
-        setGlobal("gridPropagateCommand",   "qalter -hold_jid \"WAIT_TAG\"");
-        setGlobal("gridNameToJobIDCommand", undef);
-        setGlobal("gridNameToJobIDCommandNoArray", undef);
-        setGlobal("gridTaskID",             "SGE_TASK_ID");
-        setGlobal("gridArraySubmitID",      "\\\$TASK_ID");
-        setGlobal("gridJobID",              "JOB_ID");
+        setGlobal("gridEngineSubmitCommand",      "qsub");
+        setGlobal("gridEngineHoldOption",         "-hold_jid \"WAIT_TAG\"");
+        setGlobal("gridEngineHoldOptionNoArray",  undef);
+        setGlobal("gridEngineSyncOption",         "-sync y");
+        setGlobal("gridEngineNameOption",         "-cwd -N");
+        setGlobal("gridEngineArrayOption",        "-t ARRAY_JOBS");
+        setGlobal("gridEngineArrayName",          "ARRAY_NAME");
+        setGlobal("gridEngineOutputOption",       "-j y -o");
+        setGlobal("gridEnginePropagateCommand",   "qalter -hold_jid \"WAIT_TAG\"");
+        setGlobal("gridEngineNameToJobIDCommand", undef);
+        setGlobal("gridEngineNameToJobIDCommandNoArray", undef);
+        setGlobal("gridEngineTaskID",             "SGE_TASK_ID");
+        setGlobal("gridEngineArraySubmitID",      "\\\$TASK_ID");
+        setGlobal("gridEngineJobID",              "JOB_ID");
     }
 
     if (($var eq "gridEngine") && ($val eq "LSF")) {
-        setGlobal("gridSubmitCommand",      "bsub");
-        setGlobal("gridHoldOption",         "-w \"numended\(\"WAIT_TAG\", \*\)\"");
-        setGlobal("gridHoldOptionNoArray",  "-w \"done\(\"WAIT_TAG\"\)\"");
-        setGlobal("gridSyncOption",         "-K");
-        setGlobal("gridNameOption",         "-J");
-        setGlobal("gridArrayOption",        "");
-        setGlobal("gridArrayName",          "ARRAY_NAME\[ARRAY_JOBS\]");
-        setGlobal("gridOutputOption",       "-o");
-        setGlobal("gridPropagateCommand",   "bmodify -w \"done\(\"WAIT_TAG\"\)\"");
-        setGlobal("gridNameToJobIDCommand", "bjobs -A -J \"WAIT_TAG\" | grep -v JOBID");
-        setGlobal("gridNameToJobIDCommandNoArray", "bjobs -J \"WAIT_TAG\" | grep -v JOBID");
-        setGlobal("gridTaskID",             "LSB_JOBINDEX");
-        setGlobal("gridArraySubmitID",      "%I");
-        setGlobal("gridJobID",              "LSB_JOBID");
+        setGlobal("gridEngineSubmitCommand",      "bsub");
+        setGlobal("gridEngineHoldOption",         "-w \"numended\(\"WAIT_TAG\", \*\)\"");
+        setGlobal("gridEngineHoldOptionNoArray",  "-w \"done\(\"WAIT_TAG\"\)\"");
+        setGlobal("gridEngineSyncOption",         "-K");
+        setGlobal("gridEngineNameOption",         "-J");
+        setGlobal("gridEngineArrayOption",        "");
+        setGlobal("gridEngineArrayName",          "ARRAY_NAME\[ARRAY_JOBS\]");
+        setGlobal("gridEngineOutputOption",       "-o");
+        setGlobal("gridEnginePropagateCommand",   "bmodify -w \"done\(\"WAIT_TAG\"\)\"");
+        setGlobal("gridEngineNameToJobIDCommand", "bjobs -A -J \"WAIT_TAG\" | grep -v JOBID");
+        setGlobal("gridEngineNameToJobIDCommandNoArray", "bjobs -J \"WAIT_TAG\" | grep -v JOBID");
+        setGlobal("gridEngineTaskID",             "LSB_JOBINDEX");
+        setGlobal("gridEngineArraySubmitID",      "%I");
+        setGlobal("gridEngineJobID",              "LSB_JOBID");
     }
 
     # legacy support
@@ -226,18 +276,18 @@ sub initializeLocalSystem() {
 
 sub setDefaults() {
     # grid submission options, duplicate of runCA
-    $global{"gridSubmitCommand"}		   = "qsub";
-    $global{"gridHoldOption"}		       = "-hold_jid \"WAIT_TAG\""; # for lsf it is -w "done("WAIT_TAG")"
-    $global{"gridSyncOption"}			   = "-sync y"; # for lsf it is -K
-    $global{"gridNameOption"}			   = "-cwd -N";         # for lsf it is -J
-    $global{"gridArrayOption"}			   = "-t ARRAY_JOBS";	# for lsf, empty ("")
-    $global{"gridArrayName"}			   = "ARRAY_NAME";		# for lsf, it is ARRAY_NAME[ARRAY_JOBS]
-    $global{"gridOutputOption"}			   = "-j y -o";         # for lsf, it is -o
-    $global{"gridPropagateCommand"}		   = "qalter -hold_jid \"WAIT_TAG\""; # for lsf it is bmodify -w "done(WAIT_TAG)"
-    $global{"gridNameToJobIDCommand"}      = undef;             # for lsf it is bjobs -J "WAIT_TAG" | grep -v JOBID    
-    $global{"gridTaskID"}				   = "SGE_TASK_ID";     # for lsf it is LSB_JOBINDEX
-    $global{"gridJobID"}		   = "JOB_ID";
-    $global{"gridArraySubmitID"}           = "\$TASK_ID";       # for lsf it is %I
+    $global{"gridEngineSubmitCommand"}		   = "qsub";
+    $global{"gridEngineHoldOption"}		       = "-hold_jid \"WAIT_TAG\""; # for lsf it is -w "done("WAIT_TAG")"
+    $global{"gridEngineSyncOption"}			   = "-sync y"; # for lsf it is -K
+    $global{"gridEngineNameOption"}			   = "-cwd -N";         # for lsf it is -J
+    $global{"gridEngineArrayOption"}			   = "-t ARRAY_JOBS";	# for lsf, empty ("")
+    $global{"gridEngineArrayName"}			   = "ARRAY_NAME";		# for lsf, it is ARRAY_NAME[ARRAY_JOBS]
+    $global{"gridEngineOutputOption"}			   = "-j y -o";         # for lsf, it is -o
+    $global{"gridEnginePropagateCommand"}		   = "qalter -hold_jid \"WAIT_TAG\""; # for lsf it is bmodify -w "done(WAIT_TAG)"
+    $global{"gridEngineNameToJobIDCommand"}      = undef;             # for lsf it is bjobs -J "WAIT_TAG" | grep -v JOBID    
+    $global{"gridEngineTaskID"}				   = "SGE_TASK_ID";     # for lsf it is LSB_JOBINDEX
+    $global{"gridEngineJobID"}		   = "JOB_ID";
+    $global{"gridEngineArraySubmitID"}           = "\$TASK_ID";       # for lsf it is %I
     
     $global{"shell"}                       = "/bin/bash";
 	
@@ -303,11 +353,11 @@ sub setDefaults() {
     # default thread jobs/grid params based on system
     $global{"partitions"} = 200;
     $global{"submitToGrid"} = 0;
-    $global{"sge"} = undef;
-    $global{"sgeCorrection"} = "-pe threads 16 -l mem=2GB";
-    $global{"sgeOverlap"} = "-pe threads 16 -l mem=2GB";
-    $global{"sgeConsensus"} = "-pe threads 16";
-    $global{"sgeScript"} = "-pe threads 1";
+    $global{"gridOptions"} = undef;
+    $global{"gridOptionsCorrection"} = "-pe threads 16 -l mem=2GB";
+    $global{"gridOptionsOverlap"} = "-pe threads 16 -l mem=2GB";
+    $global{"gridOptionsConsensus"} = "-pe threads 16";
+    $global{"gridOptionsScript"} = "-pe threads 1";
     $global{"useGrid"} = 0;
     $global{"scriptOnGrid"} = 0;
 
@@ -624,7 +674,7 @@ sub schedulerFinish {
 #  Functions for running jobs on grid
 
 sub runningOnGrid () {
-	my $taskID = getGlobal("gridJobID");
+	my $taskID = getGlobal("gridEngineJobID");
     return(defined($ENV{$taskID}));
 }
 
@@ -653,13 +703,13 @@ sub buildGridArray($$$) {
 sub getGridArrayName($$) {
 	my $name = shift @_;
 	my $maxLimit = shift @_;	
-	return buildGridArray($name, $maxLimit, "gridArrayName");
+	return buildGridArray($name, $maxLimit, "gridEngineArrayName");
 }
 
 sub getGridArrayOption($$) {
 	my $name = shift @_;
 	my $maxLimit = shift @_;	
-	return buildGridArray($name, $maxLimit, "gridArrayOption");	
+	return buildGridArray($name, $maxLimit, "gridEngineArrayOption");	
 }
 
 sub writeScriptHeader($$$$$) {
@@ -701,32 +751,32 @@ sub submit($$$$$) {
     my $prefix = shift @_;
     my $waitTag = shift @_;
 
-    my $sge         = getGlobal("sge");
-    my $sgeScript   = getGlobal("sgeScript");
-    my $sgePropHold = getGlobal("sgePropagateHold");
+    my $grid         = getGlobal("gridOptions");
+    my $gridScript   = getGlobal("gridOptionsScript");
+    my $gridPropHold = getGlobal("gridEnginePropagateHold");
 
-    my $submitCommand        = getGlobal("gridSubmitCommand");
-    my $holdOption           = getGlobal("gridHoldOption");
-    my $nameOption           = getGlobal("gridNameOption");
-    my $outputOption         = getGlobal("gridOutputOption");
-    my $holdPropagateCommand = getGlobal("gridPropagateCommand");
+    my $submitCommand        = getGlobal("gridEngineSubmitCommand");
+    my $holdOption           = getGlobal("gridEngineHoldOption");
+    my $nameOption           = getGlobal("gridEngineNameOption");
+    my $outputOption         = getGlobal("gridEngineOutputOption");
+    my $holdPropagateCommand = getGlobal("gridEnginePropagateCommand");
 
     my $jobName = $prefix;
     if (defined($waitTag)) {
        my $hold = $holdOption;
-       if (getGlobal("gridEngine") eq "LSF"){
-          my $tcmd = getGlobal("gridNameToJobIDCommand");
+       if (getGlobal("gridEngineEngine") eq "LSF"){
+          my $tcmd = getGlobal("gridEngineNameToJobIDCommand");
           $tcmd =~ s/WAIT_TAG/$waitTag/g;
           my $propJobCount = `$tcmd |wc -l`;
           chomp $propJobCount;
           if ($propJobCount == 0) {
-             $tcmd = getGlobal("gridNameToJobIDCommandNoArray");
+             $tcmd = getGlobal("gridEngineNameToJobIDCommandNoArray");
              $tcmd =~ s/WAIT_TAG/$waitTag/g;
-             $hold = getGlobal("gridHoldOptionNoArray");
+             $hold = getGlobal("gridEngineHoldOptionNoArray");
              $propJobCount = `$tcmd |wc -l`;
           }
           if ($propJobCount != 1) {
-             print STDERR "Warning: multiple IDs for job $sgePropHold got $propJobCount and should have been 1.\n";
+             print STDERR "Warning: multiple IDs for job $gridPropHold got $propJobCount and should have been 1.\n";
           }
           my $jobID = `$tcmd |tail -n 1 |awk '{print \$1}'`;
           chomp $jobID;
@@ -737,26 +787,26 @@ sub submit($$$$$) {
        $waitTag = $hold;
     }
 
-    my $qcmd = "$submitCommand $sge $sgeScript $nameOption \"$jobName\" $waitTag $outputOption $output $script";
+    my $qcmd = "$submitCommand $grid $gridScript $nameOption \"$jobName\" $waitTag $outputOption $output $script";
     runCommand($wrk, $qcmd) and caFailure("Failed to submit script.\n");
 
-    if (defined($sgePropHold)) {
+    if (defined($gridPropHold)) {
 	if (defined($holdPropagateCommand)) {
-           my $translateCmd = getGlobal("gridNameToJobIDCommandNoArray");
+           my $translateCmd = getGlobal("gridEngineNameToJobIDCommandNoArray");
            
            # translate hold option to job id if necessar
            if (defined($translateCmd) && $translateCmd ne "") {
               my $tcmd = $translateCmd;
-              $tcmd =~ s/WAIT_TAG/$sgePropHold/g;
+              $tcmd =~ s/WAIT_TAG/$gridPropHold/g;
               my $propJobCount = `$tcmd |wc -l`;
               chomp $propJobCount;
               if ($propJobCount != 1) {
-                 print STDERR "Warning: multiple IDs for job $sgePropHold got $propJobCount and should have been 1.\n";
+                 print STDERR "Warning: multiple IDs for job $gridPropHold got $propJobCount and should have been 1.\n";
               }
               #my $jobID = `$tcmd |head -n 1 |awk '{print \$1}'`;
               #chomp $jobID;
-              #print STDERR "Translated job ID $sgePropHold to be job $jobID\n";
-              #$sgePropHold = $jobID;
+              #print STDERR "Translated job ID $gridPropHold to be job $jobID\n";
+              #$gridPropHold = $jobID;
               open(PROPS, "$tcmd |awk '{print \$1}' | ") or die("Couldn't get list of jobs that need to hold", undef);
               
               # now we can get the job we are holding for
@@ -769,7 +819,7 @@ sub submit($$$$$) {
               }
               #$jobID = `$tcmd |head -n 1 |awk '{print \$1}'`;
               #chomp $jobID;
-              #print STDERR "Translated job ID $sgePropHold to be job $jobID\n";
+              #print STDERR "Translated job ID $gridPropHold to be job $jobID\n";
               #$jobName = $jobID;
               open(HOLDS, "$tcmd |awk '{print \$1}' | ") or die("Couldn't get list of jobs that should be held for", undef);
               
@@ -788,13 +838,13 @@ sub submit($$$$$) {
               close(HOLDS);
               close(PROPS);                
            } else {
-              $sgePropHold = "\"$sgePropHold\"";
+              $gridPropHold = "\"$gridPropHold\"";
               $holdPropagateCommand =~ s/WAIT_TAG/$jobName/g;
-              my $acmd = "$holdPropagateCommand $sgePropHold";
-              system($acmd) and print STDERR "WARNING: Failed to reset hold_jid trigger on '$sgePropHold'.\n";
+              my $acmd = "$holdPropagateCommand $gridPropHold";
+              system($acmd) and print STDERR "WARNING: Failed to reset hold_jid trigger on '$gridPropHold'.\n";
            }
 		} else {
-			print STDERR "WARNING: Failed to reset hold '$sgePropHold', not supported on current grid environment.\n";
+			print STDERR "WARNING: Failed to reset hold '$gridPropHold', not supported on current grid environment.\n";
 		}
     }
 }
@@ -806,14 +856,14 @@ sub submitScript ($$$) {
     my $libraryname = "temp" . getGlobal("libraryname");
 
     $wrk =~ s/$libraryname//g;
-    my $sgeName     = getGlobal("sgeName");
-    $sgeName = "_$sgeName"              if (defined($sgeName));
+    my $gridName     = getGlobal("gridJobName");
+    $gridName = "_$gridName"              if (defined($gridName));
 
     return if (getGlobal("scriptOnGrid") == 0);
     my $output = findNextScriptOutputFile("$wrk/$libraryname", "runPBcR.sge.out");
     my $script = "$output.sh";
     writeScriptHeader($wrk, $asm, $script, "PBcR", $commandLineOptions);
-    submit($wrk, $script, $output, "pBcR_$asm$sgeName", $waitTag);
+    submit($wrk, $script, $output, "pBcR_$asm$gridName", $waitTag);
 
     exit(0);
 }
@@ -821,14 +871,14 @@ sub submitScript ($$$) {
 sub submitBatchJobs($$$$) {
    my $wrk = shift @_;
    my $asm = shift @_;
-   my $SGE = shift @_;
-   my $TAG = shift @_;
+   my $cmd = shift @_;
+   my $tag = shift @_;
 
    if (getGlobal("scriptOnGrid")) {
-       runCommand($wrk, $SGE) and die("Failed to submit batch jobs.");
-       submitScript($wrk, $asm, $TAG);
+       runCommand($wrk, $cmd) and die("Failed to submit batch jobs.");
+       submitScript($wrk, $asm, $tag);
    } else {
-       print "Please execute:\n$SGE\n";
+       print "Please execute:\n$cmd\n";
    }
 }
 
@@ -838,10 +888,10 @@ sub submitRunCAHelper($$$$$) {
    my $options = shift @_;
    my $TAG = shift @_;
    my $submitSelf = shift @_;
-   my $holdPropagateCommand    = getGlobal("gridPropagateCommand");
-   my $holdOption	           = getGlobal("gridHoldOption");
-   my $syncOption              = getGlobal("gridSyncOption");
-   my $sge                     = getGlobal("sge");
+   my $holdPropagateCommand    = getGlobal("gridEnginePropagateCommand");
+   my $holdOption	           = getGlobal("gridEngineHoldOption");
+   my $syncOption              = getGlobal("gridEngineSyncOption");
+   my $grid                     = getGlobal("gridOptions");
 
    if (defined($holdPropagateCommand) && $holdPropagateCommand ne "") {
       # do nothing, we can use the hold option to propagate
@@ -876,10 +926,10 @@ sub submitRunPBcR($$$$) {
    my $asm = shift @_;
    my $options = shift @_;
    my $TAG = shift @_;
-   my $holdPropagateCommand    = getGlobal("gridPropagateCommand");
-   my $holdOption                  = getGlobal("gridHoldOption");
-   my $syncOption              = getGlobal("gridSyncOption");
-   my $sge                     = getGlobal("sge");
+   my $holdPropagateCommand    = getGlobal("gridEnginePropagateCommand");
+   my $holdOption                  = getGlobal("gridEngineHoldOption");
+   my $syncOption              = getGlobal("gridEngineSyncOption");
+   my $grid                     = getGlobal("gridOptions");
 
    if (defined($holdPropagateCommand) && $holdPropagateCommand ne "") {
       # do nothing, we can use the hold option to propagate
@@ -1053,11 +1103,11 @@ while (scalar(@cmdArgs) > 0) {
     } elsif ($arg eq "-partitions") {
        setGlobal("partitions", shift @cmdArgs);
     
-    } elsif ($arg eq "-sge") {
-       setGlobal("sge", shift @cmdArgs);
+    } elsif (($arg eq "-sge") || ($arg eq "-gridOptions")) {
+       setGlobal("gridOptions", shift @cmdArgs);
 
-    } elsif ($arg eq "-sgeCorrection") {
-       setGlobal("sgeCorrection", shift @cmdArgs);
+    } elsif (($arg eq "-sgeCorrection") || ($arg eq "-gridOptionsCorrection")) {
+       setGlobal("gridOptionsCorrection", shift @cmdArgs);
 
     } elsif ($arg eq "-sensitive") {
        setGlobal("sensitive", 1);
@@ -1091,7 +1141,7 @@ if (($err) || (!defined(getGlobal("fastqFile"))) || (!defined(getGlobal("specFil
 
     print STDERR "  -genomeSize	<int>          Specify the approximate genome size. This will be used to compute the maximum number of bases to correct\n";
     print STDERR "  -maxCoverage <int>           Maximum coverage of PacBio sequences to correct. Only the longest sequences adding up to this coverage will be corrected. Requires genomeSize to be specified. Defaults to 40X\n";
-    print STDERR " \"localStaging=<string>\"    Specify a local path (such as /scratch) to use for caching overlap computation. Will speed up grid-based computation by avoiding disk contention. Only use when running on a grid system (SGE or LSF), not a single machine\n";
+    print STDERR " \"localStaging=<string>\"    Specify a local path (such as /scratch) to use for caching overlap computation. Will speed up grid-based computation by avoiding disk contention. Only use when running on a grid system (SGE, PBS or LSF), not a single machine\n";
     print STDERR "\nAdvanced options (EXPERT):\n";
     print STDERR "  -maxGap <int>                The maximum uncorrected PacBio gap that will be allowed. When there is no short-read coverage for a region, by default the pipeline will split a PacBio sequence. This option will attempt to use other PacBio sequences to patch the gap and avoid splitting the read. Sequences where the gaps have no support will still be broken. For example, specifying 50, will mean any gap 50bp or smaller can have no short-read coverage (but has other PacBio sequence support) without splitting the PacBio sequence. Warning: this can allow more sequences that went through the SMRTbell to not be fixed.\n";
     print STDERR "  -coverageCutoff                Specify the pacBio coverage (integer) used to separate repeat copies instead of automatically estimating.\n";
@@ -1108,9 +1158,9 @@ if (($err) || (!defined(getGlobal("fastqFile"))) || (!defined(getGlobal("specFil
 }
 
 # get grid options
-my $submitCommand 	= getGlobal("gridSubmitCommand");
-my $nameOption 		= getGlobal("gridNameOption");
-my $outputOption 	= getGlobal("gridOutputOption");
+my $submitCommand 	= getGlobal("gridEngineSubmitCommand");
+my $nameOption 		= getGlobal("gridEngineNameOption");
+my $outputOption 	= getGlobal("gridEngineOutputOption");
 
 #check for valid parameters for requested partitions and threads
 my $limit = 1024;
@@ -1155,7 +1205,7 @@ my $MHAP_OVL = "$CA/../lib/java/mhap-$MHAP_VERSION.jar";
 my $JELLYFISH = "$CA/../../../jellyfish/bin/";
 my $wrk = makeAbsolute("");
 my $asm = "asm";
-my $scriptParams = getGlobal("sgeScript");
+my $scriptParams = getGlobal("gridOptionsScript");
 my $javaPath = "java";
 if (defined(getGlobal("javaPath"))) {
    $javaPath = getGlobal("javaPath") . "/java";
@@ -1165,8 +1215,8 @@ if (defined(getGlobal("pythonPath"))) {
    $pythonPath = getGlobal("pythonPath") . "/python";
 }
 if (defined($scriptParams)) {
-   if (!defined(getGlobal("sgeCorrection"))) {
-   	setGlobal("sgeCorrection", $scriptParams);
+   if (!defined(getGlobal("gridOptionsCorrection"))) {
+   	setGlobal("gridOptionsCorrection", $scriptParams);
    }
 }
 
@@ -1180,7 +1230,7 @@ my $useGrid = getGlobal("useGrid");
 if (defined($useGrid)) {
 	setGlobal("submitToGrid", $useGrid);
 }
-elsif (defined(getGlobal("sge"))) {
+elsif (defined(getGlobal("gridOptions"))) {
    setGlobal("submitToGrid", 1);
 }
 
@@ -1326,11 +1376,11 @@ my $threads = getGlobal("threads");
 my $partitions = getGlobal("partitions");
 
 my $submitToGrid = getGlobal("submitToGrid");
-my $sge = getGlobal("sge");
-my $sgeOvl = getGlobal("sgeOverlap");
-my $sgeCorrection = getGlobal("sgeCorrection");
-my $sgeConsensus = getGlobal("sgeConsensus");
-my $sgeTaskID = getGlobal("gridTaskID");
+my $grid = getGlobal("gridOptions");
+my $gridOvl = getGlobal("gridOptionsOverlap");
+my $gridCorrection = getGlobal("gridOptionsCorrection");
+my $gridConsensus = getGlobal("gridOptionsConsensus");
+my $gridTaskID = getGlobal("gridEngineTaskID");
 
 my $bankPath = getGlobal("bankPath");
 
@@ -1361,12 +1411,12 @@ $commandLineOptions = "-s $specFile $commandLineOptions @fragFiles";
 
 # and we're off
 submitScript($wrk, $asm, undef) if (!runningOnGrid());
-my $sgeName = (defined(getGlobal("sgeName")) ? "_" . getGlobal("sgeName") : "");
+my $gridName = (defined(getGlobal("gridJobName")) ? "_" . getGlobal("gridJobName") : "");
 if (! -d "$wrk/temp$libraryname/$asm.gkpStore") {
    $cmd = "$CA/runCA ";
    $cmd .= " -s $specFile -p $asm -d temp$libraryname ";
    $cmd .= " stopAfter=initialStoreBuilding ";
-   $cmd .= " sgeName=\"" . getGlobal("sgeName") . "\" " if defined(getGlobal("sgeName"));
+   $cmd .= " gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
    $cmd .= " @fragFiles $wrk/temp$libraryname/$libraryname.frg";
    runCommand($wrk, $cmd);
 }
@@ -1603,7 +1653,7 @@ if (!defined(getGlobal("bowtie")) && $cutoffSpecified == 0 && !(defined(getGloba
       $cmd .=    "obtHashLibrary=$minCorrectLib-$maxCorrectLib ";
       $cmd .=    "obtRefLibrary=$minCorrectLib-$maxCorrectLib ";
       $cmd .=    "obtCheckLibrary=0 ";
-      $cmd .=    "sgeName=\"" . getGlobal("sgeName") . "\" " if defined(getGlobal("sgeName"));
+      $cmd .=    "gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
       $cmd .=    "doOverlapBasedTrimming=0 stopAfter=meryl";
       runCommand($wrk, $cmd);
    }
@@ -1680,11 +1730,11 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
       $cmd .=    "obtHashLibrary=$minCorrectLib-$maxCorrectLib ";
       $cmd .=    "obtRefLibrary=$minCorrectLib-$maxCorrectLib ";
       $cmd .=    "obtCheckLibrary=0 ";
-      $cmd .=    "sgeName=\"" . getGlobal("sgeName") . "\" " if defined(getGlobal("sgeName"));
-      $cmd .=    "sgePropagateHold=\"pBcR_$asm$sgeName\" "; 
+      $cmd .=    "gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
+      $cmd .=    "gridPropagateHold=\"pBcR_$asm$gridName\" "; 
       $cmd .=    "stopAfter=overlapBasedTrimming";
       if ($submitToGrid == 1) {
-         submitRunCA("$wrk/temp$libraryname", $asm, $cmd, "runCA_obt_$asm$sgeName");
+         submitRunCA("$wrk/temp$libraryname", $asm, $cmd, "runCA_obt_$asm$gridName");
       } else {
          runCommand("$wrk/temp$libraryname", "$CA/runCA $cmd");
       }
@@ -1838,13 +1888,13 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
          print F "#!" . getGlobal("shell") ."\n";
          print F getBinDirectoryShellCode();
          print F "\n";
-         print F "jobid=\$$sgeTaskID\n";
+         print F "jobid=\$$gridTaskID\n";
          print F "if [ x\$jobid = x -o x\$jobid = xundefined -o x\$jobid = x0 ]; then\n";
          print F "jobid=\$1\n";
          print F "fi\n";
          print F "\n";
          print F "if test x\$jobid = x; then\n";
-         print F "  echo Error: I need $sgeTaskID set, or a job index on the command line\n";
+         print F "  echo Error: I need $gridTaskID set, or a job index on the command line\n";
          print F "  exit 1\n";
          print F "fi\n";
          print F "\n";
@@ -1855,10 +1905,10 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
          chmod 0755, "$wrk/temp$libraryname/1-overlapper/ovlpreplocal.sh";
 
          if ($submitToGrid == 1) {
-            my $sgeName = "pBcR_ovlpreplocal_$asm$sgeName";
-            my $jobName = getGridArrayName($sgeName, $numOvlJobs);
-            my $arrayOpt = getGridArrayOption($sgeName, $numOvlJobs);
-           submitBatchJobs($wrk, $asm, "$submitCommand $sge $sgeOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/ovlpreplocal.sh", $jobName);
+            my $gridName = "pBcR_ovlpreplocal_$asm$gridName";
+            my $jobName = getGridArrayName($gridName, $numOvlJobs);
+            my $arrayOpt = getGridArrayOption($gridName, $numOvlJobs);
+           submitBatchJobs($wrk, $asm, "$submitCommand $grid $gridOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/ovlpreplocal.sh", $jobName);
          } else {
             for (my $i = 1; $i <= $numOvlJobs; $i++) {
                schedulerSubmit("$wrk/temp$libraryname/1-overlapper/ovlpreplocal.sh $i");
@@ -2019,13 +2069,13 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
          print F "#!" . getGlobal("shell") ."\n";
          print F getBinDirectoryShellCode();
          print F "\n";
-         print F "jobid=\$$sgeTaskID\n";
+         print F "jobid=\$$gridTaskID\n";
          print F "if [ x\$jobid = x -o x\$jobid = xundefined -o x\$jobid = x0 ]; then\n";
          print F "jobid=\$1\n";
          print F "fi\n";
          print F "\n";
          print F "if test x\$jobid = x; then\n";
-         print F "  echo Error: I need $sgeTaskID set, or a job index on the command line\n";
+         print F "  echo Error: I need $gridTaskID set, or a job index on the command line\n";
          print F "  exit 1\n";
          print F "fi\n";
          print F "\n";
@@ -2072,10 +2122,10 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
          chmod 0755, "$wrk/temp$libraryname/1-overlapper/ovlprep.sh";
 
          if ($submitToGrid == 1) {
-            my $sgeName = "pBcR_ovlprep_$asm$sgeName";
-            my $jobName = getGridArrayName($sgeName, $numPrepJobs);
-            my $arrayOpt = getGridArrayOption($sgeName, $numPrepJobs);
-           submitBatchJobs($wrk, $asm, "$submitCommand $sge $sgeOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/ovlprep.sh", $jobName);
+            my $gridName = "pBcR_ovlprep_$asm$gridName";
+            my $jobName = getGridArrayName($gridName, $numPrepJobs);
+            my $arrayOpt = getGridArrayOption($gridName, $numPrepJobs);
+           submitBatchJobs($wrk, $asm, "$submitCommand $grid $gridOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/ovlprep.sh", $jobName);
          } else {
             for (my $i = 1; $i <= $numPrepJobs; $i++) {
                schedulerSubmit("$wrk/temp$libraryname/1-overlapper/ovlprep.sh $i");
@@ -2163,13 +2213,13 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
       print F "#!" . getGlobal("shell") ."\n";
       print F getBinDirectoryShellCode();
       print F "\n";
-      print F "jobid=\$$sgeTaskID\n";
+      print F "jobid=\$$gridTaskID\n";
       print F "if [ x\$jobid = x -o x\$jobid = xundefined -o x\$jobid = x0 ]; then\n";
       print F "jobid=\$1\n";
       print F "fi\n";
       print F "\n";
       print F "if test x\$jobid = x; then\n";
-      print F "  echo Error: I need $sgeTaskID set, or a job index on the command line\n";
+      print F "  echo Error: I need $gridTaskID set, or a job index on the command line\n";
       print F "  exit 1\n";
       print F "fi\n";
       print F "\n";
@@ -2330,10 +2380,10 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
       chmod 0755, "$wrk/temp$libraryname/1-overlapper/overlap.sh";
       
       if ($submitToGrid == 1) {
-          my $sgeName = "pBcR_ovl_$asm$sgeName";
-      	  my $jobName = getGridArrayName($sgeName, $numOvlJobs);
-      	  my $arrayOpt = getGridArrayOption($sgeName, $numOvlJobs);
-         submitBatchJobs($wrk, $asm, "$submitCommand $sge $sgeOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/overlap.sh", $jobName);
+          my $gridName = "pBcR_ovl_$asm$gridName";
+      	  my $jobName = getGridArrayName($gridName, $numOvlJobs);
+      	  my $arrayOpt = getGridArrayOption($gridName, $numOvlJobs);
+         submitBatchJobs($wrk, $asm, "$submitCommand $grid $gridOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/overlap.sh", $jobName);
       } else {
          for (my $i = 1; $i <= $numOvlJobs; $i++) {
             schedulerSubmit("$wrk/temp$libraryname/1-overlapper/overlap.sh $i");
@@ -2381,13 +2431,13 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
          print F "#!" . getGlobal("shell") ."\n";
          print F getBinDirectoryShellCode();
          print F "\n";
-         print F "jobid=\$$sgeTaskID\n";
+         print F "jobid=\$$gridTaskID\n";
          print F "if [ x\$jobid = x -o x\$jobid = xundefined -o x\$jobid = x0 ]; then\n";
          print F "jobid=\$1\n";
          print F "fi\n";
          print F "\n";
          print F "if test x\$jobid = x; then\n";
-         print F "  echo Error: I need $sgeTaskID set, or a job index on the command line\n";
+         print F "  echo Error: I need $gridTaskID set, or a job index on the command line\n";
          print F "  exit 1\n";
          print F "fi\n";
          print F "\n";
@@ -2398,10 +2448,10 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
          chmod 0755, "$wrk/temp$libraryname/1-overlapper/ovlclean.sh";
 
          if ($submitToGrid == 1) {
-            my $sgeName = "pBcR_ovlclean_$asm$sgeName";
-            my $jobName = getGridArrayName($sgeName, $numOvlJobs);
-            my $arrayOpt = getGridArrayOption($sgeName, $numOvlJobs);
-           submitBatchJobs($wrk, $asm, "$submitCommand $sge $sgeOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/ovlclean.sh", $jobName);
+            my $gridName = "pBcR_ovlclean_$asm$gridName";
+            my $jobName = getGridArrayName($gridName, $numOvlJobs);
+            my $arrayOpt = getGridArrayOption($gridName, $numOvlJobs);
+           submitBatchJobs($wrk, $asm, "$submitCommand $grid $gridOvl $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/1-overlapper/ovlclean.sh", $jobName);
          } else {
             for (my $i = 1; $i <= $numOvlJobs; $i++) {
                schedulerSubmit("$wrk/temp$libraryname/1-overlapper/ovlclean.sh $i");
@@ -2421,11 +2471,11 @@ if (! -d "$wrk/temp$libraryname/$asm.ovlStore") {
    $cmd .=    "obtHashLibrary=$minCorrectLib-$maxCorrectLib ";
    $cmd .=    "obtRefLibrary=$minCorrectLib-$maxCorrectLib ";
    $cmd .=    "obtCheckLibrary=0 ";
-   $cmd .=    "sgeName=\"" . getGlobal("sgeName") . "\" " if defined(getGlobal("sgeName"));
-   $cmd .=    "sgePropagateHold=\"pBcR_$asm$sgeName\" "; 
+   $cmd .=    "gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
+   $cmd .=    "gridPropagateHold=\"pBcR_$asm$gridName\" "; 
    $cmd .=    "stopAfter=overlapper";
    if ($submitToGrid == 1) {
-      submitRunCA("$wrk/temp$libraryname", $asm, $cmd, "runCA_ovl_$asm$sgeName");      
+      submitRunCA("$wrk/temp$libraryname", $asm, $cmd, "runCA_ovl_$asm$gridName");      
    } else {
       runCommand("$wrk/temp$libraryname", "$CA/runCA $cmd");
    }
@@ -2465,8 +2515,8 @@ if (! -e "$wrk/temp$libraryname/$asm.layout.success") {
    chmod 0755, "$wrk/temp$libraryname/runCorrection.sh";
 
    if ($submitToGrid == 1) {    
-      my $sgeName = "pBcR_correct_$asm$sgeName";
-      submitBatchJobs("$wrk/temp$libraryname", $asm, "$submitCommand $sge $sgeCorrection $nameOption \"$sgeName\" $outputOption /dev/null $wrk/temp$libraryname/runCorrection.sh", $sgeName);
+      my $gridName = "pBcR_correct_$asm$gridName";
+      submitBatchJobs("$wrk/temp$libraryname", $asm, "$submitCommand $grid $gridCorrection $nameOption \"$gridName\" $outputOption /dev/null $wrk/temp$libraryname/runCorrection.sh", $gridName);
    } else {
       runCommand("$wrk/temp$libraryname", "$wrk/temp$libraryname/runCorrection.sh");
    }
@@ -2513,13 +2563,13 @@ if (! -e "$wrk/temp$libraryname/runPartition.sh") {
    print F "#!" . getGlobal("shell") ."\n";
    print F getBinDirectoryShellCode();
    print F "\n";
-   print F "jobid=\$$sgeTaskID\n";
+   print F "jobid=\$$gridTaskID\n";
    print F "if [ x\$jobid = x -o x\$jobid = xundefined -o x\$jobid = x0 ]; then\n";
    print F "jobid=\$1\n";
    print F "fi\n";
    print F "\n";
    print F "if test x\$jobid = x; then\n";
-   print F "  echo Error: I need $sgeTaskID set, or a job index on the command line\n";
+   print F "  echo Error: I need $gridTaskID set, or a job index on the command line\n";
    print F "  exit 1\n";
    print F "fi\n";
    print F "\n";
@@ -2653,10 +2703,10 @@ if (! -e "$wrk/temp$libraryname/runPartition.sh") {
    chmod 0755, "$wrk/temp$libraryname/runPartition.sh";
 
    if ($submitToGrid == 1) {
-      my $sgeName = "pBcR_cns_$asm$sgeName";
-   	  my $jobName = getGridArrayName($sgeName, $partitions);
-   	  my $arrayOpt = getGridArrayOption($sgeName, $partitions);
-      submitBatchJobs("$wrk/temp$libraryname", $asm, "$submitCommand $sge $sgeConsensus $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/runPartition.sh", $jobName);
+      my $gridName = "pBcR_cns_$asm$gridName";
+   	  my $jobName = getGridArrayName($gridName, $partitions);
+   	  my $arrayOpt = getGridArrayOption($gridName, $partitions);
+      submitBatchJobs("$wrk/temp$libraryname", $asm, "$submitCommand $grid $gridConsensus $nameOption \"$jobName\" $arrayOpt $outputOption /dev/null $wrk/temp$libraryname/runPartition.sh", $jobName);
    } else {
       for (my $i = 1; $i <=$partitions; $i++) {
          schedulerSubmit("$wrk/temp$libraryname/runPartition.sh $i");
@@ -2859,8 +2909,8 @@ if (defined(getGlobal("assemble")) && getGlobal("assemble") == 1) {
      $cmd .=    "utgGraphErrorLimit=" . getGlobal("utgGraphErrorLimit") . " utgGraphErrorRate=" . getGlobal("utgGraphErrorRate") . " utgMergeErrorLimit=" . getGlobal("utgMergeErrorLimit") . " utgMergeErrorRate=" . getGlobal("utgMergeErrorRate") . " ";
      $cmd .=    "frgCorrBatchSize=100000 doOverlapBasedTrimming=" . getGlobal("asmOBT") . " obtErrorRate=" . getGlobal("asmObtErrorRate") . " obtErrorLimit=" . getGlobal("asmObtErrorLimit") . " frgMinLen=$frgLen ovlMinLen=$ovlLen \"batOptions=$batOptions\" ";
      $cmd .=    "consensus=" . getGlobal("asmCns") . " merSize=" . getGlobal("asmMerSize") . " cnsMaxCoverage=1 cnsReuseUnitigs=1 ";
-     $cmd .=    "sgeName=\"" . getGlobal("sgeName") . "\" " if defined(getGlobal("sgeName"));
-     $cmd .=    "sgePropagateHold=\"pBcR_$asm$sgeName\" ";
+     $cmd .=    "gridName=\"" . getGlobal("gridJobName") . "\" " if defined(getGlobal("gridJobName"));
+     $cmd .=    "gridPropagateHold=\"pBcR_$asm$gridName\" ";
      $cmd .=    " $libraryname.longest$asmCoverage.frg ";
 
      # don't assemble if we don't have enough data
@@ -2871,7 +2921,7 @@ if (defined(getGlobal("assemble")) && getGlobal("assemble") == 1) {
         print STDERR "\n\n";
      } else {
         if ($submitToGrid == 1) {
-           submitRunCAHelper("$wrk", $asm, $cmd, "runCA_asm_$asm$sgeName", 0);
+           submitRunCAHelper("$wrk", $asm, $cmd, "runCA_asm_$asm$gridName", 0);
         } else {
            runCommand("$wrk", "$CA/runCA $cmd");
         }
