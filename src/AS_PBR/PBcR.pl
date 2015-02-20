@@ -1275,8 +1275,12 @@ if (! -e "$BLASR/blasr" || ! -e "$BLASR/sawriter") {
    # check for consensus too
    # make sure we have the pb consensus module available if it was requested
    if (! -e "$BLASR/blasr" || ! -e "$BLASR/pbdagcon") {
-      print STDERR "Warning: requested PBDAGON but either BLASR or pbdagcon executables were not found.\n";
-      setGlobal("pbcns", 0);
+      if (! -e "$CA/blasr" || ! -e "$CA/pbdagcon") {
+         print STDERR "Warning: requested PBDAGON but either BLASR or pbdagcon executables were not found.\n";
+         setGlobal("pbcns", 0);
+      } else {
+         $BLASR=$CA;
+      }
    }
 }
 
@@ -1633,7 +1637,7 @@ if (defined($longReads) && $longReads == 1) {
   }
 } else {
    # always default to blasr alignments when available
-   if (-e "$BLASR/blasr") {
+   if (-e "$BLASR/blasr" && -e "$BLASR/sawriter") {
       setGlobal("blasr", defined(getGlobal("blasr")) ? getGlobal("blasr") : "-noRefineAlign -advanceHalf -noSplitSubreads -minMatch 10 -minPctIdentity 70");
    }
    setGlobal("falconcns", 0);
