@@ -94,7 +94,7 @@ ifdef SAMTOOLS
    CXX_PROGS += convertSamToCA
 endif
 
-SCRIPTS     = PBcR convertToPBCNS addCNSToStore mhap falcon_sense pbutgcns jellyfish
+SCRIPTS     = PBcR convertToPBCNS addCNSToStore mhap falcon_sense blasr pbutgcns pbdagcon jellyfish
 
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
@@ -166,26 +166,33 @@ falcon_sense.$(LOCAL_NAME).bin:
 	@touch falcon_sense.$(LOCAL_NAME).bin
 
 falcon_sense: falcon_sense.$(LOCAL_NAME).bin
-	@cp $< $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	@test -s $< && @cp $< $(LOCAL_BIN)/$@ && @chmod 775 $(LOCAL_BIN)/$@ || echo "falcon_sense not found for $(LOCAL_NAME), not installing. Please add to your path if available."
+
+pbdagcon.$(LOCAL_NAME).bin:
+	@touch pbdagcon.$(LOCAL_NAME).bin
+
+pbdagcon: pbdagcon.$(LOCAL_NAME).bin
+	@test -s $< && @cp $< $(LOCAL_BIN)/$@ && @chmod 775 $(LOCAL_BIN)/$@ || echo "pbdagcon not found for $(LOCAL_NAME), not installing. Please add to your path if available."
+
+blasr.$(LOCAL_NAME).bin:
+	@touch blasr.$(LOCAL_NAME).bin
+
+blasr: blasr.$(LOCAL_NAME).bin
+	@test -s $< && @cp $< $(LOCAL_BIN)/$@ && @chmod 775 $(LOCAL_BIN)/$@ || echo "blasr not found for $(LOCAL_NAME), not installing. Please add to your path if available."
 
 pbutgcns.$(LOCAL_NAME).bin:
 	@touch pbutgcns.$(LOCAL_NAME).bin
 
 pbutgcns: pbutgcns.$(LOCAL_NAME).bin
-	@cp $< $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	@test -s $< && @cp $< $(LOCAL_BIN)/$@ && @chmod 775 $(LOCAL_BIN)/$@ || echo "pbutgcns not found for $(LOCAL_NAME), not installing. Please add to your path if available."
 
 jellyfish.$(LOCAL_NAME).bin:
 	@touch jellyfish.$(LOCAL_NAME).bin
 
 ifeq ($(OSTYPE), Darwin)
 jellyfish: jellyfish.$(LOCAL_NAME).bin
-	@cp $< $(LOCAL_BIN)/$@
-	@cp *dylib $(LOCAL_LIB)/
-	@chmod 775 $(LOCAL_BIN)/$@
+	@test -s $< && @cp $< $(LOCAL_BIN)/$@ && @cp *dylib $(LOCAL_LIB)/ && @chmod 775 $(LOCAL_BIN)/$@ || echo "jellyfish not found for $(LOCAL_NAME). Please add to your path if available."
 else
 jellyfish: jellyfish.$(LOCAL_NAME).bin
-	@cp $< $(LOCAL_BIN)/$@
-	@chmod 775 $(LOCAL_BIN)/$@
+	@test -s $< && @cp $< $(LOCAL_BIN)/$@ && @chmod 775 $(LOCAL_BIN)/$@ || echo "jellyfish not found for $(LOCAL_NAME). Please add to your path if available."
 endif
