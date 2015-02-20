@@ -1269,7 +1269,13 @@ if (! -e "$BLASR/blasr" || ! -e "$BLASR/sawriter") {
    }
    # if we really can't find it just give up
    if (! -e "$BLASR/blasr" || ! -e "$BLASR/sawriter") {
-      die "BLASR binaries: blasr not found in $ENV{PATH}. Please download it from http://pacificbiosciences.github.com/DevNet/ and add it to your path.\n" if (defined(getGlobal("blasr")) || (defined(getGlobal("longReads")) && getGlobal("longReads") == 1 && ! -e $MHAP_OVL));
+       if (defined(getGlobal("blasr")) || (defined(getGlobal("longReads")) && getGlobal("longReads") == 1 && ! -e $MHAP_OVL)) {
+           my $msg = "\n";
+           $msg   .= "One or both of blasr and sawriter were not found in your path.\n";
+           $msg   .= "Please download from http://pacificbiosciences.github.com/DevNet/ and add to your path.\n";
+           $msg   .= "PATH=$ENV{PATH}\n";
+           die $msg;
+       }
    }
 
    # check for consensus too
@@ -1326,7 +1332,13 @@ if (! -e "$AMOS/bank-transact" && (!defined(getGlobal("pbcns")) || getGlobal("pb
    }
    # if we really can't find it just give up
    if (! -e "$AMOS/bank-transact") {
-      die "AMOS binaries: bank-transact not found in $ENV{PATH}. Please download it from http://amos.sf.net and add it to your path.\n" if (! -e "$BLASR/pbdagcon" && ! -e "$FALCON/falcon_sense");
+       if (! -e "$BLASR/pbdagcon" && ! -e "$FALCON/falcon_sense") {
+           my $msg = "\n";
+           $msg   .= "bank-transact not found in your path.\n";
+           $msg   .= "Please download from http://amos.sf.net and add it to your path.\n";
+           $msg   .= "PATH=$ENV{PATH}\n";
+           die $msg;
+       }
    }
 }
 
