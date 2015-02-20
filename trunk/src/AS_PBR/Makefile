@@ -59,17 +59,9 @@ ifeq ($(MACHINETYPE), Power Macintosh)
   MACHINETYPE = ppc
 endif
 
-ifneq "$(origin SAMTOOLS)" "environment"
-   ifeq ($(shell ls -d $(LOCAL_WORK)/samtools 2> /dev/null), $(LOCAL_WORK)/samtools)
-      SAMTOOLS = $(LOCAL_WORK)/samtools/
-   endif
-endif
+LOCAL_NAME=$(OSTYPE)-$(MACHINETYPE)
 
-PBR_SOURCES = OutputLayout.cc TrimFastqByQVWindow.cc CorrectPacBio.cc AS_PBR_dumpStore.cc
-ifdef SAMTOOLS
-   PBR_SOURCES += ConvertSamToCA.cc 
-   INC_IMPORT_DIRS += $(SAMTOOLS)
-endif
+PBR_SOURCES = OutputLayout.cc TrimFastqByQVWindow.cc CorrectPacBio.cc AS_PBR_dumpStore.cc ConvertSamToCA.cc bamcat.c
 
 PBR_OBJECTS = $(PBR_SOURCES:.cc=.o)
 
@@ -87,14 +79,41 @@ OBJECTS     = $(PBR_OBJECTS) $(PBR_LIB_OBJECTS)
 
 LIBRARIES     = libAS_PBR.a libCA.a
 LIBS          = libCA.a
-SAM_LIBS      = $(LIBS) libbam.a
 
-CXX_PROGS = outputLayout trimFastqByQVWindow correctPacBio dumpPBRLayoutStore
-ifdef SAMTOOLS
-   CXX_PROGS += convertSamToCA
+CXX_PROGS = outputLayout trimFastqByQVWindow correctPacBio dumpPBRLayoutStore convertSamToCA
+
+SCRIPTS     = PBcR convertToPBCNS addCNSToStore mhap
+
+ifneq ($(wildcard falcon_sense.$(LOCAL_NAME).bin),)
+  SCRIPTS += falcon_sense
+else
+  SCRIPTS += falcon_sense_missing
 endif
 
-SCRIPTS     = PBcR convertToPBCNS addCNSToStore mhap falcon_sense blasr pbutgcns pbdagcon jellyfish
+ifneq ($(wildcard blasr.$(LOCAL_NAME).bin),)
+  SCRIPTS += blasr
+else
+  SCRIPTS += blasr_missing
+endif
+
+ifneq ($(wildcard pbutgcns.$(LOCAL_NAME).bin),)
+  SCRIPTS += pbutgcns
+else
+  SCRIPTS += pbutgcns_missing
+endif
+
+ifneq ($(wildcard pbdagcon.$(LOCAL_NAME).bin),)
+  SCRIPTS += pbdagcon
+else
+  SCRIPTS += pbdagcon_missing
+endif
+
+ifneq ($(wildcard jellyfish.$(LOCAL_NAME).bin),)
+  SCRIPTS += jellyfish
+else
+  SCRIPTS += jellyfish_missing
+endif
+
 
 # Include for AS project rules
 include $(LOCAL_WORK)/src/c_make.as
@@ -127,16 +146,11 @@ libAS_PBR.a: $(PBR_LIB_OBJECTS)
 
 libCA.a: $(PBR_LIB_OBJECTS)
 
-libbam.a:
-	$(MAKE) -C $(SAMTOOLS)/
-	@cp $(SAMTOOLS)/$@ $(LOCAL_LIB)/$@
-
-
 outputLayout:    OutputLayout.o $(LIBS)
 
 trimFastqByQVWindow:	TrimFastqByQVWindow.o $(LIBS)
 
-convertSamToCA:		ConvertSamToCA.o $(SAM_LIBS)
+convertSamToCA:		ConvertSamToCA.o bamcat.o $(LIBS)
 
 correctPacBio:	   CorrectPacBio.o $(LIBS)
 
@@ -160,39 +174,52 @@ addCNSToStore: addCNSToStore.pl
 
 #  This is _ALWAYS_ unpacked, regardless of up-to-dateness.
 mhap: mhap.tar.gz
-	@tar xvzf $< -C $(LOCAL_LIB)/
+	@tar xzf $< -C $(LOCAL_LIB)/
 
-falcon_sense.$(LOCAL_NAME).bin:
-	@touch falcon_sense.$(LOCAL_NAME).bin
 
 falcon_sense: falcon_sense.$(LOCAL_NAME).bin
-	@test -s $< && cp $< $(LOCAL_BIN)/$@ && chmod 775 $(LOCAL_BIN)/$@ || echo "falcon_sense not found for $(LOCAL_NAME), not installing. Please add to your path if available."
-
-pbdagcon.$(LOCAL_NAME).bin:
-	@touch pbdagcon.$(LOCAL_NAME).bin
+	cp $< $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 pbdagcon: pbdagcon.$(LOCAL_NAME).bin
-	@test -s $< && cp $< $(LOCAL_BIN)/$@ && chmod 775 $(LOCAL_BIN)/$@ || echo "pbdagcon not found for $(LOCAL_NAME), not installing. Please add to your path if available."
-
-blasr.$(LOCAL_NAME).bin:
-	@touch blasr.$(LOCAL_NAME).bin
+	cp $< $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 blasr: blasr.$(LOCAL_NAME).bin
-	@test -s $< && cp $< $(LOCAL_BIN)/$@ && chmod 775 $(LOCAL_BIN)/$@ || echo "blasr not found for $(LOCAL_NAME), not installing. Please add to your path if available."
-
-pbutgcns.$(LOCAL_NAME).bin:
-	@touch pbutgcns.$(LOCAL_NAME).bin
+	cp $< $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 pbutgcns: pbutgcns.$(LOCAL_NAME).bin
-	@test -s $< && cp $< $(LOCAL_BIN)/$@ && chmod 775 $(LOCAL_BIN)/$@ || echo "pbutgcns not found for $(LOCAL_NAME), not installing. Please add to your path if available."
-
-jellyfish.$(LOCAL_NAME).bin:
-	@touch jellyfish.$(LOCAL_NAME).bin
+	cp $< $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
 
 ifeq ($(OSTYPE), Darwin)
+
 jellyfish: jellyfish.$(LOCAL_NAME).bin
-	@test -s $< && cp $< $(LOCAL_BIN)/$@ && cp *dylib $(LOCAL_LIB)/ && chmod 775 $(LOCAL_BIN)/$@ || echo "jellyfish not found for $(LOCAL_NAME). Please add to your path if available."
+	cp $< $(LOCAL_BIN)/$@
+	cp *dylib $(LOCAL_LIB)/
+	chmod 775 $(LOCAL_BIN)/$@
+
 else
+
 jellyfish: jellyfish.$(LOCAL_NAME).bin
-	@test -s $< && cp $< $(LOCAL_BIN)/$@ && chmod 775 $(LOCAL_BIN)/$@ || echo "jellyfish not found for $(LOCAL_NAME). Please add to your path if available."
+	cp $< $(LOCAL_BIN)/$@
+	chmod 775 $(LOCAL_BIN)/$@
+
 endif
+
+
+falcon_sense_missing:
+	@echo "!!!!!!! WARNING falcon_sense not supplied for $(LOCAL_NAME).  Please add to your PATH if installed."
+
+pbdagcon_missing:
+	@echo "!!!!!!! WARNING pbdagcon     not supplied for $(LOCAL_NAME).  Please add to your PATH if installed."
+
+blasr_missing:
+	@echo "!!!!!!! WARNING blasr        not supplied for $(LOCAL_NAME).  Please add to your PATH if installed."
+
+pbutgcns_missing:
+	@echo "!!!!!!! WARNING pbutgcns     not supplied for $(LOCAL_NAME).  Please add to your PATH if installed."
+
+jellyfish_missing:
+	@echo "!!!!!!! WARNING jellyfish    not supplied for $(LOCAL_NAME).  Please add to your PATH if installed."

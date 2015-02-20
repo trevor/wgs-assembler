@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "sam.h"
+#include "bamcat.h"
 using namespace std;
 
 /**
