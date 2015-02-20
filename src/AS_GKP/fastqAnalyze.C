@@ -92,10 +92,10 @@ doStats(char *inName,
   vector<uint32>   seqLen;
   nucFreq         *freq = new nucFreq;
 
-  char   A[MAX_READ_LEN];
-  char   B[MAX_READ_LEN];
-  char   C[MAX_READ_LEN];
-  char   D[MAX_READ_LEN];
+  char   *A = new char [MAX_READ_LEN];
+  char   *B = new char [MAX_READ_LEN];
+  char   *C = new char [MAX_READ_LEN];
+  char   *D = new char [MAX_READ_LEN];
 
   errno = 0;
   FILE *F = fopen(inName, "r");
@@ -151,6 +151,14 @@ doStats(char *inName,
     if ((totSeqs % 10000) == 0)
       fprintf(stderr, "Reading "F_U64"\r", totSeqs);
   }
+
+  delete [] A;
+  delete [] B;
+  delete [] C;
+  delete [] D;
+
+  //fclose(O);
+  fclose(F);
 
   fprintf(stderr, "Read    "F_U64"\n", totSeqs);
 
@@ -230,9 +238,6 @@ doStats(char *inName,
     fprintf(stdout, "%s\t"F_U64"\t%.4f%%\n", output[ii].label, output[ii].count, output[ii].freq);
   output.clear();
 
-  //fclose(O);
-  fclose(F);
-
   delete freq;
 }
 
@@ -252,10 +257,10 @@ doAnalyzeQV(char *inName,
   uint32 numValid  = 5;
   uint32 numTrials = 100000;
 
-  char   A[MAX_READ_LEN];
-  char   B[MAX_READ_LEN];
-  char   C[MAX_READ_LEN];
-  char   D[MAX_READ_LEN];
+  char   *A = new char [MAX_READ_LEN];
+  char   *B = new char [MAX_READ_LEN];
+  char   *C = new char [MAX_READ_LEN];
+  char   *D = new char [MAX_READ_LEN];
 
   errno = 0;
   FILE *F = fopen(inName, "r");
@@ -315,6 +320,11 @@ doAnalyzeQV(char *inName,
 
   fclose(F);
 
+  delete [] A;
+  delete [] B;
+  delete [] C;
+  delete [] D;
+
   fprintf(stdout, "%s --", inName);
 
   if (isNotSanger    == false)  fprintf(stdout, " SANGER");
@@ -357,10 +367,10 @@ doTransformQV(char *inName,
 
   uint32 numValid = 0;
 
-  char   A[MAX_READ_LEN];
-  char   B[MAX_READ_LEN];
-  char   C[MAX_READ_LEN];
-  char   D[MAX_READ_LEN];
+  char   *A = new char [MAX_READ_LEN];
+  char   *B = new char [MAX_READ_LEN];
+  char   *C = new char [MAX_READ_LEN];
+  char   *D = new char [MAX_READ_LEN];
 
   if (originalIsSolexa    == true)  numValid++;
   if (originalIsIllumina  == true)  numValid++;
@@ -411,6 +421,11 @@ doTransformQV(char *inName,
 
     fprintf(O, "%s%s%s%s\n", A, B, C, D);
   }
+
+  delete [] A;
+  delete [] B;
+  delete [] C;
+  delete [] D;
 
   fclose(F);
   fclose(O);
