@@ -1600,8 +1600,10 @@ if (defined($longReads) && $longReads == 1) {
    my $merSize = getGlobal("merSize");
 
    if (defined(getGlobal("sensitive")) && getGlobal("sensitive") == 1){
-      setGlobal("falconcns", 0);
-      setGlobal("pbcns", 1);
+      if ( -e "$BLASR/blasr" && ! -e "$BLASR/pbdagcon") {
+         setGlobal("falconcns", 0);
+         setGlobal("pbcns", 1);
+      }
       setGlobal("mhap", "--weighted -k $merSize --num-hashes 768 --num-min-matches 2 --threshold 0.04 --filter-threshold 0.000005");
    }
    if ( -e $MHAP_OVL && !defined(getGlobal("blasr"))) {
