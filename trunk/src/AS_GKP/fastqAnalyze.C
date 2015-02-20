@@ -42,7 +42,7 @@ char     indexToBase[8];
 #define  FREQ_Z    6  //  Everything else
 #define  FREQ_NUM  7
 
-#define  MAX_READ_LEN   10240
+#define  MAX_READ_LEN   AS_READ_MAX_NORMAL_LEN+1
 
 class nucFreq {
 public:
