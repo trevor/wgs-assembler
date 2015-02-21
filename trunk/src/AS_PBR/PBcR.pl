@@ -1600,7 +1600,7 @@ if (defined($longReads) && $longReads == 1) {
    my $merSize = getGlobal("merSize");
 
    if (defined(getGlobal("sensitive")) && getGlobal("sensitive") == 1){
-      if ( -e "$BLASR/blasr" && ! -e "$BLASR/pbdagcon") {
+      if ( -e "$BLASR/blasr" && -e "$BLASR/pbdagcon") {
          setGlobal("falconcns", 0);
          setGlobal("pbcns", 1);
       }
