@@ -168,7 +168,7 @@ Set_Right_Delta (int e, int d, Work_Area_t * WA) {
 uint32  EDIT_SPACE_SIZE  = 16 * 1024 * 1024;
 
 static
-int *
+void
 Allocate_More_Edit_Space(Work_Area_t *WA) {
 
   //  Determine the last allocated block, and the last assigned block
@@ -207,7 +207,8 @@ Allocate_More_Edit_Space(Work_Area_t *WA) {
 
   e = b;
 
-  while (Offset + Del < Size) {
+  while ((Offset + Del < Size) &&
+         (e < MAX_ERRORS)) {
     WA->Edit_Array_Lazy[e++] = WA->Edit_Space_Lazy[a] + Offset;
 
     Offset += Del;
