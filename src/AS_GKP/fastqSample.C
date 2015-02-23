@@ -106,7 +106,7 @@ public:
   };
 
   bool operator<(const anInput &that) const {
-    return(this->len < that.len);
+    return(len > that.len);
   };
 
 
@@ -374,7 +374,7 @@ main(int argc, char **argv) {
 
   if (LONGEST) {
     fprintf(stderr, "Sorting by length\n");
-    sort(ids.end(), ids.begin());
+    sort(ids.begin(), ids.end());
 
   } else {
     fprintf(stderr, "Shuffling sequences\n");
